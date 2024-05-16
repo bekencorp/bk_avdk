@@ -1,0 +1,9 @@
+menu "Display Service"
+
+	config MEDIA_DISPLAY_SERVICE
+		depends on SYS_CPU1
+		bool "Enable Display Service"
+		default y
+		help
+
+endmenu
