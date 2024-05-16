@@ -16,7 +16,7 @@ SoC is already supported.
 
 
 |Branch\Chip   |      [BK7258]          |      Comment            |
-|main          |                        |                         |
+|:------------ |:-----------------:     |:----------------------: |
 |release/v2.0.1|![alt text][supported]  |sdk 2.0 MP Branch        |
 
 
