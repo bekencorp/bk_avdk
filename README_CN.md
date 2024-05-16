@@ -35,9 +35,6 @@ release/xxxx分支，格式为vx.x.x.x，例如：v2.0.1.19
 |OS           |        main           |
 |:----------- |:---------------------: |
 |FreeRTOS     | ![alt text][支持]       |
-|LiteOS       | ![alt text][支持]      |
-|RT-Thread    | ![alt text][开发中]      |
-|AliOS        | ![alt text][开发中]      |
 
 [支持]: https://img.shields.io/badge/-supported-green "支持"
 [开发中]: https://img.shields.io/badge/-developing-orange "开发中"
