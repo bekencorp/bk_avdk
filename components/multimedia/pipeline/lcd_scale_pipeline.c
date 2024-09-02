@@ -44,11 +44,33 @@
 
 
 #ifdef SCALE_DIAG_DEBUG
-#define HW_SCALE_START()			do { GPIO_UP(GPIO_DVP_D5); } while (0)
-#define HW_SCALE_END()				do { GPIO_DOWN(GPIO_DVP_D5); } while (0)
+#define HW_SCALE_FRAME_START()			do { GPIO_UP(GPIO_DVP_D5); } while (0)
+#define HW_SCALE_FRAME_END()				do { GPIO_DOWN(GPIO_DVP_D5); } while (0)
+
+#define HW_SCALE_SRC_START()			do { GPIO_UP(GPIO_DVP_D6); } while (0)
+#define HW_SCALE_SRC_END()				do { GPIO_DOWN(GPIO_DVP_D6); } while (0)
+
+#define HW_SCALE_DST_START()			do { GPIO_UP(GPIO_DVP_D7); } while (0)
+#define HW_SCALE_DST_END()				do { GPIO_DOWN(GPIO_DVP_D7); } while (0)
+
+#define ROTATE_SCALE_NOTIFY() \
+do{ 			   \
+	GPIO_DOWN(GPIO_DVP_VSYNC);  \
+	GPIO_UP(GPIO_DVP_VSYNC);    \
+	GPIO_DOWN(GPIO_DVP_VSYNC);  \
+				   \
+}while(0)
+
 #else
-#define HW_SCALE_START()
-#define HW_SCALE_END()
+#define HW_SCALE_FRAME_START()
+#define HW_SCALE_FRAME_END()
+
+#define HW_SCALE_SRC_START()
+#define HW_SCALE_SRC_END()
+#define HW_SCALE_DST_START()
+#define HW_SCALE_DST_END()
+
+#define ROTATE_SCALE_NOTIFY()
 #endif
 
 
@@ -73,6 +95,7 @@ typedef enum
 typedef enum {
 	BUF_IDLE = 0,
 	BUF_SCALING = 1,
+	BUF_ROTATEING = 2,
 }buf_status_t;
 
 
@@ -117,6 +140,7 @@ typedef struct {
 	LIST_HEADER_T request_list;
 
 	uint16_t line_count;
+    mux_callback_t reset_cb;
 
 } scale_config_t;
 
@@ -160,14 +184,14 @@ bk_err_t scale_task_send_msg(uint8_t type, uint32_t param)
 
 static void scale0_complete_cb(void *param)
 {
-    HW_SCALE_END();
-    scale_task_send_msg(SCALE_FINISH, (uint32_t)scale_config->scale_frame);
+    HW_SCALE_FRAME_END();
+//    scale_task_send_msg(SCALE_FINISH, (uint32_t)scale_config->scale_frame);
 }
 
 static void scale_timer_handle(void *arg1, void *arg2)
 {
-	LOGI("%s, timeout\n", __func__);
-	decoder_mux_dump();
+    LOGW("%s %d  timeout %d [%d %d] [%d %d]\n", __func__, __LINE__,scale_config->line_count, scale_config->scale_buffer[0].index,scale_config->scale_buffer[0].state, scale_config->scale_buffer[1].index,scale_config->scale_buffer[1].state);
+    scale_task_send_msg(SCALE_RESET, 1);
 }
 
 
@@ -300,7 +324,7 @@ bk_err_t lcd_scale_start(uint32_t param)
         LOGE("scale frame malloc fail\n");
         goto error;
     }
-    HW_SCALE_START();
+    HW_SCALE_FRAME_START();
 
     LOGD("%s, src %p, dst %p\n", __func__, scale_src_frame->frame, scale_config->scale_frame->frame);
     scale_config->scale_src_frame = scale_src_frame;
@@ -343,6 +367,13 @@ error:
 
 void scale_frame_complete(scale_result_t *src, scale_result_t *dst, scale_block_t *src_block, scale_block_t *dst_block)
 {
+    HW_SCALE_FRAME_END();
+    HW_SCALE_SRC_END();
+    HW_SCALE_DST_END();
+    if (rtos_is_oneshot_timer_running(&scale_config->scale_timer))
+    {
+        rtos_stop_oneshot_timer(&scale_config->scale_timer);
+    }
 	scale_param_t *scale_param = &scale_config->scale_param;
 
 #if SCALE_DEBUG_LOG
@@ -356,17 +387,18 @@ void scale_frame_complete(scale_result_t *src, scale_result_t *dst, scale_block_
 	os_memcpy(&scale_param->src_result, src, sizeof(scale_result_t));
 	os_memcpy(&scale_param->dst_result, dst, sizeof(scale_result_t));
 
-	scale_config->state = SCALE_STATE_FRAME_COMPLETE;
-
 	scale_task_send_msg(SCALE_LINE_SOURCE_FREE, (uint32_t)src_block->args);
 	scale_task_send_msg(SCALE_LINE_DEST_FREE, (uint32_t)dst_block->args);
 
+	scale_config->state = SCALE_STATE_FRAME_COMPLETE;
 	scale_task_send_msg(SCALE_LINE_START_LOOP, 0);
 
 }
 
 void scale_frame_source_block_complete(scale_result_t *result, scale_block_t *block)
 {
+    HW_SCALE_SRC_END();
+
 	scale_param_t *scale_param = &scale_config->scale_param;
 
 #if SCALE_DEBUG_LOG
@@ -378,14 +410,16 @@ void scale_frame_source_block_complete(scale_result_t *result, scale_block_t *bl
 #endif
 
 	os_memcpy(&scale_param->src_result, result, sizeof(scale_result_t));
-
-	scale_config->state = SCALE_STATE_SOURCE_COMPLETE;
 	scale_task_send_msg(SCALE_LINE_SOURCE_FREE, (uint32_t)block->args);
-	scale_task_send_msg(SCALE_LINE_START_LOOP, 0);
 }
 
 void scale_frame_dest_block_complete(scale_result_t *result, scale_block_t *block)
 {
+    HW_SCALE_DST_END();
+    if (rtos_is_oneshot_timer_running(&scale_config->scale_timer))
+    {
+        rtos_stop_oneshot_timer(&scale_config->scale_timer);
+    }
 	scale_param_t *scale_param = &scale_config->scale_param;
 
 #if SCALE_DEBUG_LOG
@@ -395,12 +429,8 @@ void scale_frame_dest_block_complete(scale_result_t *result, scale_block_t *bloc
 		result->current_block_line,
 		result->next_block_line);
 #endif
-
 	os_memcpy(&scale_param->dst_result, result, sizeof(scale_result_t));
-
-	scale_config->state = SCALE_STATE_DEST_COMPLETE;
 	scale_task_send_msg(SCALE_LINE_DEST_FREE, (uint32_t)block->args);
-	scale_task_send_msg(SCALE_LINE_START_LOOP, 0);
 }
 
 void scale_block_result( scale_block_t *src_block, scale_block_t *dst_block)
@@ -412,6 +442,8 @@ void scale_block_result( scale_block_t *src_block, scale_block_t *dst_block)
 
 bk_err_t scale_rotate_line_request_callback(void *param)
 {
+    ROTATE_SCALE_NOTIFY();
+
 	scale_task_send_msg(SCALE_LINE_SCALE_COMPLETE, (uint32_t)param);
 	return BK_OK;
 }
@@ -423,6 +455,13 @@ bk_err_t lcd_scale_line_fill_start(complex_buffer_t *decoder_buffer, complex_buf
 
 	scale_buffer->state = BUF_SCALING;
 
+    HW_SCALE_FRAME_START();
+    HW_SCALE_SRC_START();
+    HW_SCALE_DST_START();
+	if (!rtos_is_oneshot_timer_running(&scale_config->scale_timer))
+	{
+		rtos_start_oneshot_timer(&scale_config->scale_timer);
+	}
 	if (decoder_buffer->index == 1)
 	{
 		scale_param_t *scale_param = &scale_config->scale_param;
@@ -479,7 +518,7 @@ bk_err_t lcd_scale_line_fill_start(complex_buffer_t *decoder_buffer, complex_buf
 	}
 	else
 	{
-		LOGW("%s should not be here. decoder_buffer->index=%d\n", __func__, decoder_buffer->index);
+		LOGD("%s should not be here. decoder_buffer->index=%d\n", __func__, decoder_buffer->index);
 	}
 
 	return ret;
@@ -494,6 +533,7 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
 		case SCALE_STATE_IDLE:
 		case SCALE_STATE_FRAME_COMPLETE:
 		{
+
 			complex_buffer_t *scale_buffer = NULL;
 			pipeline_encode_request_t *scale_request = NULL;
 
@@ -528,30 +568,37 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
 			scale_config->decoder_buffer = (complex_buffer_t*)os_malloc(sizeof(complex_buffer_t));
 			os_memcpy(scale_config->decoder_buffer, scale_request->buffer, sizeof(complex_buffer_t));
 
-
-
-			if (scale_config->decoder_buffer->index != 1)
-			{
-				LOGE("%s invalid index: %d\n", __func__, scale_config->decoder_buffer->index);
-			}
-
 			scale_config->state = SCALE_STATE_SCALING;
 			scale_config->line_count = 1;
 			scale_buffer->state = BUF_SCALING;
 			scale_buffer->index = scale_config->line_count;
-			scale_buffer->ok = true;
+            scale_config->src_width = scale_request->width;
+            scale_config->src_height = scale_request->height;
 
 #if SCALE_DEBUG_LOG
-			LOGI("fill src: %d\n", scale_config->decoder_buffer->index);
+			LOGI("%s %d, fill src: %d\n",  __func__, __LINE__, scale_config->decoder_buffer->index);
 #endif
-			lcd_scale_line_fill_start(scale_config->decoder_buffer, scale_buffer);
+			ret = lcd_scale_line_fill_start(scale_config->decoder_buffer, scale_buffer);
 
 			os_free(scale_request);
+            if (ret != BK_OK)
+            {
+                scale_buffer->state = BUF_IDLE;
+                scale_config->state = SCALE_STATE_IDLE;
+				LOGI("%s state %x invalid index: %d\n", __func__,state, scale_config->decoder_buffer->index);
+                scale_task_send_msg(SCALE_RESET, 1);
+            }
 		}
 		break;
 
 		case SCALE_STATE_SOURCE_COMPLETE:
 		{
+			if (scale_config->decoder_buffer)
+			{
+				LOGD("%s %d decoder decoder_buffer not NULL %p %p %d  %d\n", __func__, __LINE__, scale_config->decoder_buffer, scale_config->decoder_buffer->data, scale_config->decoder_buffer->index, scale_config->decoder_buffer->state);
+				break;
+			}
+
 			GLOBAL_INT_DECLARATION();
 			GLOBAL_INT_DISABLE();
 			pipeline_encode_request_t *scale_request = list_pop_edge(&scale_config->request_list, pipeline_encode_request_t, list);
@@ -560,14 +607,10 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
 			if (scale_request == NULL)
 			{
 				scale_config->state = SCALE_STATE_SOURCE_COMPLETE;
+				LOGD("%s %d SCALE_STATE_SOURCE_COMPLETE scale_request == NULL\n", __func__, __LINE__);
 				break;
 			}
-
-			if (scale_config->decoder_buffer)
-			{
-				LOGD("%s decoder decoder_buffer not NULL\n", __func__);
-				break;
-			}
+            HW_SCALE_SRC_START();
 
 			scale_config->decoder_buffer = (complex_buffer_t*)os_malloc(sizeof(complex_buffer_t));
 			os_memcpy(scale_config->decoder_buffer, scale_request->buffer, sizeof(complex_buffer_t));
@@ -584,11 +627,13 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
             if(scale_config->decoder_buffer->index == (scale_config->decoder_buffer->frame_buffer->height / PIPELINE_DECODE_LINE))
     		    LOGI("fill src: %d, id: %d result:%d \n", scale_config->decoder_buffer->index, scale_config->decoder_buffer->id, scale_config->decoder_buffer->ok);
 #endif
-			ret = hw_scale_source_block_fill(HW_SCALE, &scale_block);
+
+            ret = hw_scale_source_block_fill(HW_SCALE, &scale_block);
 
 			if (ret != BK_OK)
 			{
-				LOGE("%s scale err: %d\n", __func__, ret);
+				LOGD("%s scale err: %d\n", __func__, ret);
+                os_free(scale_request);
 				break;
 			}
 
@@ -605,24 +650,20 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
 			if (scale_buffer == NULL)
 			{
 				scale_config->state = SCALE_STATE_DEST_COMPLETE;
-				LOGD("%s SCALE_STATE_DEST_COMPLETE idle buffer NULL\n", __func__);
+    			LOGD("%s %d SCALE_STATE_DEST_COMPLETE idle buffer NULL[%d %d] [%d %d]\n", __func__, __LINE__, scale_config->scale_buffer[0].index,scale_config->scale_buffer[0].state, scale_config->scale_buffer[1].index,scale_config->scale_buffer[1].state);
 				break;
 			}
 
-			scale_buffer->state = BUF_SCALING;
+
 			scale_config->line_count++;
-
+			scale_buffer->state = BUF_SCALING;
 			scale_buffer->index = scale_config->line_count;
-			scale_buffer->ok = true;
-
 			scale_block_t scale_block;
 			scale_block.data = scale_buffer->data;
 			scale_block.line_index = 0;
 			scale_block.line_count = 16;
 			scale_block.args = scale_buffer;
-
 			scale_config->state = SCALE_STATE_SCALING;
-
 			ret = hw_scale_dest_block_fill(HW_SCALE, &scale_block);
 
 			if (ret != BK_OK)
@@ -630,6 +671,13 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
 				LOGE("%s scale err: %d\n", __func__, ret);
 				break;
 			}
+            HW_SCALE_DST_START();
+            
+            if (!rtos_is_oneshot_timer_running(&scale_config->scale_timer))
+            {
+                rtos_start_oneshot_timer(&scale_config->scale_timer);
+            }
+            
 		}
 		break;
 
@@ -664,7 +712,6 @@ bk_err_t lcd_scale_line_start_request_handle(pipeline_encode_request_t *scale_re
 		LOGI("%s send failed\n", __func__);
 		return BK_FAIL;
 	}
-
 	return BK_OK;
 }
 
@@ -695,7 +742,7 @@ static void scale_main_entry(beken_thread_arg_t data)
 				case SCALE_LINE_START_LOOP:
 				{
 #if SCALE_DEBUG_LOG
-					LOGI("%s, state: %d, %d\n", __func__, scale_config->state, scale_config->line_count);
+					LOGI("%s, state: %d, %d \n", __func__, scale_config->state, scale_config->line_count);
 #endif
 					lcd_scale_line_state_machine(scale_config->state, (void*)msg.param);
 				}
@@ -711,21 +758,26 @@ static void scale_main_entry(beken_thread_arg_t data)
                         LOGI("decode free: %d, %d\n", decoder_buffer->index, decoder_buffer->ok);
                     }
 #endif
+
+
+                    if (scale_config->decoder_buffer != decoder_buffer)
+                    {
+                      LOGE("%s, %d, source complete buffer not match %p %p %d\n", __func__, __LINE__, decoder_buffer, scale_config->decoder_buffer, decoder_buffer->index);
+                    }
 					if (decoder_buffer)
 					{
-						scale_config->decoder_free_cb(decoder_buffer);
+                        if (decoder_buffer->index != scale_config->src_height / PIPELINE_DECODE_LINE)
+                        {
+                            scale_config->state = SCALE_STATE_SOURCE_COMPLETE;
+                            scale_task_send_msg(SCALE_LINE_START_LOOP, 0);
+                        }
+    				    scale_config->decoder_free_cb(decoder_buffer);
+                        scale_config->decoder_buffer = NULL;
 					}
 					else
 					{
-						LOGE("%s, source complete buffer NULL\n", __func__);
+						LOGE("%s,%d, source complete buffer NULL\n", __func__, __LINE__);
 					}
-
-					if (scale_config->decoder_buffer != decoder_buffer)
-					{
-						LOGE("%s, source complete buffer not match\n", __func__);
-					}
-
-					scale_config->decoder_buffer = NULL;
 				}
 				break;
 
@@ -740,6 +792,7 @@ static void scale_main_entry(beken_thread_arg_t data)
 						request.width = scale_config->dst_width;
 						request.height = scale_config->dst_height;
 						request.buffer = scale_buffer;
+                        scale_buffer->state = BUF_ROTATEING;
 #if SCALE_DEBUG_LOG
                         if(scale_buffer->index == request.height / PIPELINE_DECODE_LINE)
                         {
@@ -747,10 +800,15 @@ static void scale_main_entry(beken_thread_arg_t data)
                         }
 #endif
 						bk_rotate_encode_request(&request, scale_rotate_line_request_callback);
+                        if (scale_buffer->index != scale_config->dst_height / PIPELINE_DECODE_LINE)
+                        {
+                            scale_config->state = SCALE_STATE_DEST_COMPLETE;
+                            scale_task_send_msg(SCALE_LINE_START_LOOP, 0);
+                        }
 					}
 					else
 					{
-						LOGE("%s error unknow request NULL\n", __func__);
+						LOGE("%s error unknow request NULL index=%d\n", __func__, scale_buffer->index);
 					}
 
 				}
@@ -775,11 +833,10 @@ static void scale_main_entry(beken_thread_arg_t data)
 						LOGE("%s scale_buffer NULL\n", __func__);
 						break;
 					}
-
 					scale_buffer->state = BUF_IDLE;
 
 #if SCALE_DEBUG_LOG
-					LOGI("%s %d [%p %p]\n", __func__, scale_buffer->index, scale_buffer, scale_buffer->data);
+					LOGI("%s %d rotate_complete_cb[%d %p %p]\n", __func__, __LINE__, scale_buffer->index, scale_buffer, scale_buffer->data);
 #endif
 
 					os_free(buffer);
@@ -788,6 +845,43 @@ static void scale_main_entry(beken_thread_arg_t data)
 				}
 				break;
 
+				case SCALE_RESET:
+					if (rtos_is_oneshot_timer_running(&scale_config->scale_timer))
+					{
+						rtos_stop_oneshot_timer(&scale_config->scale_timer);
+					}
+                    bk_hw_scale_int_enable(HW_SCALE, 0);
+                    bk_hw_scale_stop(HW_SCALE);
+                    
+                    GLOBAL_INT_DECLARATION();
+                    GLOBAL_INT_DISABLE();
+                    while (!list_empty(&scale_config->request_list))
+                    {
+                        pipeline_encode_request_t *scale_request = list_pop_edge(&scale_config->request_list, pipeline_encode_request_t, list);
+                    
+                        if (scale_request != NULL)
+                        {
+                            os_free(scale_request);
+                            LOGI("%s %d SCALE_RESET\n", __func__, __LINE__);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    GLOBAL_INT_RESTORE();
+
+                    HW_SCALE_FRAME_END();
+                    HW_SCALE_SRC_END();
+                    HW_SCALE_DST_END();
+                    scale_config->state = SCALE_STATE_IDLE;
+                    scale_config->scale_buffer[0].state = BUF_IDLE;
+                    scale_config->scale_buffer[1].state = BUF_IDLE;
+					LOGE("%s SCALE_RESET line_count%d  scale_config->state %x\n", __func__, scale_config->line_count, scale_config->state);
+                    if(scale_config->reset_cb && (msg.param == 0))
+                        scale_config->reset_cb(NULL);
+                   break;
+
 				case SCALE_STOP:
 				{
 					LOGI("%s exit\n", __func__);
@@ -795,7 +889,7 @@ static void scale_main_entry(beken_thread_arg_t data)
 					beken_semaphore_t *beken_semaphore = (beken_semaphore_t*)msg.param;
 
 					bk_hw_scale_driver_deinit(HW_SCALE);
-
+                    //bk_hw_scale_mem_free();
 					if (rtos_is_oneshot_timer_running(&scale_config->scale_timer))
 					{
 						rtos_stop_oneshot_timer(&scale_config->scale_timer);
@@ -841,12 +935,7 @@ bk_err_t scale_task_open(lcd_scale_t *lcd_scale)
 {
 	int ret =BK_OK;
 
-	LOGI("%s %d\n", __func__, __LINE__);
-
 	rtos_lock_mutex(&scale_info->lock);
-
-	lcd_scale_t local_lcd_scale = {PPI_1280X720, PPI_864X480};
-	lcd_scale  = &local_lcd_scale;
 
 	if (scale_config != NULL && scale_config->task_running)
 	{
@@ -870,28 +959,31 @@ bk_err_t scale_task_open(lcd_scale_t *lcd_scale)
 
 	if (!rtos_is_oneshot_timer_init(&scale_config->scale_timer))
 	{
-		ret = rtos_init_oneshot_timer(&scale_config->scale_timer, 3 * 1000, scale_timer_handle, NULL, NULL);
+		ret = rtos_init_oneshot_timer(&scale_config->scale_timer, 300, scale_timer_handle, NULL, NULL);
 
 		if (ret != BK_OK)
 		{
 			LOGE("create scale timer failed\n");
 		}
 	}
-	HW_SCALE_END();
+	HW_SCALE_FRAME_END();
+    HW_SCALE_SRC_END();
+    HW_SCALE_DST_END();
 
-	bk_hw_scale_driver_init(HW_SCALE);
-	bk_hw_scale_isr_register(HW_SCALE, scale0_complete_cb, NULL);
-
+	ret = bk_hw_scale_driver_init(HW_SCALE);
 	if(ret != BK_OK)
 	{
 		LOGE("%s, scale pipeline init fail\r\n", __func__);
 		goto error;
 	}
+    ///frame scale
+	bk_hw_scale_isr_register(HW_SCALE, scale0_complete_cb, NULL);
+
 	scale_config->src_width = lcd_scale->src_ppi >> 16;
 	scale_config->src_height = lcd_scale->src_ppi & 0xFFFF;
 	scale_config->dst_width = lcd_scale->dst_ppi >> 16;
 	scale_config->dst_height = lcd_scale->dst_ppi & 0xFFFF;
-//	LOGI("%s, HW scale src(default):(%d, %d), dst: (%d, %d)\r\n", __func__, scale_config->src_width, scale_config->src_height, scale_config->dst_width, scale_config->dst_height);
+
     if(scale_config->dst_width == 0 || scale_config->dst_height == 0)
     {
         scale_config->dst_width = PIXEL_480;
@@ -906,7 +998,7 @@ bk_err_t scale_task_open(lcd_scale_t *lcd_scale)
 	scale_config->scale_buffer[0].data = mux_sram_buffer->scale;
 	scale_config->scale_buffer[0].id = 0;
 
-	scale_config->scale_buffer[1].data = mux_sram_buffer->scale + sizeof(mux_sram_buffer->scale) / 2;
+    scale_config->scale_buffer[1].data = mux_sram_buffer->scale + scale_config->dst_width * IMAGE_MAX_PIPELINE_LINE * 2;
 	scale_config->scale_buffer[1].id = 1;
 #else
 	//TODO
@@ -1085,7 +1177,7 @@ bk_err_t scale_task_close(void)
 	if (scale_config->decoder_buffer)
 	{
 
-		LOGI("%s free working buffer\n", __func__);
+		LOGD("%s free working buffer\n", __func__);
 
 		if (scale_config->decoder_free_cb)
 		{
@@ -1124,6 +1216,37 @@ bk_err_t scale_task_close(void)
 	return BK_OK;
 }
 
+bk_err_t bk_scale_reset_request(mux_callback_t cb)
+{
+    rtos_lock_mutex(&scale_info->lock);
+ 
+    scale_config->reset_cb = cb;
+
+    if (BK_OK != scale_task_send_msg(SCALE_RESET, 0))
+    {
+        LOGI("%s send failed\n", __func__);
+        goto error;
+    }
+
+    rtos_unlock_mutex(&scale_info->lock);
+
+    return BK_OK;
+
+error:
+
+    if (scale_config
+        && scale_config->reset_cb)
+    {
+        scale_config->reset_cb = NULL;
+    }
+
+    rtos_unlock_mutex(&scale_info->lock);
+
+    LOGE("%s failed\n", __func__);
+
+    return BK_FAIL;
+
+}
 
 bk_err_t bk_scale_encode_request(pipeline_encode_request_t *request, mux_callback_t cb)
 {
@@ -1184,6 +1307,11 @@ bk_err_t bk_scale_pipeline_init(void)
 {
 	bk_err_t ret = BK_FAIL;
 
+    if(scale_info != NULL)
+    {
+        os_free(scale_info);
+        scale_info = NULL;
+    }
 	scale_info = (scale_info_t*)os_malloc(sizeof(scale_info_t));
 
 	if (scale_info == NULL)
@@ -1204,3 +1332,5 @@ bk_err_t bk_scale_pipeline_init(void)
 
 	return ret;
 }
+
+

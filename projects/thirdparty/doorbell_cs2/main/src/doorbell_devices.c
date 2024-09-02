@@ -674,7 +674,7 @@ int doorbell_audio_turn_on(audio_parameters_t *parameters)
 	{
 		LOGI("%s already turn on\n", __func__);
 
-		return BK_FAIL;
+		return EVT_STATUS_ALREADY;
 	}
 
 	LOGI("%s, AEC: %d, UAC: %d, sample rate: %d, %d, fmt: %d, %d\n", __func__,
@@ -784,11 +784,12 @@ int doorbell_audio_turn_on(audio_parameters_t *parameters)
 		doorbell_current_service->audio_state_changed(DB_TURN_ON);
 	}
 
-	return BK_OK;
+	return EVT_STATUS_OK;
 error:
+	bk_aud_intf_set_mode(AUD_INTF_WORK_MODE_NULL);
 	bk_aud_intf_drv_deinit();
 
-	return BK_FAIL;
+	return EVT_STATUS_ERROR;
 }
 
 int doorbell_audio_turn_off(void)
@@ -797,7 +798,7 @@ int doorbell_audio_turn_off(void)
 	{
 		LOGI("%s already turn off\n", __func__);
 
-		return BK_FAIL;
+		return EVT_STATUS_ALREADY;
 	}
 
 	LOGI("%s entry\n", __func__);
@@ -818,7 +819,7 @@ int doorbell_audio_turn_off(void)
 
 	LOGI("%s out\n", __func__);
 
-	return 0;
+	return EVT_STATUS_OK;
 }
 
 int doorbell_audio_acoustics(uint32_t index, uint32_t param)

@@ -58,5 +58,5 @@ endif()
 armino_component_register(
 	SRCS "${srcs}"
 	INCLUDE_DIRS "${incs}" 
-	PRIV_REQUIRES media multimedia bk_init bk_cli bk_vfs lvgl media_service bt lwip_intf_v2_1 wifi_transfer cs2p2p
+	PRIV_REQUIRES multimedia bk_init bk_cli bk_vfs lvgl media_service bt lwip_intf_v2_1 wifi_transfer cs2p2p
 )

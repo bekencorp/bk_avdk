@@ -747,16 +747,18 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 		{
 			LOGI("%s, FMT:ERR\r\n", __func__);
 			lcd_info.decode_mode = NONE_DECODE;
+			LCD_DRIVER_FRAME_FREE(lcd_info.decoder_frame);
+			lcd_info.decoder_frame = NULL;
 			goto out;
 		}
 		else
 		{
 			LOGI("%s, FMT:YUV420, use SOFTWARE DECODE\r\n", __func__);
 			lcd_info.decode_mode = SOFTWARE_DECODING_MAJOR;
-			bk_jpeg_dec_sw_init();
+			bk_jpeg_dec_sw_init(NULL, 0);
 		}
+	}
 
-    }
 	if (lcd_info.decode_mode == HARDWARE_DECODING)
 	{
 		lcd_info.decoder_frame->fmt = PIXEL_FMT_VUYY;
@@ -769,6 +771,7 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 		{
 			LOGD("%s hw decoder error\n", __func__);
 			LCD_DRIVER_FRAME_FREE(lcd_info.decoder_frame);
+			lcd_info.decoder_frame = NULL;
 			goto out;
 		}
 	}
@@ -791,6 +794,7 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 			{
 				LOGE("%s sw decoder error\n", __func__);
 				LCD_DRIVER_FRAME_FREE(lcd_info.decoder_frame);
+				lcd_info.decoder_frame = NULL;
 				goto out;
 			}
 		}
@@ -802,6 +806,7 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 			{
 				LOGE("%s sw decoder error\n", __func__);
 				LCD_DRIVER_FRAME_FREE(lcd_info.decoder_frame);
+				lcd_info.decoder_frame = NULL;
 				goto out;
 			}
 		}
@@ -822,6 +827,7 @@ out:
 	if (frame->height < lcd_info.lcd_height) //like jpeg 1280X720, LCD 480X854
 		lcd_info.decoder_frame->frame -= (frame->width * (lcd_info.lcd_height - frame->height));
 #endif
+
         dec_frame = lcd_info.decoder_frame;
         lcd_info.decoder_frame = NULL;
     }
@@ -1063,14 +1069,18 @@ bk_err_t lcd_driver_display_frame_sync(frame_buffer_t *frame, bool wait)
 			lcd_driver_ppi_set(frame->width, lcd_info.lcd_height);
 		else
 #endif
-			lcd_driver_ppi_set(frame->width, frame->height);
+		lcd_driver_ppi_set(frame->width, frame->height);
 
 		bk_lcd_set_yuv_mode(frame->fmt);
+        if ((frame->fmt == PIXEL_FMT_RGB565_LE) || (frame->fmt == PIXEL_FMT_RGB565))
+        {
+            lcd_hal_rgb_set_in_out_format(frame->fmt, PIXEL_FMT_RGB565);
+        }
 		lcd_info.pingpong_frame = frame;
 
 		lcd_driver_set_display_base_addr((uint32_t)frame->frame);
 		lcd_driver_display_enable();
-		LOGI("display start, frame width, height %d, %d\n", frame->width, frame->height);
+		LOGI("display start, frame W x H %d x %d, data_fmt %d\n", frame->width, frame->height, frame->fmt);
 	}
 	else
 	{
@@ -1354,20 +1364,9 @@ bk_err_t lcd_display_file_handle(media_mailbox_msg_t *msg)
 	}
 	
 	lcd_info.picture_echo = true;
-	media_mailbox_msg_t *picture_echo_node = os_malloc(sizeof(media_mailbox_msg_t));
-	
-	if (picture_echo_node != NULL)
-	{
-		ret = rtos_init_semaphore_ex(&picture_echo_node->sem, 1, 0);
-	}
-	picture_echo_node->event = EVENT_LCD_PICTURE_ECHO_NOTIFY;
-	picture_echo_node->param = (uint32_t)frame;
-	picture_echo_node->result = ret;
-	msg_send_req_to_media_major_mailbox_sync(picture_echo_node, APP_MODULE);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_LCD_PICTURE_ECHO_NOTIFY, APP_MODULE, (uint32_t)frame, NULL);
 
-	msg->result = picture_echo_node->result;
-	ret = msg->result;
-	os_free(picture_echo_node);
+	msg->result = ret;
 	return ret;
 	
 }
@@ -1416,10 +1415,6 @@ bk_err_t lcd_open_handle(media_mailbox_msg_t *msg)
 	lcd_info.fb_malloc = frame_buffer_fb_display_malloc_wait;
 
 	frame_buffer_fb_init(FB_INDEX_DISPLAY);
-
-#if CONFIG_LCD_QSPI
-    bk_lcd_qspi_disp_task_start(lcd_info.lcd_device);
-#endif
 
 	ret = lcd_driver_init(lcd_info.lcd_device);
 	if(lcd_info.lcd_device->type == LCD_TYPE_MCU8080)
@@ -1523,9 +1518,12 @@ bk_err_t lcd_open_handle(media_mailbox_msg_t *msg)
 
 	lcd_decoder_task_start(lcd_info.rotate);
 
+#if CONFIG_LCD_QSPI
+    bk_lcd_qspi_disp_task_start(lcd_info.lcd_device);
+#else
 #ifdef DISPLAY_PIPELINE_TASK
-
 	lcd_display_task_start(lcd_info.rotate);
+#endif
 #endif
 
 	set_lcd_state(LCD_STATE_ENABLED);
@@ -1614,12 +1612,12 @@ bk_err_t lcd_close_handle(media_mailbox_msg_t *msg)
 
 	jpeg_decoder_task_stop();
 
+#if CONFIG_LCD_QSPI
+    bk_lcd_qspi_disp_task_stop();
+#else
 #ifdef DISPLAY_PIPELINE_TASK
 	lcd_display_task_stop();
 #endif
-
-#if CONFIG_LCD_QSPI
-    bk_lcd_qspi_disp_task_stop();
 #endif
 
 	GLOBAL_INT_DECLARATION();
@@ -1812,7 +1810,6 @@ void lcd_event_handle(media_mailbox_msg_t *msg)
 
 	switch (msg->event)
 	{
-
 		case EVENT_LCD_OPEN_IND:
 			LOGI("%s EVENT_LCD_OPEN_IND \n", __func__);
 			ret = lcd_open_handle(msg);
@@ -1887,6 +1884,14 @@ void lcd_event_handle(media_mailbox_msg_t *msg)
 		case EVENT_LCD_DISPLAY_IND:
 			ret = lcd_display_fram_handle(msg);
 			break;
+        case EVENT_LCD_EXAMPLE_IND:
+        {
+            #if CONFIG_LCD_EXAMPLE
+            extern bk_err_t lcd_display_example(media_mailbox_msg_t *msg);
+            ret = lcd_display_example(msg);
+            #endif
+            break;
+        }
 		case EVENT_LCD_GET_STATUS_IND:
 		{
 			bool lcd_status = false;

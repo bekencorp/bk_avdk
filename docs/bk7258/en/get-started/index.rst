@@ -10,22 +10,39 @@ Armino AVDK SDK Code download
 
 We can download Armino AVDK SDK from gitlab::
 
-    mkdir -p ~/bk_avdk
-    cd ~/bk_avdk
+    mkdir -p ~/armino
+    cd ~/armino
     git clone http://gitlab.bekencorp.com/armino/bk_avdk.git
+	
+
+We also can download Armino AVDK SDK from github::
+
+	mkdir -p ~/armino
+	cd ~/armino
+	git clone --recurse-submodules https://github.com/bekencorp/bk_avdk.git 
+	
 
 Then switch to the stable branch Tag node, such as v2.0.1.8::
 
+    cd ~/armino/bk_avdk
     git checkout -B your_branch_name v2.0.1.8
     git submodule update --init --recursive
+    ls
     
+.. figure:: ../../_static/bk_avdk_dir_1.png
+    :align: center
+    :alt: advk dir
+    :figclass: align-center
+
+    Figure 1. AVDK Directiry structure
+
 !Note:
 
     The latest SDK code is downloaded from gitlab on the official website, and
 	relevant accounts can be found on the project to review the application.
 
 
-Build Compilation Environment for bk7258:
+Build Compilation Environment:
 --------------------------------------------------------------------
 
 .. note::
@@ -35,9 +52,9 @@ Build Compilation Environment for bk7258:
     
 
 Install Tool Chain
-----------------------------------------------------------------
+*************************************
 
-Click `Donwload <https://dl.bekencorp.com/tools/toolchain/arm/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2>`_ to download the BK7236 toolchain.
+Click `Download <https://dl.bekencorp.com/tools/toolchain/arm/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2>`_ to download the BK7258 toolchain.
 
 After downloading the tool kit, decompress it to '/opt/'::
 
@@ -52,9 +69,9 @@ After downloading the tool kit, decompress it to '/opt/'::
 
 
 Install Depended libraries
------------------------------------------------------------------
+*************************************
 
-Enter the following command in the terminal to install python3\CMake\Ninja::
+Enter the following command in the terminal to install python3,CMake,Ninja::
 
     sudo dpkg --add-architecture i386
     sudo apt-get update
@@ -62,7 +79,7 @@ Enter the following command in the terminal to install python3\CMake\Ninja::
     sudo pip3 install pycrypto click
 
 Install python dependencies
-------------------------------------------------------------------------------
+*************************************
 
 Enter the following command to install python dependencies::
 
@@ -79,7 +96,7 @@ Build The Project
 
 Run following commands to build BK7258 default doorbell project::
 
-    cd ~/armino
+    cd ~/armino/bk_avdk
     make bk7258
 
 
@@ -92,17 +109,17 @@ Configuration project
 We can also use the project configuration file for differentiated configuration::
 
     Project Profile Override Chip Profile Override Default Configuration
-    Example： config >> bk7258.defconfig >> KConfig
-    + Example of project configuration file：
-        projects/app/config/bk7258/config
-    + Sample chip configuration file：
+    Example: config >> bk7258.defconfig >> KConfig
+    + Example of project configuration file:
+        projects/media/doorbell/config/bk7258/config
+    + Sample chip configuration file:
         middleware/soc/bk7258/bk7258.defconfig
-    + Sample KConfig configuration file：
+    + Sample KConfig configuration file:
         middleware/arch/cm33/Kconfig
         components/bk_cli/Kconfig
 
 
-New project
+Create New project
 ------------------------------------
 
 The default project is projects/media/doorbell. For new projects, please refer to the project in projects/media/

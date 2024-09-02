@@ -19,6 +19,8 @@
 #include "media_evt.h"
 #include "media_app.h"
 
+#include "yuv_encode.h"
+
 #include <os/mem.h>
 
 #include <driver/uvc_camera.h>
@@ -42,6 +44,14 @@ void uvc_device_connect_state_callback(uvc_state_t state)
 {
 	LOGI("%s, %d, %d\n", __func__, state, uvc_state_flag);
 
+    if (state == UVC_DISCONNECT_ABNORMAL)
+    {
+#if CONFIG_MEDIA_PIPELINE
+        jpeg_decode_restart();
+#endif
+    }
+
+#if 0
 	if (state == UVC_DISCONNECT_ABNORMAL)
 	{
 		if (!uvc_state_flag)
@@ -96,7 +106,7 @@ void uvc_device_connect_state_callback(uvc_state_t state)
 
 		media_send_msg(&media_msg);
 	}
-
+#endif
 }
 
 bk_err_t bk_uvc_camera_open(media_camera_device_t *device)
@@ -120,13 +130,24 @@ bk_err_t bk_uvc_camera_open(media_camera_device_t *device)
 	uvc_state_flag = true;
 	os_memcpy(&uvc_camera_config_st->device, device, sizeof(media_camera_device_t));
 
-	uvc_camera_config_st->jpeg_cb.init = frame_buffer_fb_init;
+	uvc_camera_config_st->jpeg_cb.init   = frame_buffer_fb_init;
 	uvc_camera_config_st->jpeg_cb.deinit = frame_buffer_fb_deinit;
-	uvc_camera_config_st->jpeg_cb.clear = frame_buffer_fb_clear;
+	uvc_camera_config_st->jpeg_cb.clear  = frame_buffer_fb_clear;
 	uvc_camera_config_st->jpeg_cb.malloc = frame_buffer_fb_malloc;
-	uvc_camera_config_st->jpeg_cb.push = frame_buffer_fb_push;
-	uvc_camera_config_st->jpeg_cb.pop = NULL;
-	uvc_camera_config_st->jpeg_cb.free = frame_buffer_fb_direct_free;
+	uvc_camera_config_st->jpeg_cb.push   = frame_buffer_fb_push;
+	uvc_camera_config_st->jpeg_cb.pop    = NULL;
+	uvc_camera_config_st->jpeg_cb.free   = frame_buffer_fb_direct_free;
+
+    if (device->num_uvc_dev > 1)
+    {
+    	uvc_camera_config_st->h264_cb.init   = frame_buffer_fb_init;
+    	uvc_camera_config_st->h264_cb.deinit = frame_buffer_fb_deinit;
+    	uvc_camera_config_st->h264_cb.clear  = frame_buffer_fb_clear;
+        uvc_camera_config_st->h264_cb.malloc = frame_buffer_fb_dual_malloc;
+    	uvc_camera_config_st->h264_cb.push   = frame_buffer_fb_push;
+    	uvc_camera_config_st->h264_cb.pop    = NULL;
+    	uvc_camera_config_st->h264_cb.free   = frame_buffer_fb_direct_free;
+    }
 
 	uvc_camera_config_st->uvc_connect_state_change_cb = uvc_device_connect_state_callback;
 	uvc_camera_config_st->user_cb = NULL;

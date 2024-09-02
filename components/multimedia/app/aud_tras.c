@@ -50,6 +50,7 @@ typedef struct
 	beken_queue_t aud_tras_int_msg_que;
 	uint8_t *aud_tras_buff_addr;
 	RingBufferContext aud_tras_rb;			//save mic data needed to send by aud_tras task
+	bool is_running;
 } aud_tras_info_t;
 
 #ifdef CONFIG_AUD_TX_COUNT_DEBUG
@@ -63,6 +64,23 @@ static aud_tx_count_debug_t aud_tx_count = {0};
 
 static aud_tras_setup_t aud_trs_setup_bk = {0};
 static aud_tras_info_t *aud_tras_info = NULL;
+
+static beken_semaphore_t aud_tras_task_sem = NULL;
+
+
+static void *audio_tras_malloc(uint32_t size)
+{
+#if CONFIG_PSRAM_AS_SYS_MEMORY
+	return psram_malloc(size);
+#else
+	return os_malloc(size);
+#endif
+}
+
+static void audio_tras_free(void *mem)
+{
+	os_free(mem);
+}
 
 #ifdef AUD_TX_DEBUG
 static void uart_dump_mic_data(uart_id_t id, uint32_t baud_rate)
@@ -118,7 +136,7 @@ bk_err_t aud_tras_send_msg(aud_tras_op_t op, void *param)
 
 	msg.op = op;
 	msg.param = param;
-	if (aud_tras_info->aud_tras_int_msg_que) {
+	if (aud_tras_info->is_running && aud_tras_info && aud_tras_info->aud_tras_int_msg_que) {
 		ret = rtos_push_to_queue(&aud_tras_info->aud_tras_int_msg_que, &msg, BEKEN_NO_WAIT);
 		if (kNoErr != ret) {
 			LOGE("aud_tras_send_int_msg fail \r\n");
@@ -132,20 +150,34 @@ bk_err_t aud_tras_send_msg(aud_tras_op_t op, void *param)
 
 bk_err_t aud_tras_deinit(void)
 {
-	bk_err_t ret;
+	bk_err_t ret = BK_OK;
 	aud_tras_msg_t msg;
 
 	msg.op = AUD_TRAS_EXIT;
 	msg.param = NULL;
-	if (aud_tras_info->aud_tras_int_msg_que) {
+	if (aud_tras_info && aud_tras_info->aud_tras_int_msg_que) {
 		ret = rtos_push_to_queue_front(&aud_tras_info->aud_tras_int_msg_que, &msg, BEKEN_NO_WAIT);
 		if (kNoErr != ret) {
 			LOGE("audio send msg: AUD_TRAS_EXIT fail \r\n");
 			return kOverrunErr;
 		}
-
-		return ret;
+	} else {
+		return BK_OK;
 	}
+
+	ret = rtos_get_semaphore(&aud_tras_task_sem, BEKEN_WAIT_FOREVER);
+	if (ret != BK_OK)
+	{
+		LOGE("%s, %d, rtos_get_semaphore\n", __func__, __LINE__);
+		return BK_FAIL;
+	}
+
+	if(aud_tras_task_sem)
+	{
+		rtos_deinit_semaphore(&aud_tras_task_sem);
+		aud_tras_task_sem = NULL;
+	}
+
 	return kNoResourcesErr;
 }
 
@@ -189,13 +221,18 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 #endif
 
 	GLOBAL_INT_DECLARATION();
-	aud_temp_data = os_malloc(320);
+	aud_temp_data = audio_tras_malloc(320);
 	if (!aud_temp_data)
 	{
 		LOGE("malloc aud_temp_data\n");
 		goto aud_tras_exit;
 	}
 	os_memset(aud_temp_data, 0, 320);
+
+
+	rtos_set_semaphore(&aud_tras_task_sem);
+
+	aud_tras_info->is_running = true;
 
 	aud_tras_send_msg(AUD_TRAS_TX, NULL);
 
@@ -245,8 +282,10 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 	}
 
 aud_tras_exit:
+	aud_tras_info->is_running = false;
+
 	if (aud_temp_data) {
-		os_free(aud_temp_data);
+		audio_tras_free(aud_temp_data);
 		aud_temp_data == NULL;
 	}
 
@@ -267,7 +306,7 @@ aud_tras_exit:
 
 	if (aud_tras_info->aud_tras_buff_addr) {
 		ring_buffer_clear(&aud_tras_info->aud_tras_rb);
-		os_free(aud_tras_info->aud_tras_buff_addr);
+		audio_tras_free(aud_tras_info->aud_tras_buff_addr);
 		aud_tras_info->aud_tras_buff_addr == NULL;
 	}
 
@@ -286,9 +325,11 @@ aud_tras_exit:
 
 	if (aud_tras_info)
 	{
-		os_free(aud_tras_info);
+		audio_tras_free(aud_tras_info);
 		aud_tras_info = NULL;
 	}
+
+	rtos_set_semaphore(&aud_tras_task_sem);
 
 	rtos_delete_thread(NULL);
 }
@@ -297,7 +338,7 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 {
 	bk_err_t ret = BK_OK;
 
-	aud_tras_info = os_malloc(sizeof(aud_tras_info_t));
+	aud_tras_info = audio_tras_malloc(sizeof(aud_tras_info_t));
 
 	if (aud_tras_info == NULL)
 	{
@@ -306,7 +347,7 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 	}
 	os_memset(aud_tras_info, 0, sizeof(aud_tras_info_t));
 
-	aud_tras_info->aud_tras_buff_addr = os_malloc(AUD_TRAS_BUFF_SIZE + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+	aud_tras_info->aud_tras_buff_addr = audio_tras_malloc(AUD_TRAS_BUFF_SIZE + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
 	if (!aud_tras_info->aud_tras_buff_addr) {
 		LOGE("malloc aud_tras_buff_addr\n");
 		goto out;
@@ -316,6 +357,15 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 
 	os_memcpy(&aud_trs_setup_bk, setup_cfg, sizeof(aud_tras_setup_t));
 
+	if (aud_tras_task_sem == NULL) {
+		ret = rtos_init_semaphore(&aud_tras_task_sem, 1);
+		if (ret != BK_OK)
+		{
+			LOGE("%s, %d, create audio tras task semaphore failed \n", __func__, __LINE__);
+			goto out;
+		}
+	}
+
 	if ((!aud_tras_info->aud_tras_task_hdl) && (!aud_tras_info->aud_tras_int_msg_que))
 	{
 		ret = rtos_init_queue(&aud_tras_info->aud_tras_int_msg_que,
@@ -324,10 +374,10 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 							  TU_QITEM_COUNT);
 		if (ret != kNoErr)
 		{
-			LOGE("ceate audio transfer internal message queue fail\n");
+			LOGE("create audio transfer internal message queue fail\n");
 			goto out;
 		}
-		LOGI("ceate audio transfer internal message queue complete\n");
+		LOGD("create audio transfer internal message queue complete\n");
 
 		ret = rtos_create_thread(&aud_tras_info->aud_tras_task_hdl,
 								 4,
@@ -341,7 +391,14 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 			return kGeneralErr;
 		}
 
-		LOGI("init aud_tras task complete \n");
+		ret = rtos_get_semaphore(&aud_tras_task_sem, BEKEN_WAIT_FOREVER);
+		if (ret != BK_OK)
+		{
+			LOGE("%s, %d, rtos_get_semaphore\n", __func__, __LINE__);
+			goto out;
+		}
+
+		LOGD("init aud_tras task complete \n");
 	}
 	else
 	{
@@ -351,6 +408,12 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 	return BK_OK;
 
 out:
+	if(aud_tras_task_sem)
+	{
+		rtos_deinit_semaphore(&aud_tras_task_sem);
+		aud_tras_task_sem = NULL;
+	}
+
 	if (aud_tras_info->aud_tras_int_msg_que)
 	{
 		ret = rtos_deinit_queue(&aud_tras_info->aud_tras_int_msg_que);
@@ -362,13 +425,13 @@ out:
 
 	if (aud_tras_info->aud_tras_buff_addr) {
 		ring_buffer_clear(&aud_tras_info->aud_tras_rb);
-		os_free(aud_tras_info->aud_tras_buff_addr);
+		audio_tras_free(aud_tras_info->aud_tras_buff_addr);
 		aud_tras_info->aud_tras_buff_addr == NULL;
 	}
 
 	if (aud_tras_info)
 	{
-		os_free(aud_tras_info);
+		audio_tras_free(aud_tras_info);
 		aud_tras_info = NULL;
 	}
 

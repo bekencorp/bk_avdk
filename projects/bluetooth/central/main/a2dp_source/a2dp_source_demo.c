@@ -3,6 +3,7 @@
 #include "os/os.h"
 #include "os/mem.h"
 #include "os/str.h"
+#include <modules/pm.h>
 #include <components/log.h>
 #include "diskio.h"
 
@@ -40,9 +41,9 @@
 #endif
 
 #if CONFIG_SOC_BK7256XX
-#define A2DP_CPU_FRQ PM_CPU_FRQ_240M
+    #define A2DP_CPU_FRQ PM_CPU_FRQ_240M
 #else
-#define A2DP_CPU_FRQ PM_CPU_FRQ_320M
+    #define A2DP_CPU_FRQ PM_CPU_FRQ_320M
 #endif
 
 #define OLD_GAP_API_IMPL 1
@@ -276,6 +277,21 @@ static void bt_api_event_cb(bk_gap_bt_cb_event_t event, bk_bt_gap_cb_param_t *pa
     }
     break;
 
+    case BK_BT_GAP_AUTH_CMPL_EVT:
+    {
+        struct auth_cmpl_param *pm = (typeof(pm))param;
+
+        a2dp_logi("auth cmpl status 0x%x %02x:%02x:%02x:%02x:%02x:%02x",
+                  pm->stat,
+                  pm->bda[5],
+                  pm->bda[4],
+                  pm->bda[3],
+                  pm->bda[2],
+                  pm->bda[1],
+                  pm->bda[0]);
+    }
+    break;
+
 #if 0//OLD_GAP_API_IMPL
 
     case BK_DM_BT_GAP_DISC_RES_EVT:
@@ -388,7 +404,7 @@ static void bk_bt_a2dp_source_event_cb(bk_a2dp_cb_event_t event, bk_a2dp_cb_para
     case BK_A2DP_PROF_STATE_EVT:
     {
         a2dp_logi("a2dp prof init action %d status %d reason %d",
-                        p_param->a2dp_prof_stat.action, p_param->a2dp_prof_stat.status, p_param->a2dp_prof_stat.reason);
+                  p_param->a2dp_prof_stat.action, p_param->a2dp_prof_stat.status, p_param->a2dp_prof_stat.reason);
 
         if (!p_param->a2dp_prof_stat.status)
         {
@@ -1421,15 +1437,13 @@ static int32_t get_mp3_info(MP3FrameInfo *info)
     uint8_t *pcm_write_ptr = NULL;
     int bytesleft = 0;
     uint8_t *current_mp3_read_ptr = NULL;
-    uint8_t id3v2_maj_ver = 0;
-    uint16_t id3v2_min_ver = 0;
+    uint8_t id3_maj_ver = 0;
+    uint16_t id3_min_ver = 0;
     uint32_t file_size = 0;
     FATFS *s_pfs = NULL;
     uint32_t frame_start_offset = 0;
     int ret = 0;
     HMP3Decoder *s_mp3_decoder = NULL;
-
-    (void)id3v2_maj_ver;
 
     os_memset(info, 0, sizeof(*info));
 
@@ -1484,12 +1498,10 @@ static int32_t get_mp3_info(MP3FrameInfo *info)
         goto error;
     }
 
-    if (os_memcmp(tag_header, "ID3", 3))
+    do
     {
         FILINFO info;
         uint8_t id3v1[128] = {0};
-
-        //a2dp_loge("ID3v2 not found!, try found ID3v1");
 
         os_memset(&info, 0, sizeof(info));
         fr = f_stat(full_path, &info);
@@ -1502,7 +1514,23 @@ static int32_t get_mp3_info(MP3FrameInfo *info)
 
         file_size = info.fsize;
 
-        fr = f_lseek(&mp3file, file_size - 128);
+        if (os_memcmp(tag_header, "ID3", 3) == 0)
+        {
+            uint32_t tag_size = ((tag_header[6] & 0x7F) << 21) | ((tag_header[7] & 0x7F) << 14) | ((tag_header[8] & 0x7F) << 7) | (tag_header[9] & 0x7F);
+            frame_start_offset = sizeof(tag_header) + tag_size;
+
+            id3_min_ver = ((tag_header[4] << 8) | tag_header[3]);
+            id3_maj_ver = 2;
+
+            a2dp_logi("ID3v2.%d flag 0x%x len %d", id3_min_ver, tag_header[5], tag_size);
+
+            if (id3_min_ver == 4 && (tag_header[5] & (1 << 4)))
+            {
+                frame_start_offset += 10;
+            }
+        }
+
+        fr = f_lseek(&mp3file, file_size - sizeof(id3v1));
 
         if (fr != FR_OK)
         {
@@ -1520,35 +1548,20 @@ static int32_t get_mp3_info(MP3FrameInfo *info)
 
         if (os_memcmp(id3v1, "TAG", 3))
         {
-            a2dp_loge("ID3v1 not found!");
-            goto error;
+            a2dp_logd("ID3v1 not found!");
+            break;
         }
-
-        frame_start_offset = 0;
-
-        f_lseek(&mp3file, frame_start_offset);
 
         a2dp_logi("found ID3v1");
 
-        id3v2_maj_ver = 1;
-    }
-    else
-    {
-        uint32_t tag_size = ((tag_header[6] & 0x7F) << 21) | ((tag_header[7] & 0x7F) << 14) | ((tag_header[8] & 0x7F) << 7) | (tag_header[9] & 0x7F);
-        frame_start_offset = sizeof(tag_header) + tag_size;
-
-        id3v2_min_ver = ((tag_header[4] << 8) | tag_header[3]);
-        id3v2_maj_ver = 2;
-
-        a2dp_logi("ID3v2.%d flag 0x%x len %d", id3v2_min_ver, tag_header[5], tag_size);
-
-        if (id3v2_min_ver == 4 && (tag_header[5] & (1 << 4)))
+        if (!id3_maj_ver)
         {
-            frame_start_offset += 10;
+            id3_maj_ver = 1;
         }
-
-        f_lseek(&mp3file, frame_start_offset);
     }
+    while (0);
+
+    f_lseek(&mp3file, frame_start_offset);
 
     a2dp_logi("mp3 file open successfully!");
 
@@ -1652,8 +1665,9 @@ static void bt_a2dp_source_decode_task(void *arg)
     int bytesleft = 0;
     uint8_t *current_mp3_read_ptr = NULL;
     uint8_t *mp3_read_end_ptr = NULL;
-    uint8_t id3v2_maj_ver = 0;
-    uint16_t id3v2_min_ver = 0;
+    uint8_t id3_maj_ver = 0;
+    uint16_t id3_min_ver = 0;
+    uint8_t has_id3v1 = 0;
     uint32_t file_size = 0;
     uint32_t pcm_decode_size = 0;
 
@@ -1722,12 +1736,10 @@ static void bt_a2dp_source_decode_task(void *arg)
         goto error;
     }
 
-    if (os_memcmp(tag_header, "ID3", 3))
+    do
     {
         FILINFO info;
         uint8_t id3v1[128] = {0};
-
-        //a2dp_loge("ID3v2 not found!, try found ID3v1");
 
         os_memset(&info, 0, sizeof(info));
         fr = f_stat(full_path, &info);
@@ -1740,7 +1752,23 @@ static void bt_a2dp_source_decode_task(void *arg)
 
         file_size = info.fsize;
 
-        fr = f_lseek(&mp3file, file_size - 128);
+        if (os_memcmp(tag_header, "ID3", 3) == 0)
+        {
+            uint32_t tag_size = ((tag_header[6] & 0x7F) << 21) | ((tag_header[7] & 0x7F) << 14) | ((tag_header[8] & 0x7F) << 7) | (tag_header[9] & 0x7F);
+            frame_start_offset = sizeof(tag_header) + tag_size;
+
+            id3_min_ver = ((tag_header[4] << 8) | tag_header[3]);
+            id3_maj_ver = 2;
+
+            a2dp_logi("ID3v2.%d flag 0x%x len %d", id3_min_ver, tag_header[5], tag_size);
+
+            if (id3_min_ver == 4 && (tag_header[5] & (1 << 4)))
+            {
+                frame_start_offset += 10;
+            }
+        }
+
+        fr = f_lseek(&mp3file, file_size - sizeof(id3v1));
 
         if (fr != FR_OK)
         {
@@ -1758,35 +1786,22 @@ static void bt_a2dp_source_decode_task(void *arg)
 
         if (os_memcmp(id3v1, "TAG", 3))
         {
-            a2dp_loge("ID3v1 not found!");
-            goto error;
+            a2dp_logd("ID3v1 not found!");
+            break;
         }
 
-        frame_start_offset = 0;
-
-        f_lseek(&mp3file, frame_start_offset);
+        has_id3v1 = 1;
 
         a2dp_logi("found ID3v1");
 
-        id3v2_maj_ver = 1;
-    }
-    else
-    {
-        uint32_t tag_size = ((tag_header[6] & 0x7F) << 21) | ((tag_header[7] & 0x7F) << 14) | ((tag_header[8] & 0x7F) << 7) | (tag_header[9] & 0x7F);
-        frame_start_offset = sizeof(tag_header) + tag_size;
-
-        id3v2_min_ver = ((tag_header[4] << 8) | tag_header[3]);
-        id3v2_maj_ver = 2;
-
-        a2dp_logi("ID3v2.%d flag 0x%x len %d", id3v2_min_ver, tag_header[5], tag_size);
-
-        if (id3v2_min_ver == 4 && (tag_header[5] & (1 << 4)))
+        if (!id3_maj_ver)
         {
-            frame_start_offset += 10;
+            id3_maj_ver = 1;
         }
-
-        f_lseek(&mp3file, frame_start_offset);
     }
+    while (0);
+
+    f_lseek(&mp3file, frame_start_offset);
 
     a2dp_logi("mp3 file open successfully!");
 
@@ -1842,7 +1857,7 @@ static void bt_a2dp_source_decode_task(void *arg)
                 continue;
             }
 
-            if (id3v2_maj_ver == 1 && file_size - f_tell(&mp3file) <= 128)
+            if (has_id3v1 && file_size - f_tell(&mp3file) <= 128)
             {
                 num_rd -= f_tell(&mp3file) - (file_size - 128);
             }
@@ -2061,6 +2076,7 @@ static bk_err_t a2dp_source_demo_stop_mp3_decode_task(void)
             a2dp_loge("cpu1 power down err %d !!", ret);
         }
     }
+
 #endif
 
     return 0;

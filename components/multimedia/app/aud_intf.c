@@ -62,10 +62,10 @@ static aud_rx_count_debug_t aud_rx_count = {0};
 //aud_intf_all_setup_t aud_all_setup;
 aud_intf_info_t aud_intf_info = DEFAULT_AUD_INTF_CONFIG();
 
+static beken_semaphore_t aud_intf_task_sem = NULL;
+
 /* extern api */
 //static void audio_tras_demo_deconfig(void);
-beken_semaphore_t mailbox_media_app_aud_sem = NULL;
-media_mailbox_msg_t *media_aud_mailbox_msg = NULL;
 
 /*
 static const unsigned int PCM_8000[] = {
@@ -94,24 +94,25 @@ static const unsigned int PCM_8000[] = {
 
 static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size);
 
+static void *audio_intf_malloc(uint32_t size)
+{
+#if CONFIG_PSRAM_AS_SYS_MEMORY
+	return psram_malloc(size);
+#else
+	return os_malloc(size);
+#endif
+}
+
+static void audio_intf_free(void *mem)
+{
+	os_free(mem);
+}
 
 bk_err_t mailbox_media_aud_send_msg(media_event_t event, void *param)
 {
 	bk_err_t ret = BK_OK;
 
-	if (!media_aud_mailbox_msg) {
-		media_aud_mailbox_msg = os_malloc(sizeof(media_mailbox_msg_t));
-		if (!media_aud_mailbox_msg) {
-			LOGE("%s, %d, malloc media_aud_mailbox_msg fail \n", __func__, __LINE__);
-			aud_intf_info.api_info.busy_status = false;
-			return BK_ERR_NO_MEM;
-		}
-	}
-
-	media_aud_mailbox_msg->event = event;
-	media_aud_mailbox_msg->param = (uint32_t)param;
-	media_aud_mailbox_msg->sem = mailbox_media_app_aud_sem;
-	ret = msg_send_req_to_media_app_mailbox_sync(media_aud_mailbox_msg);
+	ret = msg_send_req_to_media_app_mailbox_sync(event, (uint32_t)param, NULL);
 	if (ret != kNoErr)
 	{
 		LOGE("%s, %d, fail, ret: 0x%x\n", __func__, __LINE__, ret);
@@ -157,6 +158,19 @@ static bk_err_t aud_intf_deinit(void)
 			return kOverrunErr;
 		}
 
+		ret = rtos_get_semaphore(&aud_intf_task_sem, BEKEN_WAIT_FOREVER);
+		if (ret != BK_OK)
+		{
+			LOGE("%s, %d, rtos_get_semaphore\n", __func__, __LINE__);
+			return BK_FAIL;
+		}
+
+		if(aud_intf_task_sem)
+		{
+			rtos_deinit_semaphore(&aud_intf_task_sem);
+			aud_intf_task_sem = NULL;
+		}
+
 		return ret;
 	}
 	return kNoResourcesErr;
@@ -165,6 +179,8 @@ static bk_err_t aud_intf_deinit(void)
 static void aud_intf_main(beken_thread_arg_t param_data)
 {
 	bk_err_t ret = BK_OK;
+
+	rtos_set_semaphore(&aud_intf_task_sem);
 
 	aud_intf_msg_t msg;
 	while (1) {
@@ -215,6 +231,8 @@ aud_intf_exit:
 	/* delete task */
 	aud_intf_info.aud_intf_thread_hdl = NULL;
 
+	rtos_set_semaphore(&aud_intf_task_sem);
+
 	rtos_delete_thread(NULL);
 }
 
@@ -228,65 +246,109 @@ bk_err_t bk_aud_intf_set_mode(aud_intf_work_mode_t work_mode)
 
 	CHECK_AUD_INTF_BUSY_STA();
 	aud_intf_work_mode_t temp = aud_intf_info.drv_info.setup.work_mode;
-
 	aud_intf_info.drv_info.setup.work_mode = work_mode;
-	ret = mailbox_media_aud_send_msg(EVENT_AUD_SET_MODE_REQ, (void *)aud_intf_info.drv_info.setup.work_mode);
-	if (ret != BK_OK) {
-		aud_intf_info.drv_info.setup.work_mode = temp;
-	} else {
-		aud_intf_info.drv_status = AUD_INTF_DRV_STA_WORK;
-	}
 
 	/* create task to handle tx and rx message */
-	if (ret == BK_OK) {
-		if (work_mode == AUD_INTF_WORK_MODE_GENERAL || work_mode == AUD_INTF_WORK_MODE_VOICE) {
-			if (!aud_intf_info.aud_intf_msg_que) {
-				ret = rtos_init_queue(&aud_intf_info.aud_intf_msg_que,
-									  "aud_intf_int_que",
-									  sizeof(aud_intf_msg_t),
-									  10);
-				if (ret != kNoErr) {
-					LOGE("%s, %d, ceate aud_intf_msg_que fail \n", __func__, __LINE__);
-					return BK_FAIL;
-				}
-				LOGI("%s, %d, ceate aud_intf_msg_que complete \n", __func__, __LINE__);
-			}
+//	aud_intf_info.api_info.busy_status = true;
 
-			if (!aud_intf_info.aud_intf_thread_hdl) {
-				ret = rtos_create_thread(&aud_intf_info.aud_intf_thread_hdl,
-									 6,
-									 "aud_intf",
-									 (beken_thread_function_t)aud_intf_main,
-									 2048,
-									 NULL);
-				if (ret != kNoErr) {
-					LOGE("%s, %d, create audio transfer driver task fail \n", __func__, __LINE__);
-					rtos_deinit_queue(&aud_intf_info.aud_intf_msg_que);
-					aud_intf_info.aud_intf_msg_que = NULL;
-					aud_intf_info.aud_intf_thread_hdl = NULL;
-				}
-				LOGI("%s, %d, create audio transfer driver task complete \n", __func__, __LINE__);
+	if (work_mode == AUD_INTF_WORK_MODE_GENERAL || work_mode == AUD_INTF_WORK_MODE_VOICE) {
+		if (aud_intf_task_sem == NULL) {
+			ret = rtos_init_semaphore(&aud_intf_task_sem, 1);
+			if (ret != BK_OK)
+			{
+				LOGE("%s, %d, create audio intf task semaphore failed \n", __func__, __LINE__);
+				goto fail;
 			}
-
-			if (work_mode == AUD_INTF_WORK_MODE_VOICE) {
-				/* init audio transfer task */
-				aud_tras_setup_t aud_tras_setup_cfg = {0};
-				aud_tras_setup_cfg.aud_tras_send_data_cb = aud_intf_info.drv_info.setup.aud_intf_tx_mic_data;
-				ret = aud_tras_init(&aud_tras_setup_cfg);
-				if (ret != BK_OK) {
-					LOGE("%s, %d, aud_tras_init fail \n", __func__, __LINE__);
-					return BK_FAIL;
-				}
-			}
-		} else if (work_mode == AUD_INTF_WORK_MODE_NULL) {
-			aud_intf_deinit();
-			if (temp == AUD_INTF_WORK_MODE_VOICE) {
-				aud_tras_deinit();
-			}
-		} else {
-			//TODO nothing
 		}
+
+		if (!aud_intf_info.aud_intf_msg_que) {
+			ret = rtos_init_queue(&aud_intf_info.aud_intf_msg_que,
+								  "aud_intf_int_que",
+								  sizeof(aud_intf_msg_t),
+								  10);
+			if (ret != kNoErr) {
+				LOGE("%s, %d, ceate aud_intf_msg_que fail \n", __func__, __LINE__);
+				aud_intf_info.aud_intf_msg_que = NULL;
+				goto fail;
+			}
+			LOGD("%s, %d, ceate aud_intf_msg_que complete \n", __func__, __LINE__);
+		}
+
+		if (!aud_intf_info.aud_intf_thread_hdl) {
+			ret = rtos_create_thread(&aud_intf_info.aud_intf_thread_hdl,
+								 6,
+								 "aud_intf",
+								 (beken_thread_function_t)aud_intf_main,
+								 2048,
+								 NULL);
+			if (ret != kNoErr) {
+				LOGE("%s, %d, create audio transfer task fail \n", __func__, __LINE__);
+				rtos_deinit_queue(&aud_intf_info.aud_intf_msg_que);
+				aud_intf_info.aud_intf_msg_que = NULL;
+				aud_intf_info.aud_intf_thread_hdl = NULL;
+				goto fail;
+			}
+
+			ret = rtos_get_semaphore(&aud_intf_task_sem, BEKEN_WAIT_FOREVER);
+			if (ret != BK_OK)
+			{
+				LOGE("%s, %d, rtos_get_semaphore\n", __func__, __LINE__);
+				goto fail;
+			}
+
+			LOGD("%s, %d, create audio transfer driver task complete \n", __func__, __LINE__);
+		}
+
+		if (work_mode == AUD_INTF_WORK_MODE_VOICE) {
+			/* init audio transfer task */
+			aud_tras_setup_t aud_tras_setup_cfg = {0};
+			aud_tras_setup_cfg.aud_tras_send_data_cb = aud_intf_info.drv_info.setup.aud_intf_tx_mic_data;
+			ret = aud_tras_init(&aud_tras_setup_cfg);
+			if (ret != BK_OK) {
+				LOGE("%s, %d, aud_tras_init fail \n", __func__, __LINE__);
+				goto fail;
+			}
+		}
+
+		ret = mailbox_media_aud_send_msg(EVENT_AUD_SET_MODE_REQ, (void *)aud_intf_info.drv_info.setup.work_mode);
+		if (ret != BK_OK) {
+			LOGE("%s, %d, set mode fail, ret: %d \n", __func__, __LINE__, ret);
+			goto fail;
+		}
+	} else if (work_mode == AUD_INTF_WORK_MODE_NULL) {
+		ret = mailbox_media_aud_send_msg(EVENT_AUD_SET_MODE_REQ, (void *)aud_intf_info.drv_info.setup.work_mode);
+		if (ret != BK_OK) {
+			LOGE("%s, %d, set mode fail, ret: %d \n", __func__, __LINE__, ret);
+			return ret;
+		}
+
+		aud_intf_deinit();
+		aud_tras_deinit();
+	} else {
+		//TODO nothing
 	}
+
+	aud_intf_info.api_info.busy_status = false;
+
+	return ret;
+
+fail:
+	aud_intf_info.drv_info.setup.work_mode = temp;
+
+	aud_tras_deinit();
+
+	if (aud_intf_info.aud_intf_thread_hdl && aud_intf_info.aud_intf_msg_que) {
+		aud_intf_deinit();
+	}
+
+	if(aud_intf_task_sem)
+	{
+		rtos_deinit_semaphore(&aud_intf_task_sem);
+		aud_intf_task_sem = NULL;
+	}
+
+	aud_intf_info.api_info.busy_status = false;
+
 	return ret;
 }
 
@@ -513,7 +575,7 @@ bk_err_t bk_aud_intf_set_aec_para(aud_intf_voc_aec_para_t aec_para, uint32_t val
 
 	CHECK_AUD_INTF_BUSY_STA();
 
-	aec_ctl = os_malloc(sizeof(aud_intf_voc_aec_ctl_t));
+	aec_ctl = audio_intf_malloc(sizeof(aud_intf_voc_aec_ctl_t));
 	if (aec_ctl == NULL) {
 		aud_intf_info.api_info.busy_status = false;
 		return BK_ERR_AUD_INTF_MEMY;
@@ -571,7 +633,7 @@ bk_err_t bk_aud_intf_set_aec_para(aud_intf_voc_aec_para_t aec_para, uint32_t val
 
 	ret = mailbox_media_aud_send_msg(EVENT_AUD_VOC_SET_AEC_PARA_REQ, aec_ctl);
 
-	os_free(aec_ctl);
+	audio_intf_free(aec_ctl);
 	return ret;
 }
 
@@ -650,12 +712,12 @@ static void aud_intf_spk_deconfig(void)
 	aud_intf_info.spk_info.spk_gain = 0;
 	ring_buffer_clear(aud_intf_info.spk_info.spk_rx_rb);
 	if (aud_intf_info.spk_info.spk_rx_ring_buff) {
-		os_free(aud_intf_info.spk_info.spk_rx_ring_buff);
+		audio_intf_free(aud_intf_info.spk_info.spk_rx_ring_buff);
 		aud_intf_info.spk_info.spk_rx_ring_buff = NULL;
 	}
 
 	if (aud_intf_info.spk_info.spk_rx_rb) {
-		os_free(aud_intf_info.spk_info.spk_rx_rb);
+		audio_intf_free(aud_intf_info.spk_info.spk_rx_rb);
 		aud_intf_info.spk_info.spk_rx_rb = NULL;
 	}
 }
@@ -675,14 +737,14 @@ bk_err_t bk_aud_intf_spk_init(aud_intf_spk_setup_t *setup)
 	aud_intf_info.spk_info.spk_type = setup->spk_type;
 	aud_intf_info.spk_info.fifo_frame_num = 4;			//default: 4
 
-	aud_intf_info.spk_info.spk_rx_ring_buff = os_malloc(aud_intf_info.spk_info.frame_size * aud_intf_info.spk_info.fifo_frame_num);
+	aud_intf_info.spk_info.spk_rx_ring_buff = audio_intf_malloc(aud_intf_info.spk_info.frame_size * aud_intf_info.spk_info.fifo_frame_num);
 	if (aud_intf_info.spk_info.spk_rx_ring_buff == NULL) {
 		LOGE("%s, %d, malloc spk_rx_ring_buff fail \n", __func__, __LINE__);
 		err = BK_ERR_AUD_INTF_MEMY;
 		goto aud_intf_spk_init_exit;
 	}
 
-	aud_intf_info.spk_info.spk_rx_rb = os_malloc(sizeof(RingBufferContext));
+	aud_intf_info.spk_info.spk_rx_rb = audio_intf_malloc(sizeof(RingBufferContext));
 	if (aud_intf_info.spk_info.spk_rx_rb == NULL) {
 		LOGE("%s, %d, malloc spk_rx_rb fail \n", __func__, __LINE__);
 		err = BK_ERR_AUD_INTF_MEMY;
@@ -703,9 +765,9 @@ bk_err_t bk_aud_intf_spk_init(aud_intf_spk_setup_t *setup)
 
 aud_intf_spk_init_exit:
 	if (aud_intf_info.spk_info.spk_rx_ring_buff != NULL)
-		os_free(aud_intf_info.spk_info.spk_rx_ring_buff);
+		audio_intf_free(aud_intf_info.spk_info.spk_rx_ring_buff);
 	if (aud_intf_info.spk_info.spk_rx_rb != NULL)
-		os_free(aud_intf_info.spk_info.spk_rx_rb);
+		audio_intf_free(aud_intf_info.spk_info.spk_rx_rb);
 	aud_intf_info.api_info.busy_status = false;
 	return err;
 }
@@ -766,7 +828,7 @@ static void aud_intf_voc_deconfig(void)
 
 	/* aec deconfig */
 	if (aud_intf_info.voc_info.aec_enable && aud_intf_info.voc_info.aec_setup) {
-		os_free(aud_intf_info.voc_info.aec_setup);
+		audio_intf_free(aud_intf_info.voc_info.aec_setup);
 	}
 	aud_intf_info.voc_info.aec_setup = NULL;
 	aud_intf_info.voc_info.aec_enable = false;
@@ -776,25 +838,25 @@ static void aud_intf_voc_deconfig(void)
 	aud_intf_info.voc_info.tx_info.tx_buff_status = false;
 	aud_intf_info.voc_info.tx_info.ping.busy_status = false;
 	if (aud_intf_info.voc_info.tx_info.ping.buff_addr) {
-		os_free(aud_intf_info.voc_info.tx_info.ping.buff_addr);
+		audio_intf_free(aud_intf_info.voc_info.tx_info.ping.buff_addr);
 		aud_intf_info.voc_info.tx_info.ping.buff_addr = NULL;
 	}
 
 	aud_intf_info.voc_info.tx_info.pang.busy_status = false;
 	if (aud_intf_info.voc_info.tx_info.pang.buff_addr) {
-		os_free(aud_intf_info.voc_info.tx_info.pang.buff_addr);
+		audio_intf_free(aud_intf_info.voc_info.tx_info.pang.buff_addr);
 		aud_intf_info.voc_info.tx_info.pang.buff_addr = NULL;
 	}
 
 	/* rx deconfig */
 	aud_intf_info.voc_info.rx_info.rx_buff_status = false;
 	if (aud_intf_info.voc_info.rx_info.decoder_ring_buff) {
-		os_free(aud_intf_info.voc_info.rx_info.decoder_ring_buff);
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_ring_buff);
 		aud_intf_info.voc_info.rx_info.decoder_ring_buff = NULL;
 	}
 
 	if (aud_intf_info.voc_info.rx_info.decoder_rb) {
-		os_free(aud_intf_info.voc_info.rx_info.decoder_rb);
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_rb);
 		aud_intf_info.voc_info.rx_info.decoder_rb = NULL;
 	}
 
@@ -873,7 +935,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 
 	/* aec config */
 	if (aud_intf_info.voc_info.aec_enable) {
-		aud_intf_info.voc_info.aec_setup = os_malloc(sizeof(aec_config_t));
+		aud_intf_info.voc_info.aec_setup = audio_intf_malloc(sizeof(aec_config_t));
 		if (aud_intf_info.voc_info.aec_setup == NULL) {
 			LOGE("%s, %d, malloc aec_setup fail \n", __func__, __LINE__);
 			err = BK_ERR_AUD_INTF_MEMY;
@@ -908,14 +970,14 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 			break;
 	}
 	aud_intf_info.voc_info.tx_info.ping.busy_status = false;
-	aud_intf_info.voc_info.tx_info.ping.buff_addr = os_malloc(aud_intf_info.voc_info.tx_info.buff_length);
+	aud_intf_info.voc_info.tx_info.ping.buff_addr = audio_intf_malloc(aud_intf_info.voc_info.tx_info.buff_length);
 	if (aud_intf_info.voc_info.tx_info.ping.buff_addr == NULL) {
 		LOGE("%s, %d, malloc pingpang buffer of tx fail \n", __func__, __LINE__);
 		err = BK_ERR_AUD_INTF_MEMY;
 		goto aud_intf_voc_init_exit;
 	}
 	aud_intf_info.voc_info.tx_info.pang.busy_status = false;
-	aud_intf_info.voc_info.tx_info.pang.buff_addr = os_malloc(aud_intf_info.voc_info.tx_info.buff_length);
+	aud_intf_info.voc_info.tx_info.pang.buff_addr = audio_intf_malloc(aud_intf_info.voc_info.tx_info.buff_length);
 	if (aud_intf_info.voc_info.tx_info.pang.buff_addr == NULL) {
 		LOGE("%s, %d, malloc pang buffer of tx fail \n", __func__, __LINE__);
 		err = BK_ERR_AUD_INTF_MEMY;
@@ -943,14 +1005,14 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 	aud_intf_info.voc_info.rx_info.frame_num = setup.frame_num;
 	aud_intf_info.voc_info.rx_info.rx_buff_seq_tail = 0;
 	aud_intf_info.voc_info.rx_info.fifo_frame_num = setup.fifo_frame_num;
-	aud_intf_info.voc_info.rx_info.decoder_ring_buff = os_malloc(aud_intf_info.voc_info.rx_info.frame_size * aud_intf_info.voc_info.rx_info.frame_num + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+	aud_intf_info.voc_info.rx_info.decoder_ring_buff = audio_intf_malloc(aud_intf_info.voc_info.rx_info.frame_size * aud_intf_info.voc_info.rx_info.frame_num + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
 	if (aud_intf_info.voc_info.rx_info.decoder_ring_buff == NULL) {
 		LOGE("%s, %d, malloc decoder ring buffer of rx fail \n", __func__, __LINE__);
 		err = BK_ERR_AUD_INTF_MEMY;
 		goto aud_intf_voc_init_exit;
 	}
 	LOGI("%s, %d, malloc decoder_ring_buff:%p, size:%d \r\n", __func__, __LINE__, aud_intf_info.voc_info.rx_info.decoder_ring_buff, aud_intf_info.voc_info.rx_info.frame_size * aud_intf_info.voc_info.rx_info.frame_num);
-	aud_intf_info.voc_info.rx_info.decoder_rb = os_malloc(sizeof(RingBufferContext));
+	aud_intf_info.voc_info.rx_info.decoder_rb = audio_intf_malloc(sizeof(RingBufferContext));
 	if (aud_intf_info.voc_info.rx_info.decoder_rb == NULL) {
 		LOGE("%s, %d, malloc decoder_rb fail \n", __func__, __LINE__);
 		err = BK_ERR_AUD_INTF_MEMY;
@@ -969,12 +1031,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 //	CHECK_AUD_INTF_BUSY_STA();
 	ret = mailbox_media_aud_send_msg(EVENT_AUD_VOC_INIT_REQ, &aud_intf_info.voc_info);
 	if (ret != BK_OK) {
-		err = BK_ERR_AUD_INTF_TX_MSG;
-		goto aud_intf_voc_init_exit;
-	}
-
-	if (media_aud_mailbox_msg->result != BK_ERR_AUD_INTF_OK) {
-		err = media_aud_mailbox_msg->result;
+		err = ret;
 		LOGE("%s, %d, fail, err:%d \r\n", __func__, __LINE__, err);
 		goto aud_intf_voc_init_exit;
 	}
@@ -1000,27 +1057,27 @@ aud_intf_voc_init_exit:
 #endif
 
 	if (aud_intf_info.voc_info.aec_setup != NULL) {
-		os_free(aud_intf_info.voc_info.aec_setup);
+		audio_intf_free(aud_intf_info.voc_info.aec_setup);
 		aud_intf_info.voc_info.aec_setup = NULL;
 	}
 
 	if (aud_intf_info.voc_info.tx_info.ping.buff_addr != NULL) {
-		os_free(aud_intf_info.voc_info.tx_info.ping.buff_addr);
+		audio_intf_free(aud_intf_info.voc_info.tx_info.ping.buff_addr);
 		aud_intf_info.voc_info.tx_info.ping.buff_addr = NULL;
 	}
 
 	if (aud_intf_info.voc_info.tx_info.pang.buff_addr != NULL) {
-		os_free(aud_intf_info.voc_info.tx_info.pang.buff_addr);
+		audio_intf_free(aud_intf_info.voc_info.tx_info.pang.buff_addr);
 		aud_intf_info.voc_info.tx_info.pang.buff_addr = NULL;
 	}
 
 	if (aud_intf_info.voc_info.rx_info.decoder_ring_buff != NULL) {
-		os_free(aud_intf_info.voc_info.rx_info.decoder_ring_buff);
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_ring_buff);
 		aud_intf_info.voc_info.rx_info.decoder_ring_buff = NULL;
 	}
 
 	if (aud_intf_info.voc_info.rx_info.decoder_rb != NULL) {
-		os_free(aud_intf_info.voc_info.rx_info.decoder_rb);
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_rb);
 		aud_intf_info.voc_info.rx_info.decoder_rb = NULL;
 	}
 
@@ -1078,7 +1135,7 @@ bk_err_t bk_aud_intf_voc_start(void)
 			if (ring_buffer_get_fill_size(aud_intf_info.voc_info.rx_info.decoder_rb)/aud_intf_info.voc_info.rx_info.frame_size < aud_intf_info.voc_info.rx_info.fifo_frame_num) {
 				uint8_t *temp_buff = NULL;
 				uint32_t temp_size = aud_intf_info.voc_info.rx_info.frame_size * aud_intf_info.voc_info.rx_info.fifo_frame_num - ring_buffer_get_fill_size(aud_intf_info.voc_info.rx_info.decoder_rb);
-				temp_buff = os_malloc(temp_size);
+				temp_buff = audio_intf_malloc(temp_size);
 				if (temp_buff == NULL) {
 					return BK_ERR_AUD_INTF_MEMY;
 				} else {
@@ -1100,7 +1157,7 @@ bk_err_t bk_aud_intf_voc_start(void)
 					}
 
 					aud_intf_voc_write_spk_data(temp_buff, temp_size);
-					os_free(temp_buff);
+					audio_intf_free(temp_buff);
 				}
 			}
 			break;
@@ -1211,26 +1268,6 @@ bk_err_t bk_aud_intf_drv_init(aud_intf_drv_setup_t *setup)
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_AUDP_AUDIO, PM_POWER_MODULE_STATE_ON);
 //	rtos_delay_milliseconds(100);
 
-	/* init semaphore used to  */
-	if (!mailbox_media_app_aud_sem) {
-		ret = rtos_init_semaphore(&mailbox_media_app_aud_sem, 1);
-
-		if (ret != BK_OK)
-		{
-			LOGE("%s, %d, create mailbox app test semaphore fail \n", __func__, __LINE__);
-			goto aud_intf_drv_init_exit;
-		}
-	}
-
-	if (!media_aud_mailbox_msg) {
-		media_aud_mailbox_msg = os_malloc(sizeof(media_mailbox_msg_t));
-		if (!media_aud_mailbox_msg) {
-			LOGE("%s, %d, malloc media_aud_mailbox_msg fail \n", __func__, __LINE__);
-			err = BK_ERR_NO_MEM;
-			goto aud_intf_drv_init_exit;
-		}
-	}
-
 	if (aud_intf_info.drv_status != AUD_INTF_DRV_STA_NULL) {
 		LOGI("%s, %d, aud_intf driver already init \n", __func__, __LINE__);
 		return BK_ERR_AUD_INTF_OK;
@@ -1243,7 +1280,7 @@ bk_err_t bk_aud_intf_drv_init(aud_intf_drv_setup_t *setup)
 	CHECK_AUD_INTF_BUSY_STA();
 
 	/* init audio interface driver */
-	LOGI("%s, %d, init aud_intf driver in CPU1 mode \n", __func__, __LINE__);
+	LOGD("%s, %d, init aud_intf driver in CPU1 mode \n", __func__, __LINE__);
 	ret = mailbox_media_aud_send_msg(EVENT_AUD_INIT_REQ, &aud_intf_info.drv_info);
 	if (ret != BK_OK) {
 		LOGE("%s, %d, init aud_intf driver fail \n", __func__, __LINE__);
@@ -1255,16 +1292,6 @@ bk_err_t bk_aud_intf_drv_init(aud_intf_drv_setup_t *setup)
 	return BK_ERR_AUD_INTF_OK;
 
 aud_intf_drv_init_exit:
-	if (mailbox_media_app_aud_sem) {
-		rtos_deinit_semaphore(&mailbox_media_app_aud_sem);
-		mailbox_media_app_aud_sem = NULL;
-	}
-
-	if (media_aud_mailbox_msg) {
-		os_free(media_aud_mailbox_msg);
-		media_aud_mailbox_msg = NULL;
-	}
-
 	LOGE("%s, %d, init aud_intf driver fail \n", __func__, __LINE__);
 
 	return err;
@@ -1291,15 +1318,6 @@ bk_err_t bk_aud_intf_drv_deinit(void)
 	}
 
 	/* deinit semaphore used to  */
-	if (mailbox_media_app_aud_sem) {
-		rtos_deinit_semaphore(&mailbox_media_app_aud_sem);
-		mailbox_media_app_aud_sem = NULL;
-	}
-
-	if (media_aud_mailbox_msg) {
-		os_free(media_aud_mailbox_msg);
-		media_aud_mailbox_msg = NULL;
-	}
 
 	aud_intf_info.drv_status = AUD_INTF_DRV_STA_NULL;
 
@@ -1344,6 +1362,9 @@ static bk_err_t aud_intf_genl_write_spk_data(uint8_t *dac_buff, uint32_t size)
 	//LOGI("%s \n", __func__);
 
 	if (aud_intf_info.spk_status == AUD_INTF_SPK_STA_START || aud_intf_info.spk_status == AUD_INTF_SPK_STA_IDLE) {
+#if (CONFIG_CACHE_ENABLE)
+		flush_all_dcache();
+#endif
 		if (ring_buffer_get_free_size(aud_intf_info.spk_info.spk_rx_rb) >= size) {
 			write_size = ring_buffer_write(aud_intf_info.spk_info.spk_rx_rb, dac_buff, size);
 			if (write_size != size) {

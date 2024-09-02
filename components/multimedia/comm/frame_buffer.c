@@ -39,6 +39,8 @@
 #define LOGE(...) BK_LOGE(TAG, ##__VA_ARGS__)
 #define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
+#define FRAME_BUFFER_READ_COMPLETE   (1 << 0)
+
 #define list_for_each_safe_edge(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; (pos != (head)) && (pos->next != pos); \
 	     pos = n, n = pos->next)
@@ -47,7 +49,7 @@ extern uint32_t  platform_is_in_interrupt_context(void);
 
 fb_info_t *fb_info = NULL;
 fb_mem_list_t fb_mem_list[FB_INDEX_MAX] = {0};
-uint8_t fb_count[FB_INDEX_MAX] = {5, 4, H264_GOP_FRAME_CNT * 2};
+uint8_t fb_count[FB_INDEX_MAX] = {5, 4, 8, H265_GOP_FRAME_CNT * 2};
 
 fb_mem_list_t *frame_buffer_list_get(pixel_format_t fmt)
 {
@@ -70,7 +72,10 @@ fb_mem_list_t *frame_buffer_list_get(pixel_format_t fmt)
 			ret = &fb_mem_list[FB_INDEX_DISPLAY];
 			break;
 		case PIXEL_FMT_H264:
-			ret = &fb_mem_list[FB_INDEX_H264];
+            ret = &fb_mem_list[FB_INDEX_H264];
+            break;
+		case PIXEL_FMT_H265:
+			ret = &fb_mem_list[FB_INDEX_H265];
 			break;
 		case PIXEL_FMT_UNKNOW:
 		default:
@@ -101,7 +106,10 @@ fb_type_t frame_buffer_type_get(pixel_format_t fmt)
 			ret = FB_INDEX_DISPLAY;
 			break;
 		case PIXEL_FMT_H264:
-			ret = FB_INDEX_H264;
+            ret = FB_INDEX_H264;
+            break;
+		case PIXEL_FMT_H265:
+			ret = FB_INDEX_H265;
 			break;
 		case PIXEL_FMT_UNKNOW:
 		default:
@@ -161,7 +169,7 @@ int frame_buffer_fb_init(fb_type_t type)
 			LOGE("%s ready_sem init failed\n", __func__);
 		}
 	}
-	else if (type == FB_INDEX_JPEG || type == FB_INDEX_H264)
+	else if (type == FB_INDEX_JPEG || type == FB_INDEX_H264 || type == FB_INDEX_H265)
 	{
 		mem_list->mode = FB_MEM_SHARED;
 		mem_list->count = fb_count[type];
@@ -247,6 +255,10 @@ int frame_buffer_fb_deinit(fb_type_t type)
 	else if (type == FB_INDEX_H264)
 	{
 		LOGI("h264 mem deinit\n");
+	}
+	else if (type == FB_INDEX_H265)
+	{
+		LOGI("h265 mem deinit\n");
 	}
 	else
 	{
@@ -366,21 +378,19 @@ void frame_buffer_fb_free(frame_buffer_t *frame, frame_module_t index)
 	fb_mem_list_t *mem_list = &fb_mem_list[type];
 	frame_buffer_node_t *node = list_entry(frame, frame_buffer_node_t, frame);
 	uint32_t isr_context = platform_is_in_interrupt_context();
-	GLOBAL_INT_DECLARATION();
 
 	if (mem_list == NULL)
 	{
 		LOGE("%s invalid mem_list: %p, %d\n", __func__, mem_list, index);
 		if (fb_info->modules[index].enable)
 		{
-			if (fb_info->modules[index].sem)
-			{
-				rtos_set_semaphore(&fb_info->modules[index].sem);
-			}
+			xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
 		}
 
 		return;
 	}
+
+	GLOBAL_INT_DECLARATION() = 0;
 
 	if (!isr_context)
 	{
@@ -398,10 +408,7 @@ void frame_buffer_fb_free(frame_buffer_t *frame, frame_module_t index)
 		if (fb_info->modules[index].enable)
 		{
 			LOGE("%s fb_mem_list disable: %p, %d\n", __func__, mem_list, index);
-			if (fb_info->modules[index].sem)
-			{
-				rtos_set_semaphore(&fb_info->modules[index].sem);
-			}
+			xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
 		}
 
 		if (!isr_context)
@@ -450,11 +457,7 @@ void frame_buffer_fb_free(frame_buffer_t *frame, frame_module_t index)
 
 		if (fb_info->modules[index].enable)
 		{
-			if (fb_info->modules[index].sem)
-			{
-				if (rtos_set_semaphore(&fb_info->modules[index].sem) != BK_OK)
-					LOGE("%s semaphore set faile\n", __func__);
-			}
+			xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
 		}
 
 		if (!isr_context)
@@ -487,8 +490,9 @@ out:
 	}
 }
 
-frame_buffer_t *frame_buffer_fb_malloc(fb_type_t type, uint32_t size)
+frame_buffer_t *frame_buffer_fb_dual_malloc(fb_type_t type, uint32_t size)
 {
+    BK_ASSERT(type == FB_INDEX_H264 || type == FB_INDEX_H265);
 	frame_buffer_node_t *node = NULL, *tmp = NULL;
 	fb_mem_list_t *mem_list = &fb_mem_list[type];
 	LIST_HEADER_T *pos, *n;
@@ -515,10 +519,6 @@ frame_buffer_t *frame_buffer_fb_malloc(fb_type_t type, uint32_t size)
 		GLOBAL_INT_DISABLE();
 	}
 
-malloc:
-
-	i_frame = 0;
-	pos = NULL, n = NULL;
 	list_for_each_safe(pos, n, &mem_list->free)
 	{
 		tmp = list_entry(pos, frame_buffer_node_t, list);
@@ -530,48 +530,141 @@ malloc:
 		}
 	}
 
-	if (node == NULL && type == FB_INDEX_H264)
+
+	// find a free node
+	if (node)
+	{
+		// get frame free list, need malloc psram buffer again
+		if (node->frame.base_addr == NULL)
+		{
+			node->frame.size = size;
+#if (CONFIG_PSRAM_WRITE_THROUGH)
+			node->frame.size += 32;// 1024
+#endif
+			// malloc psram mem to frame_buffer data
+			if (type == FB_INDEX_DISPLAY)
+			{
+				// need align 64K
+#if CONFIG_SOC_BK7256XX
+				node->frame.size += 64 * 1024;
+				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, node->frame.size);
+				if (node->frame.base_addr != NULL)
+				{
+					if ((uint32_t)node->frame.base_addr & 0xFFFF)
+					{
+						node->frame.frame = (uint8_t *)((((uint32_t)node->frame.base_addr >> 16) + 1) << 16);
+					}
+				}
+#else
+				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, node->frame.size);
+				node->frame.frame = node->frame.base_addr;
+#endif
+			}
+			else
+			{
+				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_ENCODE, node->frame.size);
+				node->frame.frame = node->frame.base_addr;
+			}
+
+			if (node->frame.base_addr == NULL)
+			{
+				// add this node to free_list, and from ready node_list to find a frame_buffer(direct free)
+				node->error = true;
+				list_add_tail(&node->list, &mem_list->free);
+				node = NULL;
+			}
+#if (CONFIG_PSRAM_WRITE_THROUGH)
+			else
+			{
+				// checkout node->frame->frame is aligned 32byte(8word)
+				if ((uint32_t)node->frame.base_addr & 0x1F)
+				{
+					node->frame.frame = (uint8_t *)((((uint32_t)node->frame.base_addr >> 5) + 1) << 5);
+				}
+
+				LOGD("%s, %d, %p, size:%d\r\n", __func__, type, node->frame.frame, size);
+			}
+#endif
+		}
+	}
+
+	if (node == NULL)
 	{
 		list_for_each_safe(pos, n, &mem_list->ready)
 		{
 			tmp = list_entry(pos, frame_buffer_node_t, list);
-
 			if (tmp != NULL
 			    && (tmp->read_mask == tmp->free_mask))
 			{
-				LOGD("%s, %x, %d\r\n", __func__, tmp->frame.h264_type ,__LINE__);
-				if (tmp->frame.h264_type & (0x1 << H264_NAL_I_FRAME))
-				{
-					i_frame++;
-					if (i_frame < 2)
-					{
-						LOGD("%s, %d, %d\r\n", __func__, tmp->frame.sequence ,__LINE__);
-						list_del(pos);
-						frame_buffer_fb_direct_free_without_lock(&tmp->frame);
-					}
-					else
-					{
-						LOGD("%s, %x, %d, i_frame:%d\r\n", __func__, tmp->frame.h264_type ,__LINE__, i_frame);
-						goto malloc;
-					}
-				}
-				else
-				{
-					if (i_frame > 0)
-					{
-						i_frame++;
-						LOGD("%s, %d, %d\r\n", __func__, tmp->frame.sequence ,__LINE__);
-						list_del(pos);
-						frame_buffer_fb_direct_free_without_lock(&tmp->frame);
-					}
-				}
-
-				if (i_frame == H264_GOP_FRAME_CNT)
-				{
-					LOGD("%s, %x, %d, i_frame:%d\r\n", __func__, tmp->frame.h264_type ,__LINE__, i_frame);
-					goto malloc;
-				}
+				node = tmp;
+				list_del(pos);
+				break;
 			}
+		}
+	}
+
+	if (!isr_context)
+	{
+		GLOBAL_INT_RESTORE();
+		rtos_unlock_mutex(&mem_list->lock);
+	}
+
+	if (node == NULL)
+	{
+		LOGE("%s %d i_frame:%d failed\n", __func__, type, i_frame);
+		return NULL;
+	}
+
+	node->frame.size = size;
+	node->frame.length = 0;
+	node->frame.width = 0;
+	node->frame.height = 0;
+	node->frame.h264_type = 0;
+	node->frame.fmt = 0;
+	node->read_mask = 0;
+	node->free_mask = 0;
+	node->frame.mix = 0;
+	node->frame.err_state = false;
+	node->frame.cb = NULL;
+
+	return &node->frame;
+}
+
+frame_buffer_t *frame_buffer_fb_malloc(fb_type_t type, uint32_t size)
+{
+	frame_buffer_node_t *node = NULL, *tmp = NULL;
+	fb_mem_list_t *mem_list = &fb_mem_list[type];
+	LIST_HEADER_T *pos, *n;
+	uint32_t isr_context = platform_is_in_interrupt_context();
+
+	if (mem_list == NULL)
+	{
+		LOGE("%s invalid mem_list: %p\n", __func__, mem_list);
+		return NULL;
+	}
+
+	if (mem_list->lock == NULL)
+	{
+		LOGE("[%s]:mem_list->lock is NULL\r\n", __func__);
+		return NULL;
+	}
+
+	GLOBAL_INT_DECLARATION() = 0;
+
+	if (!isr_context)
+	{
+		rtos_lock_mutex(&mem_list->lock);
+		GLOBAL_INT_DISABLE();
+	}
+
+	list_for_each_safe(pos, n, &mem_list->free)
+	{
+		tmp = list_entry(pos, frame_buffer_node_t, list);
+		if (tmp != NULL && !tmp->error)
+		{
+			node = tmp;
+			list_del(pos);
+			break;
 		}
 	}
 
@@ -655,7 +748,7 @@ malloc:
 
 	if (node == NULL)
 	{
-		LOGE("%s %d i_frame:%d failed\n", __func__, type, i_frame);
+		LOGD("%s %d failed...\n", __func__, type);
 		return NULL;
 	}
 
@@ -668,6 +761,7 @@ malloc:
 	node->read_mask = 0;
 	node->free_mask = 0;
 	node->frame.mix = 0;
+	node->frame.sequence = 0;
 	node->frame.err_state = false;
 	node->frame.cb = NULL;
 
@@ -685,7 +779,7 @@ void frame_buffer_fb_push(frame_buffer_t *frame)
 	bk_err_t ret;
 	GLOBAL_INT_DECLARATION() = 0;
 
-	if (type > FB_INDEX_MAX)
+	if (type >= FB_INDEX_MAX)
 	{
 		LOGE("%s invalid frame type\n", __func__);
 		return;
@@ -752,14 +846,7 @@ void frame_buffer_fb_push(frame_buffer_t *frame)
 				if (mem_list->mode == FB_MEM_SHARED
 				    && fb_info->modules[i].plugin == false)
 				{
-					if (fb_info->modules[i].sem)
-					{
-						ret = rtos_set_semaphore(&fb_info->modules[i].sem);
-						if (ret != BK_OK)
-						{
-							LOGE("%s semaphore set failed: %d\n", __func__, ret);
-						}
-					}
+					xEventGroupSetBits(fb_info->modules[i].handle, FRAME_BUFFER_READ_COMPLETE);
 
 					fb_info->modules[i].plugin = true;
 				}
@@ -854,7 +941,6 @@ fb_type_t frame_buffer_available_index(void)
 		GLOBAL_INT_DISABLE();
 	}
 
-
 	for (i = 0; i < FB_INDEX_MAX; i++)
 	{
 		if (!list_empty(&fb_mem_list[i].ready))
@@ -899,12 +985,12 @@ frame_buffer_t *frame_buffer_fb_read(frame_module_t index)
 
 		if (fb_info->modules[index].enable == true)
 		{
-			ret = rtos_get_semaphore(&fb_info->modules[index].sem, 500);//BEKEN_NEVER_TIMEOUT
+			ret = xEventGroupWaitBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE, true, true, 200);//BEKEN_NEVER_TIMEOUT
 		}
 
-		if (ret != BK_OK)
+		if (ret != FRAME_BUFFER_READ_COMPLETE)
 		{
-			LOGD("%s semaphore get failed: %d, index:%d, plugin:%d\n", __func__, ret, index, fb_info->modules[index].plugin);
+			LOGD("%s EventGroup get failed: %d, index:%d, plugin:%d\n", __func__, ret, index, fb_info->modules[index].plugin);
 			rtos_unlock_mutex(&fb_info->modules[index].lock);
 			goto out;
 		}
@@ -987,31 +1073,15 @@ bk_err_t frame_buffer_fb_register(frame_module_t index, fb_type_t type)
 	if (!isr_context)
 	{
 		rtos_lock_mutex(&fb_info->lock);
-	}
-
-	//rtos_init_mutex(&fb_info->modules[index].lock);
-
-	ret = rtos_init_semaphore_ex(&fb_info->modules[index].sem, 1, 0);
-
-	if (ret != BK_OK)
-	{
-		LOGE("%s semaphore init failed: %d\n", __func__, ret);
-		if (!isr_context)
-		{
-			rtos_unlock_mutex(&fb_info->lock);
-		}
-		return ret;
-	}
-
-	if (!isr_context)
-	{
 		GLOBAL_INT_DISABLE();
 	}
 
-	fb_info->modules[index].enable = true;
 	fb_info->modules[index].plugin = false;
 	fb_info->modules[index].type = type;
 	fb_info->register_mask[type] |= INDEX_MASK(index);
+	xEventGroupClearBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+	xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+	fb_info->modules[index].enable = true;
 
 	if (!isr_context)
 	{
@@ -1057,22 +1127,6 @@ bk_err_t frame_buffer_fb_deregister(frame_module_t index, fb_type_t type)
 	if (!isr_context)
 	{
 		GLOBAL_INT_RESTORE();
-	}
-
-	ret = rtos_set_semaphore(&fb_info->modules[index].sem);
-
-	rtos_lock_mutex(&fb_info->modules[index].lock);
-	ret = rtos_deinit_semaphore(&fb_info->modules[index].sem);
-	rtos_unlock_mutex(&fb_info->modules[index].lock);
-	//rtos_deinit_mutex(&fb_info->modules[index].lock);
-
-	if (ret != BK_OK)
-	{
-		LOGE("%s semaphore deinit failed: %d\n", __func__, ret);
-	}
-
-	if (!isr_context)
-	{
 		rtos_unlock_mutex(&fb_info->lock);
 	}
 
@@ -1374,6 +1428,7 @@ void frame_buffer_init(void)
 		for (uint8_t index = 0; index < MODULE_MAX; index++)
 		{
 			rtos_init_mutex(&fb_info->modules[index].lock);
+			fb_info->modules[index].handle = xEventGroupCreate();
 		}
 	}
 
@@ -1388,6 +1443,7 @@ void frame_buffer_deinit(void)
 		for (uint8_t index = 0; index < MODULE_MAX; index++)
 		{
 			rtos_deinit_mutex(&fb_info->modules[index].lock);
+			vEventGroupDelete(fb_info->modules[index].handle);
 		}
 
 		os_free(fb_info);
@@ -1406,12 +1462,21 @@ frame_buffer_t *frame_buffer_display_malloc(uint32_t size)
 
 	os_memset(frame, 0, sizeof(frame_buffer_t));
 	frame->frame = (uint8_t *)((((uint32_t)(frame + 1) >> 5) + 1) << 5);
+	frame->size = size;
 
 	return frame;
 }
 
 void frame_buffer_display_free(frame_buffer_t *frame)
 {
-	bk_psram_frame_buffer_free(frame);
+	if (frame->cb == NULL) {
+		bk_psram_frame_buffer_free(frame);
+	} else {
+		if (frame->cb->free) {
+			frame->cb->free(frame);
+		} else {
+			LOGE("frame buffer free callback is null\r\n");
+		}
+	}
 }
 

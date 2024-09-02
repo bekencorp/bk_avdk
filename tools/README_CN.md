@@ -15,10 +15,9 @@ bk_idk为Armino生态的基础SDK。
 当芯片处于开发阶段时，芯片的构建会被关闭，一些重要的内容（如文档和技术规格书等）可能会缺失。请确保使用与芯片相匹配的 Armino 版本
 
 
-|Branch\Chip   |    [BK7235]      |    [BK7256]      |      [BK7236]      |      [BK7258]      |      Comment            |
-|:------------ |:---------------: |:---------------: |:-----------------: |:-----------------: |:----------------------: |
-|main          |                  |                  |                    |                    |To do                    |
-|release/v2.0.1|![alt text][支持]  |![alt text][支持]  |![alt text][开发中]  |![alt text][开发中]|sdk 2.0 Develop Branch   |
+|Branch\Chip   |      [BK7258]      |      Comment            |
+|:------------ |:-----------------: |:----------------------: |
+|release/v2.0.1|![alt text][支持]  |sdk 2.0 MP Branch   |
 
 
 [支持]: https://img.shields.io/badge/-supported-green "支持"
@@ -26,7 +25,6 @@ bk_idk为Armino生态的基础SDK。
 
 ==Tag说明，release分支Tag为正式版本，请使用正式发布版本，进行开发。==
 
-main分支，格式为vx.x.x.x，例如：v2.0.0.1
 release/xxxx分支，格式为vx.x.x.x，例如：v2.0.1.1
 
 
@@ -37,9 +35,6 @@ release/xxxx分支，格式为vx.x.x.x，例如：v2.0.1.1
 |OS           |        main           |
 |:----------- |:---------------------: |
 |FreeRTOS     | ![alt text][支持]       |
-|LiteOS       | ![alt text][支持]      |
-|RT-Thread    | ![alt text][开发中]      |
-|AliOS        | ![alt text][开发中]      |
 
 [支持]: https://img.shields.io/badge/-supported-green "支持"
 [开发中]: https://img.shields.io/badge/-developing-orange "开发中"

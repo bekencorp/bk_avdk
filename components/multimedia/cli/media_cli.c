@@ -40,10 +40,12 @@
 #define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
 #define UNKNOW_ERROR (-686)
+
 #define CMD_CONTAIN(value) cmd_contain(argc, argv, value)
 #define GET_PPI(value)     get_ppi_from_cmd(argc, argv, value)
 #define GET_NAME(value)    get_name_from_cmd(argc, argv, value)
-#define GET_ROTATE()    get_rotate_from_cmd(argc, argv)
+#define GET_ROTATE()       get_rotate_from_cmd(argc, argv)
+#define GET_H26X_PPI()     get_h26x_ppi_from_cmd(argc, argv)
 
 static bk_uvc_config_t uvc_config_param = {0};
 
@@ -199,6 +201,25 @@ uint32_t get_ppi_from_cmd(int argc, char **argv, uint32_t pre)
 
 	return value;
 }
+
+uint32_t get_h26x_ppi_from_cmd(int argc, char **argv)
+{
+	int i;
+	uint32_t value = PPI_DEFAULT;
+
+	for (i = 5; i < argc; i++)
+	{
+		value = get_string_to_ppi(argv[i]);
+
+		if (value != PPI_DEFAULT)
+		{
+			break;
+		}
+	}
+	LOGD("%s %d-%d+++\n", __func__, value >> 16, value & 0xFFFF);
+	return value;
+}
+
 
 char * get_name_from_cmd(int argc, char **argv, char * pre)
 {
@@ -602,6 +623,7 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 			device.mode = JPEG_MODE;
 			device.fmt = PIXEL_FMT_JPEG;
 			device.info.fps = FPS25;
+            device.num_uvc_dev = 1;
 
 			if (CMD_CONTAIN("h264"))
 			{
@@ -618,10 +640,28 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 				}
 				else
 				{
-					device.info.resolution.width = ppi >> 16;
+					device.info.resolution.width  = ppi >> 16;
 					device.info.resolution.height = ppi & 0xFFFF;
 					//media_app_register_uvc_connect_state_cb(uvc_connect_state_callback);
 
+					if (CMD_CONTAIN("dual")) {
+						media_ppi_t h26x_ppi = 0;
+						device.dualstream = 1;
+						if (CMD_CONTAIN("H264")) {
+							device.d_fmt  = PIXEL_FMT_H264;
+							device.d_mode = H264_MODE;
+						} else if (CMD_CONTAIN("H265"))
+						{
+							device.d_fmt  = PIXEL_FMT_H265;
+							device.d_mode = H265_MODE;
+						}
+						h26x_ppi = GET_H26X_PPI();
+						device.num_uvc_dev = 2;
+						device.d_info.resolution.width	= h26x_ppi >> 16;
+						device.d_info.resolution.height = h26x_ppi & 0xFFFF;
+						device.d_info.fps = FPS30;
+						LOGI("Enter Second uvc device H26X Config.\n");
+					}
 					ret = media_app_camera_open(&device);
 				}
 			}
@@ -752,7 +792,63 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 
 			if (os_strcmp(argv[2], "reset") == 0)
 			{
-				ret = media_app_h264_pipeline_reset();
+				if (os_strcmp(argv[3], "dvp") == 0)
+					ret = media_app_h264_regenerate_idr(DVP_CAMERA);
+				else
+					ret = media_app_h264_regenerate_idr(UVC_CAMERA);
+			}
+		}
+
+		if (os_strcmp(argv[1], "fb") == 0)
+		{
+			static frame_buffer_t *new_frame = NULL;
+			fb_type_t type = FB_INDEX_JPEG;
+
+			if (os_strcmp(argv[2], "init") == 0)
+			{
+				if (os_strcmp(argv[3], "jpeg") == 0)
+				{
+					type = FB_INDEX_JPEG;
+				}
+				else if (os_strcmp(argv[3], "h264") == 0)
+				{
+					type = FB_INDEX_H264;
+				}
+				else
+				{
+					type = FB_INDEX_DISPLAY;
+				}
+
+				ret = media_app_frame_buffer_init(type);
+			}
+
+			if (os_strcmp(argv[2], "malloc") == 0)
+			{
+				if (os_strcmp(argv[3], "jpeg") == 0)
+				{
+					new_frame = media_app_frame_buffer_jpeg_malloc();
+					ret = BK_OK;
+				}
+				else if (os_strcmp(argv[3], "h264") == 0)
+				{
+					new_frame = media_app_frame_buffer_h264_malloc();
+					ret = BK_OK;
+				}
+				else
+				{
+					//
+					ret = kParamErr;
+				}
+			}
+
+			if (os_strcmp(argv[2], "push") == 0)
+			{
+				ret = media_app_frame_buffer_push(new_frame);
+			}
+
+			if (os_strcmp(argv[2], "clear") == 0)
+			{
+				ret = media_app_frame_buffer_clear(new_frame);
 			}
 		}
 	}

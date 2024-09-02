@@ -216,11 +216,13 @@ function buildMultiVersionSelector()
     });
 }
 
+
 function setPageStyle()
 {
     console.log($(".wy-breadcrumbs-aside").html())
 
     var stylePage = `
+        <a href="AVDKDocument.pdf" download="AVDKDocument.pdf"><img src="_static/pdf.png" style="width: 24px; height: 24px; display: inline; align-items: center; cursor: pointer; margin-left:5px"/></a>
         <img id="styleIcon" src="_static/light.png" style="width: 24px; height: 24px; display: inline; align-items: center; cursor: pointer; margin-left:5px"></img>
         <img id="modeIcon" src="_static/open.png" style="width: 24px; height: 24px; display: inline; align-items: center; cursor: pointer; margin-left:5px"></img>
     `;

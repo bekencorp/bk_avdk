@@ -67,7 +67,7 @@ endif()
 armino_component_register(
 	SRCS "${srcs}"
 	INCLUDE_DIRS "${incs}" 
-	PRIV_REQUIRES media bk_init bk_cli multimedia lvgl media_service
+	PRIV_REQUIRES bk_init bk_cli multimedia lvgl media_service
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-unused-variable -O3)

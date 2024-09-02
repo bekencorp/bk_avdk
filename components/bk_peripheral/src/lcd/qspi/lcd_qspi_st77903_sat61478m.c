@@ -94,7 +94,7 @@ static const lcd_qspi_t lcd_qspi_st77903_sat61478m_config =
 	.refresh_config.line_len = (PPI_360X480 >> 16) * 3,
 	.frame_len = (PPI_360X480 >> 16) * 3 * (PPI_360X480 & 0xFFFF),
 #else
-	.refresh_config.line_len = (PPI_400X400 >> 16) * 2,
+	.refresh_config.line_len = (PPI_360X480 >> 16) * 2,
 	.frame_len = (PPI_360X480 >> 16) * 2 * (PPI_360X480 & 0xFFFF),
 #endif
 };

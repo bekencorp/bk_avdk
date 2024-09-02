@@ -176,7 +176,9 @@ static void bt_audio_hf_sco_disconnected(void)
 
 void bk_bt_app_hfp_client_cb(bk_hf_client_cb_event_t event, bk_hf_client_cb_param_t *param)
 {
-    LOGI("%s event: %d\r\n", __func__, event);
+    LOGI("%s event: %d, addr:%02x:%02x:%02x:%02x:%02x:%02x\r\n", __func__, event, param->remote_bda[0], param->remote_bda[1],
+                                                                                  param->remote_bda[2], param->remote_bda[3],
+                                                                                  param->remote_bda[4], param->remote_bda[5]);
 
     switch (event)
     {
@@ -191,7 +193,7 @@ void bk_bt_app_hfp_client_cb(bk_hf_client_cb_event_t event, bk_hf_client_cb_para
             else if (BK_HF_CLIENT_AUDIO_STATE_CONNECTED == param->audio_state.state)
             {
                 bt_audio_hfp_hf_codec = param->audio_state.codec_type;
-                os_memcpy(hfp_peer_addr, param->audio_state.remote_bda, 6);
+                os_memcpy(hfp_peer_addr, param->remote_bda, 6);
                 LOGI("sco connected to %02x:%02x:%02x:%02x:%02x:%02x, codec type %d\n", hfp_peer_addr [ 5 ], hfp_peer_addr [ 4 ], hfp_peer_addr [ 3 ],
                      hfp_peer_addr [ 2 ], hfp_peer_addr [ 1 ], hfp_peer_addr [ 0 ], bt_audio_hfp_hf_codec);
 
@@ -205,16 +207,16 @@ void bk_bt_app_hfp_client_cb(bk_hf_client_cb_event_t event, bk_hf_client_cb_para
             if (param->conn_state.state == BK_HF_CLIENT_CONNECTION_STATE_SLC_CONNECTED)
             {
                 LOGI("HFP service level connected, ag_feature:0x%x, ag_chld_feature:0x%x \n", param->conn_state.peer_feat, param->conn_state.chld_feat);
-                LOGI("HFP client connect to peer address: %02x:%02x:%02x:%02x:%02x:%02x \n", param->conn_state.remote_bda [ 0 ], param->conn_state.remote_bda [ 1 ],
-                     param->conn_state.remote_bda [ 2 ], param->conn_state.remote_bda [ 3 ],
-                     param->conn_state.remote_bda [ 4 ], param->conn_state.remote_bda [ 5 ]);
+                LOGI("HFP client connect to peer address: %02x:%02x:%02x:%02x:%02x:%02x \n", param->remote_bda [ 0 ], param->remote_bda [ 1 ],
+                     param->remote_bda [ 2 ], param->remote_bda [ 3 ],
+                     param->remote_bda [ 4 ], param->remote_bda [ 5 ]);
             }
             else if (param->conn_state.state == BK_HF_CLIENT_CONNECTION_STATE_DISCONNECTED)
             {
                 LOGI("HFP disconnected \n");
-                LOGI("HFP disconnect peer address: %02x:%02x:%02x:%02x:%02x:%02x \n", param->conn_state.remote_bda [ 0 ], param->conn_state.remote_bda [ 1 ],
-                     param->conn_state.remote_bda [ 2 ], param->conn_state.remote_bda [ 3 ],
-                     param->conn_state.remote_bda [ 4 ], param->conn_state.remote_bda [ 5 ]);
+                LOGI("HFP disconnect peer address: %02x:%02x:%02x:%02x:%02x:%02x \n", param->remote_bda [ 0 ], param->remote_bda [ 1 ],
+                     param->remote_bda [ 2 ], param->remote_bda [ 3 ],
+                     param->remote_bda [ 4 ], param->remote_bda [ 5 ]);
             }
         }
         break;
@@ -276,7 +278,7 @@ void bk_bt_app_hfp_client_cb(bk_hf_client_cb_event_t event, bk_hf_client_cb_para
         break;
         case BK_HF_CLIENT_CCWA_EVT:
         {
-            LOGI("+CCWA: HFP calling waiting number:%s \n", param->ccwa.number);
+            LOGI("+CCWA: HFP calling waiting number:%s, name: %s\n", param->ccwa.number, param->ccwa.name);
         }
         break;
         case BK_HF_CLIENT_CLCC_EVT:

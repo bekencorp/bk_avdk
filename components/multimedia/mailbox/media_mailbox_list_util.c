@@ -30,7 +30,7 @@
 #define LOGE(...) BK_LOGE(TAG, ##__VA_ARGS__)
 #define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
-void media_mailbox_list_clear(LIST_HEADER_T *list)
+void media_mailbox_list_clear(LIST_HEADER_T *list, uint8_t flag)
 {
 	GLOBAL_INT_DECLARATION();
 
@@ -45,8 +45,11 @@ void media_mailbox_list_clear(LIST_HEADER_T *list)
 			tmp = list_entry(pos, media_mailbox_list_t, list);
 			if (tmp != NULL)
 			{
-				rtos_set_semaphore(&node->sem);
 				node = tmp->msg;
+				if (flag)
+				{
+					rtos_set_semaphore(&node->sem);
+				}
 				list_del(pos);
 				os_free(tmp);
 			}

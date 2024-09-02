@@ -64,7 +64,7 @@ typedef struct head_param
 
 APP_DEMO_P2P_PTR g_demo_p2p = NULL;
 
-extern void bk_wlan_status_register_cb_internal(FUNC_1PARAM_PTR cb);
+extern void bk_wlan_status_register_cb(FUNC_1PARAM_PTR cb);
 
 uint32 app_demo_p2p_alloc_buffer(void)
 {
@@ -208,7 +208,7 @@ static int app_demo_p2p_setup(void)
     wNetConfig.wifi_retry_interval = 100;
 
     APP_DEMO_P2P_PRT("ssid:%s key:%s\r\n", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
-    bk_wlan_start_internal(&wNetConfig);
+    bk_wlan_start(&wNetConfig);
     //ip_address_set(BK_STATION, 0, "192.168.49.100", "255.255.255.0", "192.168.49.1", "192.168.49.1");
     return 1;
 }
@@ -220,7 +220,7 @@ static void app_demo_p2p_main(beken_thread_arg_t data)
 
     g_demo_p2p->status = APS_WIFI_DISCONECTED;
 
-    bk_wlan_status_register_cb_internal(app_demo_p2p_rw_event_func);
+    bk_wlan_status_register_cb(app_demo_p2p_rw_event_func);
 
     if (app_demo_p2p_setup() == 0)
     {
@@ -257,15 +257,15 @@ static void app_demo_p2p_main(beken_thread_arg_t data)
 
 
 #ifdef CONFIG_P2P
-		wlan_hw_reinit_internal();
+		wlan_hw_reinit();
 		if (msg.data == 1) {
 			uap_ip_down();
-			wlan_p2p_cancel_internal();
-			wlan_p2p_find_internal();
+			wlan_p2p_cancel();
+			wlan_p2p_find();
 		} else if (msg.data == 0) {
 			sta_ip_down();
 			sys_msleep(2000);
-			wlan_p2p_find_internal();
+			wlan_p2p_find();
 		}
 #endif
                     APP_DEMO_P2P_PRT("wifi disconnected!\r\n");

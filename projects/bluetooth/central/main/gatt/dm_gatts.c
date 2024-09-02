@@ -24,23 +24,20 @@
 #include <os/str.h>
 #include <os/os.h>
 
-#if GAP_IS_OLD_API
-    #include "components/bluetooth/bk_dm_ble.h"
-#else
-    #include "components/bluetooth/bk_dm_bluetooth_types.h"
-    #include "components/bluetooth/bk_dm_gap_ble_types.h"
-    #include "components/bluetooth/bk_dm_gap_ble.h"
-#endif
+#include "components/bluetooth/bk_dm_bluetooth_types.h"
+#include "components/bluetooth/bk_dm_gap_ble_types.h"
+#include "components/bluetooth/bk_dm_gap_ble.h"
 
-#include "components/bluetooth/bk_dm_ble.h"
-#include "components/bluetooth/bk_ble_types.h"
 #include "dm_gatts.h"
 #include "dm_gatt_connection.h"
+#include "dm_gap_utils.h"
 
 #define DYNAMIC_ADD_ATTR 0
 
 
 #define INVALID_ATTR_HANDLE 0
+#define ADV_HANDLE 0
+
 #define MIN_VALUE(x, y) (((x) < (y)) ? (x): (y))
 
 
@@ -50,6 +47,9 @@
 //} dm_gatts_app_env_t;
 
 #define dm_gatts_app_env_t dm_gatt_addition_app_env_t
+
+
+static int32_t dm_gatts_set_adv_param(uint8_t local_addr_is_public);
 
 static beken_semaphore_t s_ble_sema = NULL;
 static uint16_t s_service_attr_handle = INVALID_ATTR_HANDLE;
@@ -76,6 +76,8 @@ static uint16_t s_conn_id = 0xff;
 
 static bk_gatt_if_t s_gatts_if;
 //static uint8_t s_timer_send_is_indicate = 0;
+
+static uint8_t s_dm_gatts_local_addr_is_public = 0;
 
 #if DYNAMIC_ADD_ATTR
 
@@ -117,12 +119,12 @@ static const bk_gatts_attr_db_t s_gatts_attr_db_service_1[] =
 {
     //service
     {
-        BK_GATT_PRIMARY_SERVICE_DECL(0x1234),
+        BK_GATT_PRIMARY_SERVICE_DECL(INTERESTING_SERIVCE_UUID),
     },
 
     //char 1
     {
-        BK_GATT_CHAR_DECL(0x5678,
+        BK_GATT_CHAR_DECL(INTERESTING_CHAR_UUID,
                           sizeof(s_char_buff), s_char_buff,
                           BK_GATT_CHAR_PROP_BIT_READ | BK_GATT_CHAR_PROP_BIT_WRITE_NR | BK_GATT_CHAR_PROP_BIT_WRITE | BK_GATT_CHAR_PROP_BIT_NOTIFY,
                           //BK_GATT_PERM_READ | BK_GATT_PERM_WRITE,
@@ -173,7 +175,6 @@ static const bk_gatts_attr_db_t s_gatts_attr_db_service_1[] =
     },
 };
 
-
 static const bk_gatts_attr_db_t s_gatts_attr_db_service_2[] =
 {
     //service
@@ -218,12 +219,10 @@ static const bk_gatts_attr_db_t s_gatts_attr_db_service_2[] =
         BK_GATT_CHAR_DECL(0x15ab,
                           sizeof(s_char_auto_rsp_buff), s_char_auto_rsp_buff,
                           BK_GATT_CHAR_PROP_BIT_READ | BK_GATT_CHAR_PROP_BIT_WRITE_NR | BK_GATT_CHAR_PROP_BIT_WRITE,
-                          BK_GATT_PERM_READ_ENC_MITM | BK_GATT_PERM_WRITE_ENC_MITM,
+                          BK_GATT_PERM_READ_ENC_MITM | BK_GATT_PERM_WRITE_ENC_MITM, //gap iocap must not be BK_IO_CAP_NONE !!!
                           BK_GATT_AUTO_RSP),
     },
 };
-
-
 
 static uint16_t *const s_attr_handle_list[sizeof(s_gatts_attr_db_service_1) / sizeof(s_gatts_attr_db_service_1[0])] =
 {
@@ -241,35 +240,6 @@ static uint16_t s_attr_handle_list2[sizeof(s_gatts_attr_db_service_2) / sizeof(s
 
 
 #endif
-
-#if GAP_IS_OLD_API
-
-static void dm_ble_cmd_cb(ble_cmd_t cmd, ble_cmd_param_t *param)
-{
-    param->status;
-
-    switch (cmd)
-    {
-    case BLE_CREATE_ADV:
-    case BLE_SET_ADV_DATA:
-    case BLE_SET_RSP_DATA:
-    case BLE_START_ADV:
-    case BLE_STOP_ADV:
-    case BLE_SET_RANDOM_ADDR:
-        if (s_ble_sema != NULL)
-        {
-            rtos_set_semaphore( &s_ble_sema );
-        }
-
-        break;
-
-    default:
-        break;
-    }
-
-}
-
-#else
 
 static int32_t dm_ble_gap_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t *param)
 {
@@ -315,7 +285,7 @@ static int32_t dm_ble_gap_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t 
 
         if (pm->status)
         {
-            gatt_loge("set adv param err %d", pm->status);
+            gatt_loge("set adv param err 0x%x", pm->status);
         }
 
         if (s_ble_sema != NULL)
@@ -381,8 +351,6 @@ static int32_t dm_ble_gap_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t 
 
     return DM_BLE_GAP_APP_CB_RET_PROCESSED;
 }
-
-#endif
 
 static int32_t nest_func_send_indicate(dm_gatt_app_env_t *env, void *arg)
 {
@@ -1032,44 +1000,23 @@ static int32_t bk_gatts_cb (bk_gatts_cb_event_t event, bk_gatt_if_t gatts_if, bk
             rtos_deinit_timer(&s_char_notify_timer);
         }
 
-#if GAP_IS_OLD_API
-        ret = bk_ble_set_advertising_enable(1, dm_ble_cmd_cb);
+#if 0
+        bk_bd_addr_t nominal_addr = {0};
+        uint8_t nominal_addr_type = 0;
+        bk_bd_addr_t identity_addr = {0};
+        uint8_t identity_addr_type = 0;
 
-        if (ret != BK_ERR_BLE_SUCCESS)
+        if (1 && 0 == dm_gatt_get_authen_status(nominal_addr, &nominal_addr_type, identity_addr, &identity_addr_type))
         {
-            gatt_loge("bk_ble_set_advertising_enable err %d", ret);
-        }
-
-        if (s_ble_sema != NULL)
-        {
-            ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-
-            if (ret != kNoErr)
-            {
-                gatt_loge("rtos_get_semaphore 4 err %d", ret);
-            }
-        }
-
-#else
-        bk_bd_addr_t addr;
-        uint8_t addr_type = 0;
-        const bk_ble_gap_ext_adv_t ext_adv =
-        {
-            .instance = 0,
-            .duration = 0,
-            .max_events = 0,
-        };
-
-        if (0)//dm_gat_get_authen_status(addr, &addr_type))
-        {
+            // for bonded adv
             bk_ble_gap_ext_adv_params_t adv_param =
             {
-                .type = BK_BLE_GAP_SET_EXT_ADV_PROP_LEGACY_LD_DIR,
+                .type = BK_BLE_GAP_SET_EXT_ADV_PROP_LEGACY_IND,
                 .interval_min = 120,
                 .interval_max = 160,
                 .channel_map = BK_ADV_CHNL_ALL,
-                .own_addr_type = BLE_ADDR_TYPE_RANDOM,
-                .peer_addr_type = addr_type,
+                .own_addr_type = BLE_ADDR_TYPE_RPA_RANDOM,
+                .peer_addr_type = identity_addr_type,
                 .filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
                 .primary_phy = BK_BLE_GAP_PRI_PHY_1M,
                 .secondary_phy = BK_BLE_GAP_PHY_1M,
@@ -1077,7 +1024,9 @@ static int32_t bk_gatts_cb (bk_gatts_cb_event_t event, bk_gatt_if_t gatts_if, bk
                 .scan_req_notif = 0,
             };
 
-            os_memcpy(adv_param.peer_addr, addr, sizeof(addr));
+            adv_param.peer_addr_type = identity_addr_type;
+            os_memcpy(adv_param.peer_addr, identity_addr, sizeof(identity_addr));
+
             ret = bk_ble_gap_set_adv_params(0, &adv_param);
 
             if (ret)
@@ -1089,6 +1038,17 @@ static int32_t bk_gatts_cb (bk_gatts_cb_event_t event, bk_gatt_if_t gatts_if, bk
             rtos_delay_milliseconds(100);
         }
 
+#else
+        dm_gatts_set_adv_param(s_dm_gatts_local_addr_is_public);
+        rtos_delay_milliseconds(100);
+#endif
+        const bk_ble_gap_ext_adv_t ext_adv =
+        {
+            .instance = 0,
+            .duration = 0,
+            .max_events = 0,
+        };
+
         ret = bk_ble_gap_adv_start(1, &ext_adv);
 
         if (ret)
@@ -1097,7 +1057,6 @@ static int32_t bk_gatts_cb (bk_gatts_cb_event_t event, bk_gatt_if_t gatts_if, bk
         }
 
         rtos_delay_milliseconds(100);
-#endif
     }
     break;
 
@@ -1119,6 +1078,7 @@ static int32_t bk_gatts_cb (bk_gatts_cb_event_t event, bk_gatt_if_t gatts_if, bk
 int32_t dm_gatts_disconnect(uint8_t *addr)
 {
     dm_gatt_app_env_t *common_env_tmp = NULL;
+    int32_t err = 0;
 
     gatt_logi("0x%02x:%02x:%02x:%02x:%02x:%02x",
               addr[5],
@@ -1128,11 +1088,18 @@ int32_t dm_gatts_disconnect(uint8_t *addr)
               addr[1],
               addr[0]);
 
+    if (!s_gatts_if)
+    {
+        gatt_loge("gatts not init");
+
+        return -1;
+    }
+
     common_env_tmp = dm_ble_find_app_env_by_addr(addr);
 
     if (!common_env_tmp || !common_env_tmp->data)
     {
-        gatt_loge("conn max %p %p !!!!", common_env_tmp, common_env_tmp ? common_env_tmp->data : NULL);
+        gatt_loge("conn not found !!!!", common_env_tmp, common_env_tmp ? common_env_tmp->data : NULL);
         return -1;
     }
 
@@ -1142,12 +1109,10 @@ int32_t dm_gatts_disconnect(uint8_t *addr)
         return -1;
     }
 
-    bd_addr_t connect_addr;
-    int32_t err = 0;
+    bk_bd_addr_t peer_addr;
+    os_memcpy(peer_addr, addr, sizeof(peer_addr));
 
-    os_memcpy(connect_addr.addr, addr, sizeof(connect_addr.addr));
-    //todo: use new api
-    err = bk_ble_disconnect_connection(&connect_addr, NULL);
+    err = bk_ble_gap_disconnect(peer_addr);
 
     if (err)
     {
@@ -1161,9 +1126,69 @@ int32_t dm_gatts_disconnect(uint8_t *addr)
     return err;
 }
 
+static int32_t dm_gatts_set_adv_param(uint8_t local_addr_is_public)
+{
+    int32_t ret = 0;
+    bk_bd_addr_t nominal_addr = {0};
+    uint8_t nominal_addr_type = 0;
+    bk_bd_addr_t identity_addr = {0};
+    uint8_t identity_addr_type = 0;
+    bk_ble_gap_ext_adv_params_t adv_param = {0};
+
+    adv_param = (bk_ble_gap_ext_adv_params_t)
+    {
+        .type = BK_BLE_GAP_SET_EXT_ADV_PROP_LEGACY_IND,
+        .interval_min = 120,
+        .interval_max = 160,
+        .channel_map = BK_ADV_CHNL_ALL,
+        .filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+        .primary_phy = BK_BLE_GAP_PRI_PHY_1M,
+        .secondary_phy = BK_BLE_GAP_PHY_1M,
+        .sid = 0,
+        .scan_req_notif = 0,
+    };
+
+    // attention: some device could only connect rpa adv after pair, some device is opposite, some device behavior depend on which adv is used when pairing.
+    // so we need to decide if rpa should be used in adv.
+
+    if (g_dm_gap_use_rpa && 0 == dm_gatt_get_authen_status(nominal_addr, &nominal_addr_type, identity_addr, &identity_addr_type))
+    {
+        adv_param.own_addr_type = (local_addr_is_public ? BLE_ADDR_TYPE_RPA_PUBLIC : BLE_ADDR_TYPE_RPA_RANDOM);
+
+        adv_param.peer_addr_type = nominal_addr_type;
+        os_memcpy(adv_param.peer_addr, nominal_addr, sizeof(nominal_addr));
+    }
+    else
+    {
+        adv_param.own_addr_type = (local_addr_is_public ? BLE_ADDR_TYPE_PUBLIC : BLE_ADDR_TYPE_RANDOM);
+    }
+
+    ret = bk_ble_gap_set_adv_params(ADV_HANDLE, &adv_param);
+
+    if (ret)
+    {
+        gatt_loge("bk_ble_gap_set_adv_params err %d", ret);
+        goto error;
+    }
+
+    return 0;
+
+error:;
+
+    gatt_loge("err");
+    return -1;
+}
+
 int32_t dm_gatts_start_adv(void)
 {
     int32_t ret = 0;
+
+    if (!s_gatts_if)
+    {
+        gatt_loge("gatts not init");
+
+        return -1;
+    }
 
     const bk_ble_gap_ext_adv_t ext_adv =
     {
@@ -1199,6 +1224,13 @@ int32_t dm_gatts_enable_service(uint32_t index, uint8_t enable)
     int32_t ret = 0;
     uint16_t handle = (index == 0 ? s_service_attr_handle : s_attr_handle_list2[0]);
 
+    if (!s_gatts_if)
+    {
+        gatt_loge("gatts not init");
+
+        return -1;
+    }
+
     if (enable)
     {
         bk_ble_gatts_start_service(handle);
@@ -1221,7 +1253,7 @@ int32_t dm_gatts_enable_service(uint32_t index, uint8_t enable)
     return 0;
 }
 
-int dm_gatts_main(void)
+int dm_gatts_main(cli_gatt_param_t *param)
 {
     ble_err_t ret = 0;
 
@@ -1231,6 +1263,14 @@ int dm_gatts_main(void)
     {
         gatt_loge("rtos_init_semaphore err %d", ret);
         return -1;
+    }
+
+    if (param)
+    {
+        if (param->p_pa)
+        {
+            s_dm_gatts_local_addr_is_public = *param->p_pa;
+        }
     }
 
     bk_ble_gatts_register_callback(bk_gatts_cb);
@@ -1568,158 +1608,18 @@ int dm_gatts_main(void)
         return -1;
     }
 
-#if GAP_IS_OLD_API
-
-    bd_addr_t random_addr;
-    bk_get_mac((uint8_t *)random_addr.addr, MAC_TYPE_BLUETOOTH);
-
-    for (int i = 0; i < sizeof(random_addr.addr) / 2; i++)
-    {
-        uint8_t tmp_addr = random_addr.addr[i];
-        random_addr.addr[i] = random_addr.addr[sizeof(random_addr.addr) - 1 - i];
-        random_addr.addr[sizeof(random_addr.addr) - 1 - i] = tmp_addr;
-    }
-
-    random_addr.addr[0]++;
-
-    ble_adv_parameter_t tmp_param;
-
-    uint8_t adv_data[31] =
-    {
-        //adv format <len> <type> <payload>, len = type + payload, type pls see <<Generic Access Profile>>'s Assigned number
-
-        //len = 0x2, type = 1 means Flags
-        0x02, 0x01, 0x06,
-
-        //len = strlen(name) + 1, type = 0x8 means Shortened Local Name, "SMART-SOUNDBAR"
-        1 + 0, 0x08, //name suchas 'S', 'M', 'A', 'R', 'T', '-', 'S', 'O', 'U', 'N', 'D', 'B', 'A', 'R',
-    };
-
-    uint8_t adv_name_len = snprintf((char *)(adv_data + 5), sizeof(adv_data) - 5, "CENTRAL-%02X%02X%02X", random_addr.addr[2], random_addr.addr[1], random_addr.addr[0]);
-
-    adv_data[3] = adv_name_len + 1;
-
-    uint8_t adv_len = 5 + adv_name_len;
-
-    extern uint8_t test_adv_data_len[31 - sizeof(adv_data)];  //attention: sizeof(adv_data) must <= 31 !!!!!!!!!!!!!
-    (void)test_adv_data_len;
-
-    memset(&tmp_param, 0, sizeof(tmp_param));
-
-    tmp_param.adv_intv_max = 160;
-    tmp_param.adv_intv_min = 120;
-    tmp_param.adv_type = ADV_LEGACY_TYPE_ADV_IND;
-    tmp_param.chnl_map = ADV_ALL_CHNLS;
-    tmp_param.filter_policy = ADV_FILTER_POLICY_ALLOW_SCAN_ANY_CONNECT_ANY;
-    tmp_param.own_addr_type = 1;//0;
-    tmp_param.peer_addr_type = 0;
-    //tmp_param.peer_addr;
-
-    //    ret = bk_ble_set_advertising_params(adv_param.adv_intv_min, adv_param.adv_intv_max, adv_param.chnl_map,
-    //            adv_param.own_addr_type,adv_param.prim_phy, adv_param.second_phy, ble_at_cmd_cb);
-
-    gatt_logi("bk_ble_set_advertising_params start", ret);
-    ret = bk_ble_set_advertising_params(&tmp_param, dm_ble_cmd_cb);
-
-
-    if (ret != BK_ERR_BLE_SUCCESS)
-    {
-        gatt_loge("bk_ble_set_advertising_params err %d", ret);
-        goto error;
-    }
-
-    gatt_logi("bk_ble_set_advertising_params wait", ret);
-
-    if (s_ble_sema != NULL)
-    {
-        ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-
-        if (ret != kNoErr)
-        {
-            gatt_loge("rtos_get_semaphore 1 err %d", ret);
-            goto error;
-        }
-    }
-
-    gatt_logi("bk_ble_set_random_addr start", ret);
-    ret = bk_ble_set_random_addr((bd_addr_t *)&random_addr, dm_ble_cmd_cb);
-
-    if (ret != BK_ERR_BLE_SUCCESS)
-    {
-        gatt_loge("bk_ble_set_random_addr err %d", ret);
-        goto error;
-    }
-
-    gatt_logi("bk_ble_set_random_addr wait", ret);
-
-    if (s_ble_sema != NULL)
-    {
-        ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-
-        if (ret != kNoErr)
-        {
-            gatt_loge("rtos_get_semaphore 2 err %d", ret);
-            goto error;
-        }
-    }
-
-    ret = bk_ble_set_advertising_data(adv_len, (uint8_t *)adv_data, dm_ble_cmd_cb);
-
-    if (ret != BK_ERR_BLE_SUCCESS)
-    {
-        gatt_loge("bk_ble_set_advertising_data err %d", ret);
-        goto error;
-    }
-
-    if (s_ble_sema != NULL)
-    {
-        ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-
-        if (ret != kNoErr)
-        {
-            gatt_loge("rtos_get_semaphore 3 err %d", ret);
-            goto error;
-        }
-    }
-
-    ret = bk_ble_set_advertising_enable(1, dm_ble_cmd_cb);
-
-    if (ret != BK_ERR_BLE_SUCCESS)
-    {
-        gatt_loge("bk_ble_set_advertising_enable err %d", ret);
-        goto error;
-    }
-
-    if (s_ble_sema != NULL)
-    {
-        ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-
-        if (ret != kNoErr)
-        {
-            gatt_loge("rtos_get_semaphore 4 err %d", ret);
-            goto error;
-        }
-    }
-
-#else
-    bk_bd_addr_t random_addr;
+    bk_bd_addr_t current_addr = {0}, identity_addr = {0};
     char adv_name[64] = {0};
 
-    bk_get_mac((uint8_t *)random_addr, MAC_TYPE_BLUETOOTH);
+    dm_ble_gap_get_identity_addr(identity_addr);
 
-    for (int i = 0; i < sizeof(random_addr) / 2; i++)
-    {
-        uint8_t tmp_addr = random_addr[i];
-        random_addr[i] = random_addr[sizeof(random_addr) - 1 - i];
-        random_addr[sizeof(random_addr) - 1 - i] = tmp_addr;
-    }
-
-    random_addr[0]++;
-    random_addr[5] |= 0xc0; // static random addr[47:46] must be 0b11 in msb !!!
+    os_memcpy(current_addr, identity_addr, sizeof(identity_addr));
 
     dm_gatt_add_gap_callback(dm_ble_gap_cb);
 
-    snprintf((char *)(adv_name), sizeof(adv_name) - 1, "CENTRAL-%02X%02X%02X", random_addr[2], random_addr[1], random_addr[0]);
+    snprintf((char *)(adv_name), sizeof(adv_name) - 1, "CENTRAL-%02X%02X%02X", identity_addr[2], identity_addr[1], identity_addr[0]);
+
+    gatt_logi("adv name %s", adv_name);
 
     ret = bk_ble_gap_set_device_name(adv_name);
 
@@ -1729,26 +1629,11 @@ int dm_gatts_main(void)
         goto error;
     }
 
-    bk_ble_gap_ext_adv_params_t adv_param =
-    {
-        .type = BK_BLE_GAP_SET_EXT_ADV_PROP_LEGACY_IND,
-        .interval_min = 120,
-        .interval_max = 160,
-        .channel_map = BK_ADV_CHNL_ALL,
-        .own_addr_type = BLE_ADDR_TYPE_RANDOM,
-        .peer_addr_type = BLE_ADDR_TYPE_PUBLIC,
-        .filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
-        .primary_phy = BK_BLE_GAP_PRI_PHY_1M,
-        .secondary_phy = BK_BLE_GAP_PHY_1M,
-        .sid = 0,
-        .scan_req_notif = 0,
-    };
+    ret = dm_gatts_set_adv_param(s_dm_gatts_local_addr_is_public);
 
-    ret = bk_ble_gap_set_adv_params(0, &adv_param);
-
-    if (ret)
+    if (ret != kNoErr)
     {
-        gatt_loge("bk_ble_gap_set_adv_params err %d", ret);
+        gatt_loge("set adv param err %d", ret);
         goto error;
     }
 
@@ -1760,25 +1645,26 @@ int dm_gatts_main(void)
         goto error;
     }
 
-    ret = bk_ble_gap_set_rand_addr(random_addr);
+    uint8_t need_set_random_addr = 0;
 
-    if (ret)
+    if (g_dm_gap_use_rpa && dm_ble_gap_get_rpa(current_addr) == 0)
     {
-        gatt_loge("bk_ble_gap_set_rand_addr err %d", ret);
-        goto error;
+        gatt_logw("set adv random addr with generate rpa");
+        need_set_random_addr = 1;
+    }
+    else if (!s_dm_gatts_local_addr_is_public)
+    {
+        gatt_logw("set adv random addr with user define");
+
+        current_addr[0]++;
+        current_addr[5] |= 0xc0; // static random addr[47:46] must be 0b11 in msb !!!
+
+        need_set_random_addr = 1;
     }
 
-    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-
-    if (ret != kNoErr)
+    if (need_set_random_addr)
     {
-        gatt_loge("wait set rand addr err %d", ret);
-        goto error;
-    }
-
-    if (adv_param.own_addr_type == BLE_ADDR_TYPE_RANDOM || adv_param.own_addr_type == BLE_ADDR_TYPE_RPA_RANDOM)
-    {
-        ret = bk_ble_gap_set_adv_rand_addr(0, random_addr);
+        ret = bk_ble_gap_set_adv_rand_addr(ADV_HANDLE, current_addr);
 
         if (ret)
         {
@@ -1867,8 +1753,6 @@ int dm_gatts_main(void)
         gatt_loge("wait set adv enable err %d", ret);
         goto error;
     }
-
-#endif
 
 error:
     return 0;

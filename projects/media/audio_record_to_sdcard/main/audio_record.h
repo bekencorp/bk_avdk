@@ -18,22 +18,6 @@
 extern "C" {
 #endif
 
-typedef enum {
-	AUDIO_RECORD_IDLE = 0,
-	AUDIO_RECORD_EXIT,
-	AUDIO_RECORD_MAX
-} audio_record_op_t;
-
-typedef struct {
-	audio_record_op_t op;
-	void *param;
-} audio_record_msg_t;
-
-typedef struct {
-	char *file_name;
-	uint32_t samp_rate;
-} audio_record_setup_t;
-
 bk_err_t audio_record_to_sdcard_start(char *file_name, uint32_t samp_rate);
 
 bk_err_t audio_record_to_sdcard_stop(void);

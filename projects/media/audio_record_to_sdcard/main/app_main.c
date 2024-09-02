@@ -4,6 +4,7 @@
 #include <components/shell_task.h>
 #include "cli.h"
 #include "audio_record.h"
+#include "media_service.h"
 
 extern void user_app_main(void);
 extern void rtos_set_user_app_entry(beken_thread_function_t entry);
@@ -19,28 +20,24 @@ void cli_audio_record_to_sdcard_cmd(char *pcWriteBuffer, int xWriteBufferLen, in
 {
 	uint32_t samp_rate = 8000;
 
-	if (argc != 2 && argc != 4) {
+	if (argc < 2)
+    {
 		cli_audio_record_to_sdcard_help();
 		return;
 	}
 
 	if (os_strcmp(argv[1], "start") == 0) {
+        if (argc < 4)
+        {
+            cli_audio_record_to_sdcard_help();
+            return;
+        }
+
 		samp_rate = strtoul(argv[3], NULL, 10);
-#if 0
-		bk_set_printf_sync(true);
-		extern void bk_enable_white_list(int enabled);
-		bk_enable_white_list(1);
-//		bk_disable_mod_printf("AUDIO_PIPELINE", 0);
-//		bk_disable_mod_printf("AUDIO_ELEMENT", 0);
-//		bk_disable_mod_printf("AUDIO_EVENT", 0);
-//		bk_disable_mod_printf("AUDIO_MEM", 0);
-		bk_disable_mod_printf("FATFS_STREAM", 0);
-		bk_disable_mod_printf("ONBOARD_MIC", 0);
-#endif
 		if (BK_OK != audio_record_to_sdcard_start(argv[2], samp_rate))
-			os_printf("start audio record to sdcard ok \n");
+			os_printf("start audio record to sdcard fail\n");
 		else
-			os_printf("start audio record to sdcard fail \n");
+			os_printf("start audio record to sdcard ok\n");
 	}else if (os_strcmp(argv[1], "stop") == 0) {
 		audio_record_to_sdcard_stop();
 	} else {
@@ -72,12 +69,10 @@ int main(void)
 {
 #if (CONFIG_SYS_CPU0)
 	rtos_set_user_app_entry((beken_thread_function_t)user_app_main);
-	// bk_set_printf_sync(true);
-	// shell_set_log_level(BK_LOG_WARN);
 #endif
 	bk_init();
-//    extern int media_service_init(void);
-//	media_service_init();
+    int media_service_init(void);
+	media_service_init();
 
 	return 0;
 }

@@ -35,6 +35,7 @@ if(CONFIG_SYS_CPU0)
             gatt/dm_gatts.c
             gatt/dm_gatt_cli.c
             gatt/dm_gatt_connection.c
+            gatt/dm_gap_utils.c
 			storage/bluetooth_storage.c
         )
 

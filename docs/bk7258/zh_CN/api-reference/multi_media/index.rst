@@ -10,8 +10,6 @@ Multi-Media
    Display <bk_display>
    DMA2D <bk_dma2d>
    Rotate <bk_hw_rotate>
-   FFT <bk_fft>
-   I2S <bk_i2s>
    SBC <bk_sbc>
    MP3 <bk_mp3>
    DVP_Camera <bk_dvp_camera>
@@ -20,6 +18,9 @@ Multi-Media
    JPEG_ENCODE <bk_jpegenc>
    JPEG_DECODE_HW <bk_jpegdec_hw>
    JPEG_DECODE_SW <bk_jpegdec_sw>
+   JPEG_ENCODE_SW <bk_jpegenc_sw>
    AEC <bk_aec>
    G711 <bk_g711>
    Aud_Intf <bk_aud_intf>
+   image_algorithm <image_algorithm>
+   HW_SCALE <bk_hw_scale>

@@ -1230,6 +1230,8 @@ static int doorbell_cs2_p2p_audio_receiver(beken_thread_arg_t arg)
 			while (doorbell_cs2_info->aud_running == BK_TRUE);
 
 			doorbell_cs2_info->aud_status = BK_FALSE;
+			doorbell_cs2_info->aud_running = false;
+
 			rtos_delay_milliseconds(300);
 			break;
 		}
@@ -1240,7 +1242,7 @@ static int doorbell_cs2_p2p_audio_receiver(beken_thread_arg_t arg)
 		}
 	}
 
-	rtos_set_semaphore(&doorbell_cs2_info->aud_sem);
+	//rtos_set_semaphore(&doorbell_cs2_info->aud_sem);
 
 	if (tmp_read_buf)
 	{
@@ -1619,6 +1621,7 @@ static int doorbell_cs2_audio_state_changed(doorbell_state_t state)
 	}
 	else if (state == DB_TURN_OFF)
 	{
+		#if 0
 		if (doorbell_cs2_info->aud_running == BK_FALSE)
 		{
 			LOGW("%s already close\n", __func__);
@@ -1635,7 +1638,7 @@ static int doorbell_cs2_audio_state_changed(doorbell_state_t state)
 			LOGE("%s wait semaphore failed\n", __func__);
 			goto error;
 		}
-
+		#endif
 	}
 
 	return BK_OK;

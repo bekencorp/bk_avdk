@@ -3,17 +3,17 @@ H264 Decoding
 
 :link_to_translation:`zh_CN:[中文]`
 
-1、H264 Decoding
+1.H264 Decoding
 --------------------
 
     The H264 decoding part is implemented on the mobile phone. This article uses the ffmpeg library for decoding
 
-2、ffmpeg Official Website
+2.ffmpeg Official Website
 ----------------------------------------
 
 	https://ffmpeg.org/
 
-3、Decoding Process Diagram
+3.Decoding Process Diagram
 ----------------------------------------
 
 .. figure:: ../../../_static/ffmpeg_h264_decode_flow.png
@@ -23,7 +23,7 @@ H264 Decoding
 
     Figure 1. decode_flow
 
-4、Process Explanation
+4.Process Explanation
 -------------------------------
 
 1. Register Decoder:``avcodec_register_all``

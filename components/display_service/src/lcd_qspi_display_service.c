@@ -43,7 +43,7 @@ static void lcd_qspi_disp_task_entry(beken_thread_arg_t arg)
     rtos_set_semaphore(&g_lcd_qspi_task_sem);
 
     while(lcd_qspi_disp_task_running) {
-        rtos_get_semaphore(&g_lcd_qspi_disp_sem, 35);
+        rtos_get_semaphore(&g_lcd_qspi_disp_sem, 5);
         if (g_lcd_qspi_imag_addr) {
             bk_lcd_qspi_send_data(LCD_QSPI_ID, qspi_device, g_lcd_qspi_imag_addr, qspi_device->qspi->frame_len);
         }
@@ -60,7 +60,7 @@ void bk_lcd_qspi_disp_task_start(const lcd_device_t *device)
 
     if (lcd_qspi_disp_thread_hdl != NULL) {
         QSPI_DISP_LOGE("%s camera_display_thread already running\n", __func__);
-        return ;
+        return;
     }
 
     ret = rtos_init_semaphore_ex(&g_lcd_qspi_task_sem, 1, 0);
@@ -78,7 +78,7 @@ void bk_lcd_qspi_disp_task_start(const lcd_device_t *device)
     lcd_qspi_disp_task_running = true;
 
     ret = rtos_create_thread(&lcd_qspi_disp_thread_hdl,
-                             4,
+                             3,
                              "qspi_disp",
                              (beken_thread_function_t)lcd_qspi_disp_task_entry,
                              4096,

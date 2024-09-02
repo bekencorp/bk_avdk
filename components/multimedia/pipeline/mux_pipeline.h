@@ -25,6 +25,11 @@ extern "C" {
 
 #include "bk_list.h"
 
+#define GPIO_DVP_HSYNC		(30)
+#define GPIO_DVP_VSYNC		(31)
+#define GPIO_DVP_PCLK		(29)
+#define GPIO_DVP_MCLK		(27)
+
 #define GPIO_DVP_D0		(32)
 #define GPIO_DVP_D1		(33)
 #define GPIO_DVP_D2		(34)
@@ -48,7 +53,7 @@ extern "C" {
 #define DECODE_DIAG_DEBUG
 #define ROTATE_DIAG_DEBUG
 #define SCALE_DIAG_DEBUG
-#define DISP_DIAG_DEBUG
+//#define DISP_DIAG_DEBUG
 #endif
 
 typedef enum
@@ -77,6 +82,12 @@ typedef enum
 	MUX_BUFFER_RELEASE,
 } mux_buffer_state_t;
 
+typedef enum
+{
+    MUX_DEC_ERR = 0,
+	MUX_DEC_OK,
+	MUX_DEC_TIMEOUT,
+} dec_result_t;
 
 typedef struct {
 
@@ -88,10 +99,8 @@ typedef struct {
 	uint8_t index;
 	uint8_t id;
 
-	union {
-		uint8_t state;
-		uint8_t ok;
-	};
+	uint8_t state;
+	uint8_t ok;
 
 } complex_buffer_t;
 
@@ -114,9 +123,8 @@ typedef struct {
 
 
 typedef bk_err_t (*mux_callback_t)(void *param);
-
 typedef bk_err_t (*mux_request_callback_t)(pipeline_encode_request_t *request, mux_callback_t cb);
-
+typedef bk_err_t (*mux_reset_callback_t)(mux_callback_t reset_cb);
 
 typedef struct
 {
@@ -173,11 +181,16 @@ void decoder_mux_dump(void);
 bk_err_t bk_h264_encode_request(pipeline_encode_request_t *request, mux_callback_t cb);
 bk_err_t bk_rotate_encode_request(pipeline_encode_request_t *request, mux_callback_t cb);
 bk_err_t bk_scale_encode_request(pipeline_encode_request_t *request, mux_callback_t cb);
-void bk_jdec_buffer_request_register(pipeline_module_t module, mux_request_callback_t cb);
+void bk_jdec_buffer_request_register(pipeline_module_t module, mux_request_callback_t cb, mux_reset_callback_t reset_cb);
 void bk_jdec_buffer_request_deregister(pipeline_module_t module);
 bk_err_t bk_scale_pipeline_init(void);
 bk_err_t bk_rotate_pipeline_init(void);
 bk_err_t bk_jdec_pipeline_init(void);
+bk_err_t bk_h264_pipeline_init(void);
+
+bk_err_t bk_h264_reset_request(mux_callback_t cb);
+bk_err_t bk_scale_reset_request(mux_callback_t cb);
+bk_err_t bk_rotate_reset_request(mux_callback_t cb);
 
 void decoder_mux_dump(void);
 

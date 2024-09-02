@@ -408,13 +408,13 @@ static void media_trans_task_entry(beken_thread_arg_t data)
 			switch (msg.type)
 			{
 				case MSG_EOF:
-				media_msg->event = EVENT_DVP_EOF_NOTIFY;
-				msg_send_notify_to_media_major_mailbox(media_msg, APP_MODULE);
+					media_msg->event = EVENT_DVP_EOF_NOTIFY;
+					msg_send_notify_to_media_major_mailbox(media_msg, APP_MODULE);
 					break;
 
 				case MSG_DMA_RESTART:
-				media_msg->event = EVENT_DMA_RESTART_NOTIFY;
-				msg_send_notify_to_media_major_mailbox(media_msg, APP_MODULE);
+					media_msg->event = EVENT_DMA_RESTART_NOTIFY;
+					msg_send_notify_to_media_major_mailbox(media_msg, APP_MODULE);
 					break;
 
 				default:
@@ -441,15 +441,10 @@ static bk_err_t media_tranfer_task_init(void)
 	if (media_msg == NULL)
 	{
 		media_msg = (media_mailbox_msg_t *)os_malloc(sizeof(media_mailbox_msg_t));
-		if (media_msg != NULL)
+		if (media_msg == NULL)
 		{
-			ret = rtos_init_semaphore_ex(&media_msg->sem, 1, 0);
-
-			if (ret != kNoErr)
-			{
-				LOGE("%s init semaphore failed\n", __func__);
-				goto error;
-			}
+			LOGE("%s media_msg malloc failed\n", __func__);
+			goto error;
 		}
 	}
 
@@ -487,12 +482,6 @@ error:
 
 	if (media_msg)
 	{
-		if(media_msg->sem)
-		{
-			rtos_deinit_semaphore(&media_msg->sem);
-			media_msg->sem = NULL;
-		}
-
 		os_free(media_msg);
 		media_msg = NULL;
 	}

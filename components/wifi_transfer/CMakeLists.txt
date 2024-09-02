@@ -1,11 +1,12 @@
-set(incs .)
+set(incs include)
 set(srcs)
 
 set(priv_req bk_common)
 
 if (CONFIG_WIFI_TRANSFER AND CONFIG_SYS_CPU0)
 	list(APPEND srcs
-		wifi_transfer.c
+		src/wifi_transfer.c
+		src/trans_list.c
 		)
 endif()
 

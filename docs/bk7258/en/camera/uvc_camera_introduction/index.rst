@@ -21,13 +21,13 @@ The UVC output data format is determined by its own firmware, which may support 
 3 UVC Usage process
 ------------------------
 
-- 1、initialize the USB hardware module, that is, initialize the host, and start its work usb_task;
-- 2、host Detects whether the device is connected and enumerates.
-- 3、After detecting that the connection is successful, the upper layer reads the device descriptor and sets UVC parameters based on it
-- 4、Start the UVC
-- 5、Process UVC packets
-- 6、Pause UVC transmission
-- 7、restore UVC transmission, etc., do a good job of state machine switching
+- 1.initialize the USB hardware module, that is, initialize the host, and start its work usb_task;
+- 2.host Detects whether the device is connected and enumerates.
+- 3.After detecting that the connection is successful, the upper layer reads the device descriptor and sets UVC parameters based on it
+- 4.Start the UVC
+- 5.Process UVC packets
+- 6.Pause UVC transmission
+- 7.restore UVC transmission, etc., do a good job of state machine switching
 
 4 Main applications of UVC working mode
 -----------------------------------------

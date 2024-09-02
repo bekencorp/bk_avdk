@@ -125,7 +125,7 @@ MINOOR_ITCM void lcd_jpeg_dec_sw_open(uint32_t param)
 	bk_err_t ret = BK_FAIL;
 	if (param)
 	{
-		ret = bk_jpeg_dec_sw_init();
+		ret = bk_jpeg_dec_sw_init(NULL, 0);
 		LOGI("%s mailbox sw decoder open\n", __func__);
 		if (ret != BK_OK)
         {

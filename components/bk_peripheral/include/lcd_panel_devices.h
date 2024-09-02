@@ -103,6 +103,9 @@ extern const lcd_device_t lcd_device_st77903_h0165y008t;
 extern const lcd_device_t lcd_device_spd2010;
 #endif
 
+#if CONFIG_LCD_SPI_ST7796U
+extern const lcd_device_t lcd_device_st7796u;
+#endif
 
 void lcd_panel_devices_init(void);
 

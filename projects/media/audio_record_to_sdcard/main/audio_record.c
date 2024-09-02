@@ -12,323 +12,185 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "stdio.h"
 #include <os/os.h>
-#include "audio_pipeline.h"
-#include "audio_mem.h"
-#include "onboard_mic_stream.h"
-#include "fatfs_stream.h"
+#include <os/mem.h>
 #include "audio_record.h"
+#include "aud_intf.h"
+#include "aud_intf_types.h"
+#include "ff.h"
+#include "diskio.h"
 
 
 #define TAG  "AUD_RECORD_SDCARD"
 
-#define TU_QITEM_COUNT      (4)
+static FIL mic_file;
+static char mic_file_name[50];
 
-#define AUDIO_RECORD_TO_SDCARD_CHECK_NULL(ptr) do {\
-		if (ptr == NULL) {\
-			BK_LOGE(TAG, "AUDIO_RECORD_TO_SDCARD_CHECK_NULL fail \n");\
-			goto audio_record_exit;\
-		}\
-	} while(0)
+static FATFS *pfs = NULL;
 
 
-typedef struct {
-	audio_pipeline_handle_t pipeline;
-	audio_element_handle_t onboard_mic;
-	audio_element_handle_t fatfs_writer;
-	audio_record_setup_t setup;
-	beken_thread_t audio_record_task_hdl;
-	beken_queue_t audio_record_msg_que;
-} audio_record_info_t;
-
-static audio_record_info_t *audio_record_info = NULL;
-
-bk_err_t audio_record_send_msg(audio_record_op_t op, void *param)
+static bk_err_t tf_mount(void)
 {
-	bk_err_t ret;
-	audio_record_msg_t msg;
+	FRESULT fr;
 
-	msg.op = op;
-	msg.param = param;
-	if (audio_record_info && audio_record_info->audio_record_msg_que) {
-		ret = rtos_push_to_queue(&audio_record_info->audio_record_msg_que, &msg, BEKEN_NO_WAIT);
-		if (kNoErr != ret) {
-			BK_LOGE(TAG, "aud_tras_send_int_msg fail \r\n");
-			return kOverrunErr;
-		}
-
-		return ret;
+	if (pfs != NULL)
+	{
+		os_free(pfs);
 	}
-	return kNoResourcesErr;
+
+	pfs = os_malloc(sizeof(FATFS));
+	if(NULL == pfs)
+	{
+		BK_LOGI(TAG, "f_mount malloc failed!\r\n");
+		return BK_FAIL;
+	}
+
+	fr = f_mount(pfs, "1:", 1);
+	if (fr != FR_OK)
+	{
+		BK_LOGE(TAG, "f_mount failed:%d\r\n", fr);
+		return BK_FAIL;
+	}
+	else
+	{
+		BK_LOGI(TAG, "f_mount OK!\r\n");
+	}
+
+	return BK_OK;
 }
 
-/* The "onboard mic stream" element is a producer. The element is the first element.
-   Usually this element only has src.
-   The data flow model of this element is as follow:
-   +-----------------+               +-------------------+
-   |   onboard-mic   |               |       fatfs       |
-   |     stream      |               |    stream[out]    |
-   |                 |               |                   |
-   |                src - ringbuf - sink                 |
-   |                 |               |                   |
-   |                 |               |                   |
-   +-----------------+               +-------------------+
-
-   Function: Use onboard mic stream to record audio data to tfcard.
-*/
-void audio_record_main(beken_thread_arg_t param_data)
+static bk_err_t tf_unmount(void)
 {
-	bk_err_t ret = BK_OK;
-	audio_event_iface_handle_t evt = NULL;
-
-	BK_LOGI(TAG, "--------- %s ----------\n", __func__);
-	AUDIO_MEM_SHOW("start");
-
-	BK_LOGI(TAG, "--------- step1: pipeline init ----------\n");
-	audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
-	audio_record_info->pipeline = audio_pipeline_init(&pipeline_cfg);
-	AUDIO_RECORD_TO_SDCARD_CHECK_NULL(audio_record_info->pipeline);
-
-	BK_LOGI(TAG, "--------- step2: init elements ----------\n");
-	onboard_mic_stream_cfg_t onboard_mic_cfg = ONBOARD_MIC_ADC_STREAM_CFG_DEFAULT();
-	onboard_mic_cfg.adc_cfg.samp_rate = audio_record_info->setup.samp_rate;
-	audio_record_info->onboard_mic = onboard_mic_stream_init(&onboard_mic_cfg);
-	AUDIO_RECORD_TO_SDCARD_CHECK_NULL(audio_record_info->onboard_mic);
-	fatfs_stream_cfg_t fatfs_writer_cfg = FATFS_STREAM_CFG_DEFAULT();
-	fatfs_writer_cfg.type = AUDIO_STREAM_WRITER;
-	fatfs_writer_cfg.buf_sz = onboard_mic_cfg.adc_cfg.chl_num * onboard_mic_cfg.adc_cfg.samp_rate * onboard_mic_cfg.adc_cfg.bits / 1000 / 8 * 20;
-	audio_record_info->fatfs_writer = fatfs_stream_init(&fatfs_writer_cfg);
-	AUDIO_RECORD_TO_SDCARD_CHECK_NULL(audio_record_info->fatfs_writer);
-
-	if (BK_OK != audio_element_set_uri(audio_record_info->fatfs_writer, audio_record_info->setup.file_name)) {
-		BK_LOGE(TAG, "set uri fail, %d \n", __LINE__);
-		goto audio_record_exit;
+	FRESULT fr;
+	fr = f_unmount(DISK_NUMBER_SDIO_SD, "1:", 1);
+	if (fr != FR_OK)
+	{
+		BK_LOGE(TAG, "f_unmount failed:%d\r\n", fr);
+		return BK_FAIL;
+	}
+	else
+	{
+		BK_LOGI(TAG, "f_unmount OK!\r\n");
 	}
 
-	BK_LOGI(TAG, "--------- step3: pipeline register ----------\n");
-
-	if (BK_OK != audio_pipeline_register(audio_record_info->pipeline, audio_record_info->onboard_mic, "onboard_mic")) {
-		BK_LOGE(TAG, "register element fail, %d \n", __LINE__);
-		goto audio_record_exit;
-	}
-	if (BK_OK != audio_pipeline_register(audio_record_info->pipeline, audio_record_info->fatfs_writer, "fatfs_out")) {
-		BK_LOGE(TAG, "register element fail, %d \n", __LINE__);
-		goto audio_record_exit;
+	if (pfs)
+	{
+		os_free(pfs);
+		pfs = NULL;
 	}
 
-	BK_LOGI(TAG, "--------- step4: pipeline link ----------\n");
-	if (BK_OK != audio_pipeline_link(audio_record_info->pipeline, (const char *[]) {"onboard_mic", "fatfs_out"}, 2)) {
-		BK_LOGE(TAG, "pipeline link fail, %d \n", __LINE__);
-		goto audio_record_exit;
+	return BK_OK;
+}
+
+static int send_mic_data_to_sd(uint8_t *data, unsigned int len)
+{
+	FRESULT fr;
+	uint32 uiTemp = 0;
+
+	/* write data to file */
+	fr = f_write(&mic_file, (void *)data, len, &uiTemp);
+	if (fr != FR_OK) {
+		BK_LOGE(TAG, "write %s fail.\r\n", mic_file_name);
 	}
 
-	BK_LOGI(TAG, "--------- step5: init event listener ----------\n");
-	audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
-	evt = audio_event_iface_init(&evt_cfg);
-
-	if (BK_OK != audio_pipeline_set_listener(audio_record_info->pipeline, evt)) {
-		BK_LOGE(TAG, "set uri fail, %d \n", __LINE__);
-		goto audio_record_exit;
-	}
-
-	BK_LOGI(TAG, "--------- step6: pipeline run ----------\n");
-	if (BK_OK != audio_pipeline_run(audio_record_info->pipeline)) {
-		BK_LOGE(TAG, "pipeline run fail, %d \n", __LINE__);
-		goto audio_record_exit;
-	}
-
-	while (1) {
-		audio_event_iface_msg_t msg;
-
-		audio_record_msg_t record_msg;
-		ret = rtos_pop_from_queue(&audio_record_info->audio_record_msg_que, &record_msg, 0);
-		if (kNoErr == ret) {
-			switch (record_msg.op) {
-				case AUDIO_RECORD_EXIT:
-					BK_LOGI(TAG, "goto: AUDIO_RECORD_EXIT \r\n");
-					goto audio_record_exit;
-					break;
-
-				default:
-					break;
-			}
-		}
-
-		ret = audio_event_iface_listen(evt, &msg, 1000 / portTICK_RATE_MS);//portMAX_DELAY
-		if (ret != BK_OK) {
-			BK_LOGI(TAG, "not receive event, error : %d \n", ret);
-			continue;
-		}
-
-		if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT
-			&& msg.cmd == AEL_MSG_CMD_REPORT_STATUS
-			&& (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED))) {
-			BK_LOGW(TAG, "Stop event received \n");
-			break;
-		}
-	}
-
-
-audio_record_exit:
-
-	BK_LOGI(TAG, "--------- step7: deinit pipeline ----------\n");
-	if (BK_OK != audio_pipeline_stop(audio_record_info->pipeline)) {
-		BK_LOGE(TAG, "pipeline stop fail, %d \n", __LINE__);
-	}
-	if (BK_OK != audio_pipeline_wait_for_stop(audio_record_info->pipeline)) {
-		BK_LOGE(TAG, "pipeline wait stop fail, %d \n", __LINE__);
-	}
-
-	if (BK_OK != audio_pipeline_terminate(audio_record_info->pipeline)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-	}
-
-	if (BK_OK != audio_pipeline_unregister(audio_record_info->pipeline, audio_record_info->onboard_mic)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-	}
-	if (BK_OK != audio_pipeline_unregister(audio_record_info->pipeline, audio_record_info->fatfs_writer)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-	}
-
-	if (BK_OK != audio_pipeline_remove_listener(audio_record_info->pipeline)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-	}
-
-	if (evt && BK_OK != audio_event_iface_destroy(evt)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-	}
-
-	if (BK_OK != audio_pipeline_deinit(audio_record_info->pipeline)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-	}
-
-	if (BK_OK != audio_element_deinit(audio_record_info->onboard_mic)) {
-		BK_LOGE(TAG, "element deinit fail, %d \n", __LINE__);
-	}
-
-	if (BK_OK != audio_element_deinit(audio_record_info->fatfs_writer)) {
-		BK_LOGE(TAG, "element deinit fail, %d \n", __LINE__);
-	}
-
-	BK_LOGI(TAG, "--------- onboard mic test complete ----------\n");
-	AUDIO_MEM_SHOW("end");
-
-
-	if (audio_record_info && audio_record_info->setup.file_name) {
-		os_free(audio_record_info->setup.file_name);
-		audio_record_info->setup.file_name = NULL;
-	}
-
-	/* delete msg queue */
-	if (audio_record_info && audio_record_info->audio_record_msg_que) {
-		rtos_deinit_queue(&audio_record_info->audio_record_msg_que);
-		audio_record_info->audio_record_msg_que = NULL;
-	}
-
-	/* delete task */
-	audio_record_info->audio_record_task_hdl = NULL;
-
-	if (audio_record_info) {
-		os_free(audio_record_info);
-		audio_record_info = NULL;
-	}
-
-	rtos_delete_thread(NULL);
+	return uiTemp;
 }
 
 bk_err_t audio_record_to_sdcard_start(char *file_name, uint32_t samp_rate)
 {
-	bk_err_t ret = BK_OK;
+    bk_err_t ret = BK_OK;
+    FRESULT fr;
 
-	audio_record_info = (audio_record_info_t *)os_malloc(sizeof(audio_record_info_t));
-	if (audio_record_info) {
-		audio_record_info->audio_record_task_hdl = NULL;
-		audio_record_info->audio_record_msg_que = NULL;
-		audio_record_info->fatfs_writer = NULL;
-		audio_record_info->onboard_mic = NULL;
-		audio_record_info->pipeline = NULL;
-		audio_record_info->setup.file_name = NULL;
-		audio_record_info->setup.file_name = (char *)os_malloc(50);
-		if (audio_record_info->setup.file_name) {
-			sprintf(audio_record_info->setup.file_name, "1:/%s", file_name);
-			BK_LOGI(TAG, "file_name: %s \n", audio_record_info->setup.file_name);
-		} else {
-			BK_LOGE(TAG, "malloc file_name fail, %d \n", __LINE__);
-			return BK_FAIL;
-		}
-		audio_record_info->setup.samp_rate = samp_rate;
-	} else {
-		BK_LOGE(TAG, "malloc audio_record_info fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
+    aud_intf_drv_setup_t aud_intf_drv_setup = DEFAULT_AUD_INTF_DRV_SETUP_CONFIG();
+    aud_intf_mic_setup_t aud_intf_mic_setup = DEFAULT_AUD_INTF_MIC_SETUP_CONFIG();
 
-	if ((!audio_record_info->audio_record_task_hdl) && (!audio_record_info->audio_record_msg_que))
-	{
-		ret = rtos_init_queue(&audio_record_info->audio_record_msg_que,
-							  "audio_record_msg_que",
-							  sizeof(audio_record_msg_t),
-							  TU_QITEM_COUNT);
-		if (ret != kNoErr)
-		{
-			BK_LOGE(TAG, "ceate audio record message queue fail\n");
-			goto fail;
-		}
+    ret = tf_mount();
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "tfcard mount fail, ret:%d\n", ret);
+        goto fail;
+    }
 
-		ret = rtos_create_thread(&audio_record_info->audio_record_task_hdl,
-								 4,
-								 "audio_record",
-								 (beken_thread_function_t)audio_record_main,
-								 1024 * 2,
-								 NULL);
-		if (ret != kNoErr)
-		{
-			BK_LOGE(TAG, "Error: Failed to create audio_record task \n");
-			goto fail;
-		}
-	}
-	else
-	{
-		goto fail;
-	}
+    /*open file to save pcm data */
+    sprintf(mic_file_name, "1:/%s", file_name);
+    fr = f_open(&mic_file, mic_file_name, FA_CREATE_ALWAYS | FA_WRITE);
+    if (fr != FR_OK) {
+        BK_LOGE(TAG, "open %s fail\n", mic_file_name);
+        goto fail;
+    }
 
-	return ret;
+    aud_intf_drv_setup.aud_intf_tx_mic_data = send_mic_data_to_sd;
+    ret = bk_aud_intf_drv_init(&aud_intf_drv_setup);
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_drv_init fail, ret:%d\n", ret);
+        goto fail;
+    }
+
+    ret = bk_aud_intf_set_mode(AUD_INTF_WORK_MODE_GENERAL);
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_set_mode fail, ret:%d\n", ret);
+        goto fail;
+    }
+
+    //aud_intf_mic_setup.mic_chl = AUD_INTF_MIC_CHL_MIC1;
+    aud_intf_mic_setup.samp_rate = samp_rate;
+    //aud_intf_mic_setup.mic_type = AUD_INTF_MIC_TYPE_UAC;
+    aud_intf_mic_setup.frame_size = 640;
+    //aud_intf_mic_setup.mic_gain = 0x2d;
+    ret = bk_aud_intf_mic_init(&aud_intf_mic_setup);
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_mic_init fail, ret:%d\n", ret);
+        goto fail;
+    }
+
+    ret = bk_aud_intf_mic_start();
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_mic_start fail, ret:%d\n", ret);
+        goto fail;
+    }
+
+	return BK_OK;
 
 fail:
-	if (audio_record_info && audio_record_info->setup.file_name) {
-		os_free(audio_record_info->setup.file_name);
-		audio_record_info->setup.file_name = NULL;
-	}
 
-	if (audio_record_info && audio_record_info->audio_record_msg_que) {
-		rtos_deinit_queue(&audio_record_info->audio_record_msg_que);
-		audio_record_info->audio_record_msg_que = NULL;
-	}
+    bk_aud_intf_mic_stop();
+    bk_aud_intf_mic_deinit();
+    bk_aud_intf_set_mode(AUD_INTF_WORK_MODE_NULL);
+    bk_aud_intf_drv_deinit();
 
-	if (audio_record_info) {
-		os_free(audio_record_info);
-		audio_record_info = NULL;
-	}
+    /* close mic file */
+    f_close(&mic_file);
 
-	return BK_FAIL;
+    return BK_FAIL;
 }
 
 bk_err_t audio_record_to_sdcard_stop(void)
 {
 	bk_err_t ret;
-	audio_record_msg_t msg;
+    ret = bk_aud_intf_mic_stop();
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_mic_stop fail, ret:%d\n", ret);
+    }
 
-	msg.op = AUDIO_RECORD_EXIT;
-	msg.param = NULL;
-	if (audio_record_info->audio_record_msg_que) {
-		ret = rtos_push_to_queue_front(&audio_record_info->audio_record_msg_que, &msg, BEKEN_NO_WAIT);
-		if (kNoErr != ret) {
-			BK_LOGE(TAG, "audio send msg: AUDIO_RECORD_EXIT fail \r\n");
-			return kOverrunErr;
-		}
+    ret = bk_aud_intf_mic_deinit();
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_mic_deinit fail, ret:%d\n", ret);
+    }
 
-		return ret;
-	}
-	return kNoResourcesErr;
+    ret = bk_aud_intf_set_mode(AUD_INTF_WORK_MODE_NULL);
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_set_mode fail, ret:%d\n", ret);
+    }
+
+    ret = bk_aud_intf_drv_deinit();
+    if (ret != BK_ERR_AUD_INTF_OK) {
+        BK_LOGE(TAG, "bk_aud_intf_drv_deinit fail, ret:%d\n", ret);
+    }
+
+    /* close mic file */
+    f_close(&mic_file);
+
+    tf_unmount();
+
+    return BK_OK;
 }
 

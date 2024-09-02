@@ -71,6 +71,12 @@ static void dma2d_transfer_complete(void)
 bk_err_t lcd_driver_blend(lcd_blend_t *lcd_blend)
 {
 #if CONFIG_LCD_FONT_BLEND 
+    if (lcd_blend->xsize * lcd_blend->ysize * 2 > LCD_BLEND_MALLOC_SIZE)
+    {
+        LOGE("%s belnd mem size not enought, ICON size %d*%d*2 > blend mem size %d\n", __func__, lcd_blend->xsize, lcd_blend->ysize, LCD_BLEND_MALLOC_SIZE);
+        return BK_FAIL;
+    }
+
 	int	i = 0;
 	//uint8_t * p_logo_addr = (uint8_t *)lcd_blend->pfg_addr;
 	uint8_t * p_yuv_src = (uint8_t *)lcd_blend->pbg_addr;
@@ -185,6 +191,12 @@ bk_err_t lcd_driver_blend(lcd_blend_t *lcd_blend)
 bk_err_t lcd_dma2d_driver_blend(lcd_blend_t *lcd_blend)
 {
 #if CONFIG_LCD_DMA2D_BLEND
+    if (lcd_blend->xsize * lcd_blend->ysize * 2 > LCD_BLEND_MALLOC_SIZE)
+    {
+        LOGE("%s belnd mem size not enought, ICON size %d*%d*2 > blend mem size %d\n", __func__, lcd_blend->xsize, lcd_blend->ysize, LCD_BLEND_MALLOC_SIZE);
+        return BK_FAIL;
+    }
+
 	uint16_t lcd_start_x = 0;
 	uint16_t lcd_start_y = 0;
 	if ((lcd_blend->lcd_width < lcd_blend->bg_width)  || (lcd_blend->lcd_height < lcd_blend->bg_height)) //for lcd size is small then frame image size
@@ -273,6 +285,12 @@ bk_err_t lcd_dma2d_driver_blend(lcd_blend_t *lcd_blend)
  */
 bk_err_t lcd_driver_font_blend(lcd_font_config_t *lcd_font)
 {
+    if (lcd_font->xsize * lcd_font->ysize * 2 > LCD_BLEND_MALLOC_SIZE)
+    {
+        LOGE("%s belnd mem size not enought, ICON size %d*%d*2 > blend mem size %d\n", __func__, lcd_font->xsize, lcd_font->ysize, LCD_BLEND_MALLOC_SIZE);
+        return BK_FAIL;
+    }
+
 	int ret = BK_OK;
 	
 	register uint32_t i =0;
@@ -645,7 +663,7 @@ bk_err_t lcd_font_blend_deinit(void)
 bk_err_t lcd_font_blend_init(void)
 {
 	bk_err_t ret = BK_OK;
- 	return ret;
+	return ret;
 }
 
 

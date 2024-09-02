@@ -128,7 +128,7 @@ static void media_read_frame_info_callback(frame_buffer_t *frame)
 void uvc_debug_init (void)
 {
 	bk_err_t ret;
-	bk_jpeg_dec_sw_init();
+	bk_jpeg_dec_sw_init(NULL, 0);
 
 	ret =media_app_uvc_register_info_notify_cb(media_checkout_uvc_device_info);
 	if (ret != BK_OK)

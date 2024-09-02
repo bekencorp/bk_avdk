@@ -61,9 +61,9 @@ static bk_err_t fatfs_size_handle(media_mailbox_msg_t *msg)
 	audio_element_mb_t *audio_msg = (audio_element_mb_t *)msg->param;
 	fatfs_fp_param_t *fatfs_fp = (fatfs_fp_param_t *)audio_msg->param;
 	/* send response mailbox message to cpu1 */
-	int ret = f_size((FIL *)fatfs_fp->fp);
-	msg_send_rsp_to_media_app_mailbox(msg, ret);
-	return ret;
+	fatfs_fp->size = f_size((FIL *)fatfs_fp->fp);
+	msg_send_rsp_to_media_app_mailbox(msg, BK_OK);
+	return BK_OK;
 }
 
 static bk_err_t fatfs_lseek_handle(media_mailbox_msg_t *msg)
@@ -72,14 +72,20 @@ static bk_err_t fatfs_lseek_handle(media_mailbox_msg_t *msg)
 	fatfs_lseek_param_t *fatfs_lseek = (fatfs_lseek_param_t *)audio_msg->param;
 	/* send response mailbox message to cpu1 */
 	bk_err_t ret = f_lseek((FIL *)fatfs_lseek->fp, fatfs_lseek->ofs);
-	msg_send_rsp_to_media_app_mailbox(msg, ret);
+	if (ret >= 0) {
+		fatfs_lseek->result = ret;
+		msg_send_rsp_to_media_app_mailbox(msg, BK_OK);
+	} else {
+		fatfs_lseek->result = 0;
+		msg_send_rsp_to_media_app_mailbox(msg, ret);
+	}
 	return ret;
 }
 
 static int fatfs_read_handle(media_mailbox_msg_t *msg)
 {
 	FRESULT fr;
-	int ret = 0;
+	int ret = BK_OK;
 	/* use file descriptors to access files */
 	uint32 rlen = 0;
 
@@ -87,10 +93,11 @@ static int fatfs_read_handle(media_mailbox_msg_t *msg)
 	fatfs_rw_param_t *fatfs_rd = (fatfs_rw_param_t *)audio_msg->param;
 	fr = f_read((FIL *)fatfs_rd->fp, fatfs_rd->buff, fatfs_rd->len, &rlen);
 	if (fr == FR_OK) {
-		ret = rlen;
+		fatfs_rd->result = rlen;
 	}else {
 		BK_LOGE(TAG, "%s read data fail. Error message: %s \n", __func__, f_error((FIL *)fatfs_rd->fp));
-		ret = -1;
+		ret = BK_FAIL;
+		fatfs_rd->result = 0;
 	}
 	/* send response mailbox message to cpu1 */
 	msg_send_rsp_to_media_app_mailbox(msg, ret);
@@ -100,17 +107,18 @@ static int fatfs_read_handle(media_mailbox_msg_t *msg)
 static int fatfs_write_handle(media_mailbox_msg_t *msg)
 {
 	FRESULT fr;
-	int ret = 0;
+	int ret = BK_OK;
 	uint32 wlen = 0;
 
 	audio_element_mb_t *audio_msg = (audio_element_mb_t *)msg->param;
 	fatfs_rw_param_t *fatfs_wt = (fatfs_rw_param_t *)audio_msg->param;
 	fr = f_write((FIL *)fatfs_wt->fp, fatfs_wt->buff, fatfs_wt->len, &wlen);
 	if (fr == FR_OK) {
-		ret = wlen;
+		fatfs_wt->result = wlen;
 	} else {
 		BK_LOGE(TAG, "%s write data fail. Error message: %s \n", __func__, f_error((FIL *)fatfs_wt->fp));
-		ret = -1;
+		ret = BK_FAIL;
+		fatfs_wt->result = 0;
 	}
 	/* send response mailbox message to cpu1 */
 	msg_send_rsp_to_media_app_mailbox(msg, ret);

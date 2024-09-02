@@ -25,6 +25,7 @@ typedef struct __attribute__((packed))
     bt_user_storage_elem_linkkey_t linkkey[BT_LINKKEY_MAX_SAVE_COUNT];
 #if CONFIG_BLE
     bk_ble_bond_dev_t ble_key[BT_LINKKEY_MAX_SAVE_COUNT];
+    bk_ble_local_keys_t local_keys;
 #endif
 } bt_user_storage_t;
 
@@ -48,4 +49,8 @@ int32_t bluetooth_storage_save_volume(uint8_t *addr, uint8_t volume);
 int32_t bluetooth_storage_save_ble_key_info(bk_ble_bond_dev_t *list, uint32_t count);
 int32_t bluetooth_storage_clean_ble_key_info(void);
 int32_t bluetooth_storage_read_ble_key_info(bk_ble_bond_dev_t *list, uint32_t *count);
+
+int32_t bluetooth_storage_save_local_key(bk_ble_local_keys_t *key);
+int32_t bluetooth_storage_clean_local_key(void);
+int32_t bluetooth_storage_read_local_key(bk_ble_local_keys_t *key);
 #endif

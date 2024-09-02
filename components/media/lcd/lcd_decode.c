@@ -420,7 +420,7 @@ bk_err_t lcd_sw_decode_init(media_decode_mode_t sw_dec_mode)
 	}
 	else
 	{
-		ret = bk_jpeg_dec_sw_init();
+		ret = bk_jpeg_dec_sw_init(NULL, 0);
 		if (ret != BK_OK)
 		{
 			LOGE("%s dec_sem init failed: %d\n", __func__, ret);

@@ -3,7 +3,6 @@
 #include <os/os.h>
 #include <common/bk_include.h>
 #include "ff.h"
-#include "../lv_fatfs.h"
 #include "../lv_conf.h"
 
 
@@ -41,15 +40,8 @@ failed_mount:
     os_printf("----- test_mount %d over  -----\r\n\r\n", number);
 }
 
-void lv_fatfs_init(void)
-{
-	char vol[3];
-	lv_fatfs_mount(LV_FS_FATFS_DISK_NUM);
-	sprintf(vol, "%d:", LV_FS_FATFS_DISK_NUM);
-	f_chdrive(vol);
-}
 
-void lv_fatfs_deinit(int number)
+static void lv_fatfs_unmount(int number)
 {
 	FRESULT fr;
 	char cFileName[FF_MAX_LFN];
@@ -68,4 +60,16 @@ void lv_fatfs_deinit(int number)
 	os_printf("----- test_unmount %d over	-----\r\n\r\n", number);
 }
 
+void lv_fatfs_init(void)
+{
+	char vol[3];
+	lv_fatfs_mount(LV_FS_FATFS_DISK_NUM);
+	sprintf(vol, "%d:", LV_FS_FATFS_DISK_NUM);
+	f_chdrive(vol);
+}
+
+void lv_fatfs_deinit(void)
+{
+    lv_fatfs_unmount(LV_FS_FATFS_DISK_NUM);
+}
 #endif

@@ -10,21 +10,38 @@ Armino AVDK SDK代码下载
 
 您可从 gitlab 上下载 Armino AVDK SDK::
 
-    mkdir -p ~/bk_avdk
-    cd ~/bk_avdk
+    mkdir -p ~/armino
+    cd ~/armino
     git clone http://gitlab.bekencorp.com/armino/bk_avdk.git
+
+
+您也可从 github 上下载 Armino AVDK SDK::
+
+	mkdir -p ~/armino
+	cd ~/armino
+	git clone --recurse-submodules https://github.com/bekencorp/bk_avdk.git 
+   
     
 然后切换到稳定分支Tag节点, 如v2.0.1.8::
 
+    cd ~/armino/bk_avdk
     git checkout -B your_branch_name v2.0.1.8
     git submodule update --init --recursive
+    ls
+
+.. figure:: ../../_static/bk_avdk_dir_1.png
+    :align: center
+    :alt: advk dir
+    :figclass: align-center
+
+    Figure 1. AVDK Directiry structure
 
 .. note::
 
     从官网的gitlab下载的为最近的SDK代码，相关账号找项目上审核申请。
 
 
-Armino bk7258构建编译环境
+构建编译环境
 ------------------------------------
 
 .. note::
@@ -33,7 +50,7 @@ Armino bk7258构建编译环境
 
 
 安装工具链
-------------------------------------
+*************************************
 
 点击 `下载 <https://dl.bekencorp.com/tools/toolchain/arm/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2>`_ 下载 BK7258 工具链。
 
@@ -50,7 +67,7 @@ Armino bk7258构建编译环境
 
 
 安装依赖库
-------------------------------------
+*************************************
 
 在终端输入下述命令安装 python3，CMake，Ninja 以及依赖库::
 
@@ -60,7 +77,7 @@ Armino bk7258构建编译环境
     sudo pip3 install pycrypto click
 
 安装 python 依赖库
-------------------------------------
+*************************************
 
 在 Armino 根目录下输入下述命令安装 python 依赖库::
 
@@ -76,7 +93,7 @@ Armino bk7258构建编译环境
 
 在终端下输入下述命令编译 Armino AVDK默认工程，PROJECT为可选参数，默认为media/doorbell::
 
-    cd ~/armino
+    cd ~/armino/bk_avdk
     make bk7258
 
 您也可以通过 PROJECT 参数来编译 projects 下其他工程，如 make bk7258 PROJECT=media/doorbell
@@ -86,12 +103,12 @@ Armino bk7258构建编译环境
 配置工程
 ------------------------------------
 
-您可以通过工程配置文件来进行更改 Armino 默认配置或者针对不同芯片进行差异化配置::
+您可以通过工程配置文件来进行更改默认配置或者针对不同芯片进行差异化配置::
 
     工程配置文件 Override 芯片配置文件 Override 默认配置
     如： config >> bk7258.defconfig >> KConfig
     + 工程配置文件示例：
-        projects/app/config/bk7258/config
+        projects/media/doorbell/config/bk7258/config
     + 芯片配置文件示例：
         middleware/soc/bk7258/bk7258.defconfig
     + KConfig 配置文件示例：

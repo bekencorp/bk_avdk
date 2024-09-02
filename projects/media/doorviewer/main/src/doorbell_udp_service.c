@@ -437,7 +437,7 @@ bk_err_t doorbell_udp_service_init(void)
 
 	os_memset(db_udp_service, 0, sizeof(db_udp_service_t));
 
-	db_udp_service->img_channel = doorbell_transmission_malloc(1600, DOORBELL_NETWORK_MAX_SIZE);
+	db_udp_service->img_channel = doorbell_transmission_malloc(1600, DOORBELL_UDP_NETWORK_MAX_SIZE);
 
 	if (db_udp_service->img_channel == NULL)
 	{

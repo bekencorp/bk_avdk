@@ -24,7 +24,7 @@ const unsigned int g_sram_addr_map[4] =
 #if (CONFIG_SYS_CPU0)
 void user_app_main(void)
 {
-	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_AUDP_AUDIO, PM_POWER_MODULE_STATE_ON);
+	//bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_AUDP_AUDIO, PM_POWER_MODULE_STATE_ON);
 }
 #endif
 
@@ -40,8 +40,12 @@ int main(void)
 	extern int media_service_init(void);
 	media_service_init();
 
+#if (CONFIG_SYS_CPU0)
+	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_AUDP_AUDIO, PM_POWER_MODULE_STATE_ON);
+#endif
+
 #if ((CONFIG_ASDF_WORK_CPU1 && CONFIG_SYS_CPU1) || (CONFIG_ASDF_WORK_CPU0 && CONFIG_SYS_CPU0))
-	rtos_delay_milliseconds(1000);
+	//rtos_delay_milliseconds(5000);
 	wanson_asr_init();
 	wanson_asr_start();
 #endif

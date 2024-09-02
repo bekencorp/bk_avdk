@@ -68,7 +68,7 @@ typedef struct
 
 APP_DEMO_STA_PTR g_demo_sta = NULL;
 
-extern void bk_wlan_status_register_cb_internal(FUNC_1PARAM_PTR cb);
+extern void bk_wlan_status_register_cb(FUNC_1PARAM_PTR cb);
 
 uint32 app_demo_sta_alloc_buffer(void)
 {
@@ -216,7 +216,7 @@ static void app_demo_sta_main(beken_thread_arg_t data)
 
     g_demo_sta->status = APS_WIFI_DISCONECTED;
 
-    bk_wlan_status_register_cb_internal(app_demo_sta_rw_event_func);
+    bk_wlan_status_register_cb(app_demo_sta_rw_event_func);
 
     if (app_demo_sta_setup() == 0)
     {

@@ -27,15 +27,7 @@ JPEGENC APIs:
  - :cpp:func:`bk_jpeg_enc_driver_deinit` - deinit jpeg encode module driver
  - :cpp:func:`bk_jpeg_enc_init` - init jpeg encode module
  - :cpp:func:`bk_jpeg_enc_deinit` - deinit jpeg encode module
- - :cpp:func:`bk_jpeg_enc_dvp_init` - init jpeg encode module
- - :cpp:func:`bk_jpeg_enc_dvp_deinit` - deinit jpeg encode module
- - :cpp:func:`bk_jpeg_enc_set_yuv_mode` - set jpeg encode module work mode
- - :cpp:func:`bk_jpeg_enc_set_enable` - set encode enable/disable
  - :cpp:func:`bk_jpeg_enc_get_frame_size` - get a frame size output from jpeg  encode module
- - :cpp:func:`bk_jpeg_enc_register_frame_start_isr` - register sof callback function
- - :cpp:func:`bk_jpeg_enc_register_frame_end_isr` - register eof callback function
- - :cpp:func:`bk_jpeg_enc_register_end_yuv_isr` - register yof callback function
- - :cpp:func:`bk_jpeg_enc_dvp_gpio_enable` - enable jpeg encode module data gpio
 
 API Reference
 ----------------------------------------

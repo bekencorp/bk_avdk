@@ -32,6 +32,11 @@
 #include "draw_blend.h"
 #include "lcd_draw_blend.h"
 
+#if CONFIG_LCD_SPI_DISPLAY
+#include <lcd_spi_display_service.h>
+#endif
+
+
 #define TAG "lcd_pip"
 
 #define LOGI(...) BK_LOGI(TAG, ##__VA_ARGS__)
@@ -100,7 +105,11 @@ static void lcd_driver_display_mcu_isr(void)
 	if (lcd_disp_config->pingpong_frame != NULL)
 	{
 		media_debug->fps_lcd++;
-		frame_buffer_display_free(lcd_disp_config->display_frame);
+        if (lcd_disp_config->display_frame)
+        {
+		    frame_buffer_display_free(lcd_disp_config->display_frame);
+            lcd_disp_config->display_frame = NULL;
+        }
 
 		GLOBAL_INT_DISABLE();
 		lcd_disp_config->display_frame = lcd_disp_config->pingpong_frame;
@@ -135,7 +144,8 @@ if (flash_status == FLASH_OP_IDLE)
 
 			GLOBAL_INT_DISABLE();
 
-			if (lcd_disp_config->pingpong_frame != lcd_disp_config->display_frame) {
+			if (lcd_disp_config->pingpong_frame != lcd_disp_config->display_frame) 
+            {
 				if (lcd_disp_config->display_frame->width != lcd_disp_config->pingpong_frame->width
 					|| lcd_disp_config->display_frame->height != lcd_disp_config->pingpong_frame->height)
 				{
@@ -146,9 +156,12 @@ if (flash_status == FLASH_OP_IDLE)
 					bk_lcd_set_yuv_mode(lcd_disp_config->pingpong_frame->fmt);
 				}
                 if (lcd_disp_config->display_frame->cb != NULL
-                    && lcd_disp_config->display_frame->cb->free != NULL) {
+                    && lcd_disp_config->display_frame->cb->free != NULL) 
+                {
                     lcd_disp_config->display_frame->cb->free(lcd_disp_config->display_frame);
-                } else {
+                } 
+                else
+                {
                     temp_buffer = lcd_disp_config->display_frame;
                     lcd_disp_config->display_frame = NULL;
                 }
@@ -373,8 +386,6 @@ static bk_err_t lcd_display_task_start(void)
 static bk_err_t lcd_display_task_stop(void)
 {
 	bk_err_t ret = BK_OK;
-	LOGI("%s, %d\n", __func__, __LINE__);
-
 	if (!lcd_disp_config || lcd_disp_config->disp_task_running == false)
 	{
 		LOGI("%s already stop\n", __func__);
@@ -382,8 +393,6 @@ static bk_err_t lcd_display_task_stop(void)
 	}
 
 	lcd_display_task_send_msg(DISPLAY_FRAME_EXTI, 0);
-
-	LOGI("%s, %d\n", __func__, __LINE__);
 
 	ret = rtos_get_semaphore(&lcd_disp_config->disp_task_sem, BEKEN_NEVER_TIMEOUT);
 
@@ -398,7 +407,7 @@ static bk_err_t lcd_display_task_stop(void)
 		lcd_disp_config->queue = NULL;
 	}
 
-	LOGI("%s, %d\n", __func__, __LINE__);
+	LOGI("%s complete\n", __func__);
 
 	return ret;
 }
@@ -410,8 +419,6 @@ bk_err_t lcd_display_config_free(void)
 
 	if (lcd_disp_config)
 	{
-		LOGI("%s %d\n", __func__, __LINE__);
-
 		if (lcd_disp_config->disp_task_sem)
 		{
 			rtos_deinit_semaphore(&lcd_disp_config->disp_task_sem);
@@ -446,7 +453,7 @@ bk_err_t lcd_display_config_free(void)
 			lcd_disp_config = NULL;
 		}
 	}
-	LOGI("%s %d\n", __func__, __LINE__);
+	LOGD("%s %d\n", __func__, __LINE__);
 	return ret;
 }
 
@@ -513,6 +520,7 @@ bk_err_t lcd_display_open(lcd_open_t *config)
 	}
     lcd_disp_config->lcd_width = lcd_device->ppi >> 16;
     lcd_disp_config->lcd_height = lcd_device->ppi & 0xFFFF;
+    lcd_disp_config->lcd_type = lcd_device->type;
 
 	// step 4: init frame buffer
 	LOGI("%s %d lcd ppi:%d %d\n", __func__, __LINE__, lcd_disp_config->lcd_width, lcd_disp_config->lcd_height);
@@ -533,10 +541,6 @@ bk_err_t lcd_display_open(lcd_open_t *config)
 	media_debug->fps_lcd= 0;
 	media_debug->isr_lcd = 0;
 
-#if CONFIG_LCD_QSPI
-    bk_lcd_qspi_disp_task_start(lcd_device);
-#endif
-
 #if (CONFIG_LCD_FONT_BLEND || CONFIG_LCD_DMA2D_BLEND)
     ret = lcd_blend_malloc_buffer();
     if (ret != BK_OK) {
@@ -551,14 +555,25 @@ bk_err_t lcd_display_open(lcd_open_t *config)
     }
 #endif
 
-	ret = lcd_display_task_start();
-	if (ret != BK_OK)
-	{
-		LOGE("%s lcd_display_task_start failed: %d\n", __func__, ret);
-		goto out;
-	}
+    if (lcd_device->type == LCD_TYPE_SPI) {
+    #if CONFIG_LCD_SPI_DISPLAY
+        lcd_spi_init(lcd_device);
+    #endif
+    } else if (lcd_device->type == LCD_TYPE_QSPI) {
+    #if CONFIG_LCD_QSPI
+        bk_lcd_qspi_disp_task_start(lcd_device);
+        lcd_disp_config->disp_task_running = true;
+    #endif
+    } else {
+        ret = lcd_display_task_start();
+        if (ret != BK_OK)
+        {
+            LOGE("%s lcd_display_task_start failed: %d\n", __func__, ret);
+            goto out;
+        }
+    }
 
-	lcd_driver_backlight_open();
+    lcd_driver_backlight_open();
 
 	LOGI("%s %d complete\n", __func__, __LINE__);
 
@@ -586,9 +601,10 @@ bk_err_t lcd_display_close(void)
 
 #if CONFIG_LCD_QSPI
     bk_lcd_qspi_disp_task_stop();
-#endif
-
+    lcd_disp_config->disp_task_running = false;
+#else
 	lcd_display_task_stop();
+#endif
 
 	lcd_display_config_free();
 #if (CONFIG_LCD_DMA2D_BLEND || CONFIG_LCD_FONT_BLEND)

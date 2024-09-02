@@ -37,6 +37,10 @@ const tp_sensor_config_t *tp_sensor_configs[] =
 #if CONFIG_TP_HY4633
 	&tp_sensor_hy4633,
 #endif
+
+#if CONFIG_TP_CST816D
+	&tp_sensor_cst816d,
+#endif
 };
 
 void tp_sensor_devices_init(void)

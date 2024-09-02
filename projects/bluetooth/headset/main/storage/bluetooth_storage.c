@@ -362,6 +362,12 @@ int32_t bluetooth_storage_sync_to_flash(void)
 {
     int32_t ret = 0;
 
+    if (!s_bt_user_storage)
+    {
+        os_printf("%s not init\n", __func__);
+        return -1;
+    }
+
 #if CONFIG_EASY_FLASH_V4
 
     ret = ef_set_env_blob(BT_STORAGE_KEY, s_bt_user_storage, sizeof(*s_bt_user_storage));
@@ -454,6 +460,45 @@ int32_t bluetooth_storage_read_ble_key_info(bk_ble_bond_dev_t *list, uint32_t *c
     os_memcpy(list, s_bt_user_storage->ble_key, sizeof(s_bt_user_storage->ble_key[0]) * final_count);
 
     *count = final_count;
+
+    return 0;
+}
+
+int32_t bluetooth_storage_save_local_key(bk_ble_local_keys_t *key)
+{
+    if (!s_bt_user_storage)
+    {
+        os_printf("%s not init\n", __func__);
+        return -1;
+    }
+
+    os_memcpy(&s_bt_user_storage->local_keys, key, sizeof(*key));
+
+    return 0;
+}
+
+int32_t bluetooth_storage_clean_local_key(void)
+{
+    if (!s_bt_user_storage)
+    {
+        os_printf("%s not init\n", __func__);
+        return -1;
+    }
+
+    os_memset(&s_bt_user_storage->local_keys, 0, sizeof(s_bt_user_storage->local_keys));
+
+    return 0;
+}
+
+int32_t bluetooth_storage_read_local_key(bk_ble_local_keys_t *key)
+{
+    if (!s_bt_user_storage)
+    {
+        os_printf("%s not init\n", __func__);
+        return -1;
+    }
+
+    os_memcpy(key, &s_bt_user_storage->local_keys, sizeof(*key));
 
     return 0;
 }

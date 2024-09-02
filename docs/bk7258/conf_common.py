@@ -16,17 +16,28 @@ import sys, os
 import re
 from subprocess import Popen, PIPE
 import shlex
-
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('..'))
-
 from local_util import run_cmd_get_output, copy_if_modified
 
 builddir = '_build'
 if 'BUILDDIR' in os.environ:
     builddir = os.environ['BUILDDIR']
+
+DocumentsName = 'ReadtheDocsTemplate'
+if 'DOCUMENTS_NAME' in os.environ:
+    DocumentsName = os.environ['DOCUMENTS_NAME']
+
+DocumentsTitle = 'ReadtheDocsTemplate'
+if 'DOCUMENTS_TITLE' in os.environ:
+    DocumentsTitle = os.environ['DOCUMENTS_TITLE']
+
+DocumentsAuthor = 'Bekencorp'
+if 'DOCUMENTS_AUTHOR' in os.environ:
+    DocumentsAuthor = os.environ['DOCUMENTS_AUTHOR']
+
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+sys.path.insert(0, os.path.abspath('..'))
 
 sdk_config = "../../build/config/sdkconfig.h"
 sdk_config_arr = []
@@ -268,28 +279,39 @@ html_static_path = ['../_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'ReadtheDocsTemplatedoc'
+htmlhelp_basename = DocumentsName + 'doc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
+    # The paper size ('letterpaper' or 'a4paper').
+    #
+    'papersize': 'a4paper',
 
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
+    # The font size ('10pt', '11pt' or '12pt').
+    #
+    'pointsize': '10pt',
 
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
+    # Latex figure (float) alignment
+    #
+    'figure_align': 'htbp',
+
+    'passoptionstopackages': r'\PassOptionsToPackage{nonstopmode}{abc}',
+
+    'sphinxsetup': ' TitleColor={rgb}{0,0.3,0.6}, noteBorderColor={rgb}{0.7,0.7,0.7}',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'ReadtheDocsTemplate.tex', u'Read the Docs Template Documentation',
-   u'Read the Docs', 'manual'),
+  ('index', DocumentsName + '.tex', DocumentsTitle,
+   DocumentsAuthor, 'manual'),
+]
+
+latex_additional_files = [
+    'avdk_style.sty',
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -318,8 +340,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'readthedocstemplate', u'Read the Docs Template Documentation',
-     [u'Read the Docs'], 1)
+    ('index', DocumentsName, DocumentsTitle,
+     [DocumentsAuthor], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -332,8 +354,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'ReadtheDocsTemplate', u'Read the Docs Template Documentation',
-   u'Read the Docs', 'ReadtheDocsTemplate', 'One line description of project.',
+  ('index', DocumentsName, DocumentsTitle,
+   DocumentsAuthor, DocumentsName, DocumentsTitle,
    'Miscellaneous'),
 ]
 
@@ -371,6 +393,7 @@ html_js_files = [
 
 # Override RTD CSS theme to introduce the theme corrections
 # https://github.com/rtfd/sphinx_rtd_theme/pull/432
+
 def setup(app):
     app.add_css_file("css/custom.css")
     app.add_js_file("js/custom.js")

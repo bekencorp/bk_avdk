@@ -34,10 +34,6 @@ INPUT = \
     ../../../bk_idk/include/driver/dma2d_types.h \
     ../../../bk_idk/include/driver/jpeg_dec.h \
     ../../../bk_idk/include/driver/jpeg_dec_types.h \
-    ../../../bk_idk/include/driver/fft.h \
-    ../../../bk_idk/include/driver/fft_types.h \
-    ../../../bk_idk/include/driver/i2s.h \
-    ../../../bk_idk/include/driver/i2s_types.h \
     ../../../bk_idk/include/driver/sbc.h \
     ../../../bk_idk/include/driver/sbc_types.h \
     ../../../bk_idk/include/driver/jpeg_enc.h \
@@ -51,11 +47,15 @@ INPUT = \
     ../../../bk_idk/include/components/video_transfer.h \
     ../../../bk_idk/include/components/video_types.h \
     ../../../bk_idk/include/modules/jpeg_decode_sw.h \
+    ../../../bk_idk/include/modules/jpeg_enc_sw.h \
     ../../../bk_idk/include/modules/aec.h \
     ../../../bk_idk/include/modules/g711.h \
     ../../../bk_idk/include/driver/rott_driver.h \
     ../../../bk_idk/include/driver/rott_types.h \
-    ../../../bk_idk/include/modules/mp3dec.h
+    ../../../bk_idk/include/modules/mp3dec.h \
+    ../../../bk_idk/include/modules/image_scale.h \
+    ../../../bk_idk/include/driver/hw_scale.h \
+    ../../../bk_idk/include/driver/hw_scale_types.h
 
 
 ## Get warnings for functions that have no documentation for their parameters or return value

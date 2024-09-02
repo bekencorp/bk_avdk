@@ -30,7 +30,6 @@
 #define LOGE(...) BK_LOGE(TAG, ##__VA_ARGS__)
 #define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
-static media_mailbox_msg_t *storage_major_node = NULL;
 static beken_queue_t storage_major_task_queue = NULL;
 static beken_thread_t storage_major_task_thread = NULL;
 static beken_semaphore_t storage_major_sem = NULL;
@@ -72,10 +71,7 @@ static void storage_frame_major_notify_app(uint32_t param)
 		return;
 	}
 
-	storage_major_node->event = EVENT_VID_CAPTURE_NOTIFY;
-	storage_major_node->param = (uint32_t)frame;
-
-	msg_send_req_to_media_major_mailbox_sync(storage_major_node, APP_MODULE);
+	msg_send_req_to_media_major_mailbox_sync(EVENT_VID_CAPTURE_NOTIFY, APP_MODULE, (uint32_t)frame, NULL);
 
 	frame_buffer_fb_free(frame, MODULE_CAPTURE);
 
@@ -102,9 +98,7 @@ static void storage_video_major_notify_app(uint32_t param)
 			continue;
 		}
 
-		storage_major_node->event = EVENT_VID_SAVE_ALL_NOTIFY;
-		storage_major_node->param = (uint32_t)frame;
-		msg_send_req_to_media_major_mailbox_sync(storage_major_node, APP_MODULE);
+		msg_send_req_to_media_major_mailbox_sync(EVENT_VID_SAVE_ALL_NOTIFY, APP_MODULE, (uint32_t)frame, NULL);
 
 		frame_buffer_fb_free(frame, MODULE_CAPTURE);
 	};
@@ -127,17 +121,6 @@ static void storage_video_major_notify_app_stop(uint32_t param)
 
 static void storage_major_deinit(uint32_t param)
 {
-	if (storage_major_node)
-	{
-		if (storage_major_node->sem)
-		{
-			rtos_deinit_semaphore(&storage_major_node->sem);
-			storage_major_node->sem = NULL;
-		}
-
-		os_free(storage_major_node);
-		storage_major_node = NULL;
-	}
 
 	if (storage_major_sem)
 	{
@@ -214,26 +197,6 @@ static bk_err_t storage_major_task_init(uint32_t param)
 		}
 	}
 
-	if (storage_major_node == NULL)
-	{
-		storage_major_node = (media_mailbox_msg_t *)os_malloc(sizeof(media_mailbox_msg_t));
-		if (storage_major_node != NULL)
-		{
-			ret = rtos_init_semaphore_ex(&storage_major_node->sem, 1, 0);
-
-			if (ret != BK_OK)
-			{
-				LOGE("%s init semaphore failed\n", __func__);
-				goto error;
-			}
-		}
-		else
-		{
-			LOGE("%s malloc storage_major_node failed\n", __func__);
-			ret = BK_ERR_NO_MEM;
-			goto error;
-		}
-	}
 
 	if ((!storage_major_task_queue) && (!storage_major_task_thread))
 	{
@@ -280,18 +243,6 @@ error:
 	{
 		rtos_deinit_semaphore(&storage_major_sem);
 		storage_major_sem = NULL;
-	}
-
-	if (storage_major_node)
-	{
-		if (storage_major_node->sem)
-		{
-			rtos_deinit_semaphore(&storage_major_node->sem);
-			storage_major_node->sem = NULL;
-		}
-
-		os_free(storage_major_node);
-		storage_major_node = NULL;
 	}
 
 	if (storage_major_task_queue)

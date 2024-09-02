@@ -135,7 +135,7 @@ void lv_example_img_display_init(int switch_time_ms)
     
     if(!background)
     {
-        bk_jpeg_dec_sw_init();
+		bk_jpeg_dec_sw_init(NULL, 0);
         
         g_bg.data = psram_malloc(LV_HOR_RES*LV_VER_RES*2);
         if(!g_bg.data)

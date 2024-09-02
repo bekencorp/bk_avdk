@@ -48,6 +48,7 @@ typedef enum {
 	JPEGDEC_STOP,
 	JPEGDEC_SET_ROTATE_ANGLE,
 	JPEGDEC_RESET,
+	JPEGDEC_RESET_RESTART,
 } jdec_msg_type_t;
 
 typedef enum {
@@ -70,6 +71,7 @@ typedef enum {
 	SCALE_LINE_SOURCE_FREE,
 	SCALE_LINE_DEST_FREE,
 	SCALE_LINE_SCALE_COMPLETE,
+	SCALE_RESET,
 } scale_msg_type_t;
 
 typedef struct {
@@ -85,6 +87,8 @@ bk_err_t h264_encode_task_close(void);
 bk_err_t h264_encode_regenerate_idr_frame(void);
 
 bool check_h264_task_is_open(void);
+
+void jpeg_decode_restart(void);
 
 bk_err_t jpeg_decode_task_send_msg(uint8_t type, uint32_t param);
 bk_err_t jpeg_decode_task_send_more_msg(uint8_t type, uint32_t param, uint32_t param1);
@@ -109,10 +113,12 @@ bk_err_t rotate_task_send_msg(uint8_t type, uint32_t param);
 
 bool check_rotate_task_is_open(void);
 
+uint8_t *jdec_decode_get_yuv_buffer(void);
+
 void jdec_decode_clear_rotate_buffer_handle(void);
 
 
-bk_err_t jpeg_dec_task_open();
+bk_err_t jpeg_dec_task_open(uint32_t rotate_buffer);
 bk_err_t jpeg_dec_task_close();
 bk_err_t jpeg_dec_task_send_msg(uint32_t type, uint32_t param);
 void jpeg_dec_set_rotate_angle(media_rotate_t rotate_angle);
@@ -149,6 +155,9 @@ void jpeg_decode_set_rotate_angle(media_rotate_t rotate_angle);
 
 
 bool check_uvc_status(void);
+
+void rotate_set_dma2d_cb(void);
+void sw_dec_set_dma2d_cb(void);
 
 #ifdef __cplusplus
 }

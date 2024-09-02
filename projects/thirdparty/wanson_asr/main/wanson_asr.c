@@ -1,4 +1,5 @@
 #include <common/bk_include.h>
+#include <modules/pm.h>
 #include <os/os.h>
 #include "FreeRTOS.h"
 #include "task.h"
@@ -311,9 +312,6 @@ bk_err_t wanson_asr_init(void)
 	bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_480M);
 #endif
 
-#if CONFIG_SOC_BK7256XX
-	bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_320M);
-#endif
 	/* init send mic data task */
 	send_mic_data_init();
 

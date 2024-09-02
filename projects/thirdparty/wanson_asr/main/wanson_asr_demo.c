@@ -15,6 +15,7 @@
 #include <os/mem.h>
 #include <os/os.h>
 #include <os/str.h>
+#include <modules/pm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "aud_intf.h"

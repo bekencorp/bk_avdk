@@ -40,7 +40,7 @@ LCD RGB Config
 
     Figure 2. rgb lcd config flow
 
-LCD parcical display 
+LCD parcical display
 ----------------------------------------
 
 .. figure:: ../../../_static/lcd_partical_display.png
@@ -50,7 +50,7 @@ LCD parcical display
 
     Figure 3. rgb lcd config flow
 
-局部显示参数配置
+Local display parameter configuration
 
 .. figure:: ../../../_static/partical_params_config.png
     :align: center

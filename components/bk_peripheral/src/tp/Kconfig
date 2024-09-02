@@ -18,4 +18,9 @@ menu "TP"
 		depends on TP
 		bool "Enable TP_HY4633 API"
 		default n
+
+	config TP_CST816D
+		depends on TP
+		bool "Enable TP_CST816D API"
+		default n
 endmenu

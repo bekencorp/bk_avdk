@@ -1,7 +1,7 @@
-API 概述
+API Overview
 ===============================
 
 :link_to_translation:`zh_CN:[中文]`
 
-下表为 SDK 公开 API 状态.
+The following table shows the status of the SDK public API
 

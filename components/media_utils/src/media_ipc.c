@@ -131,7 +131,6 @@ void media_ipc_data_clear(LIST_HEADER_T *list)
 			{
 				list_del(pos);
 				os_free(tmp);
-				break;
 			}
 		}
 	}
@@ -331,7 +330,6 @@ int media_ipc_channel_close(meida_ipc_t *ipc)
 	GLOBAL_INT_RESTORE();
 
 	media_ipc_data_clear(&handle->local_list);
-	media_ipc_data_clear(&handle->remote_list);
 	media_ipc_data_clear(&handle->free_list);
 	os_free(handle->cfg.name);
 	os_free(handle);

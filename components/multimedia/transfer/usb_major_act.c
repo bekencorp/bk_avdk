@@ -32,7 +32,6 @@
 
 static beken_queue_t usb_major_msg_que = NULL;
 static beken_thread_t usb_major_task = NULL;
-static media_mailbox_msg_t *usb_major_node = NULL;
 
 static bool usb_major_task_running = false;
 static usb_trs_info_t usb_trs_info;
@@ -95,9 +94,7 @@ static void usb_major_task_transfer_data_handle(uint32_t param)
 		media_debug->fps_wifi++;
 
 		// send msg to cpu0
-		usb_major_node->event = EVENT_USB_DATA_NOTIFY;
-		usb_major_node->param = (uint32_t)encode_frame;
-		msg_send_req_to_media_major_mailbox_sync(usb_major_node, APP_MODULE);
+		msg_send_req_to_media_major_mailbox_sync(EVENT_USB_DATA_NOTIFY, APP_MODULE, (uint32_t)encode_frame, NULL);
 
 		frame_buffer_fb_free(encode_frame, MODULE_WIFI);
 	}
@@ -106,18 +103,6 @@ static void usb_major_task_transfer_data_handle(uint32_t param)
 static void usb_major_task_exit_handle(uint32_t param)
 {
 	media_mailbox_msg_t *msg = (media_mailbox_msg_t *)param;
-
-	if (usb_major_node)
-	{
-		if(usb_major_node->sem)
-		{
-			rtos_deinit_semaphore(&usb_major_node->sem);
-			usb_major_node->sem = NULL;
-		}
-
-		os_free(usb_major_node);
-		usb_major_node = NULL;
-	}
 
 	frame_buffer_fb_deregister(MODULE_WIFI, usb_trs_info.param);
 
@@ -172,21 +157,6 @@ static bk_err_t usb_major_task_init(void)
 {
 	bk_err_t ret = BK_FAIL;
 
-	if (usb_major_node == NULL)
-	{
-		usb_major_node = (media_mailbox_msg_t *)os_malloc(sizeof(media_mailbox_msg_t));
-		if (usb_major_node != NULL)
-		{
-			ret = rtos_init_semaphore_ex(&usb_major_node->sem, 1, 0);
-
-			if (ret != kNoErr)
-			{
-				LOGE("%s init semaphore failed\n", __func__);
-				goto error;
-			}
-		}
-	}
-
 	if ((!usb_major_task) && (!usb_major_msg_que))
 	{
 		ret = rtos_init_queue(&usb_major_msg_que,
@@ -218,18 +188,6 @@ static bk_err_t usb_major_task_init(void)
 	return ret;
 
 error:
-
-	if (usb_major_node)
-	{
-		if(usb_major_node->sem)
-		{
-			rtos_deinit_semaphore(&usb_major_node->sem);
-			usb_major_node->sem = NULL;
-		}
-
-		os_free(usb_major_node);
-		usb_major_node = NULL;
-	}
 
 	if (usb_major_msg_que)
 	{

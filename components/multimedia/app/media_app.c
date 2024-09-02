@@ -71,80 +71,26 @@ static jpeg_decode_pipeline_param_t jpeg_decode_pipeline_param = {0};
 
 bk_err_t media_send_msg_sync(uint32_t event, uint32_t param)
 {
-	int ret = kGeneralErr;
-
-	media_mailbox_msg_t *node = NULL;
-
-	node = os_malloc(sizeof(media_mailbox_msg_t));
-	if (node != NULL)
+	int ret = BK_FAIL;
+	ret = msg_send_req_to_media_app_mailbox_sync(event, param, NULL);
+	if (ret != BK_OK)
 	{
-		ret = rtos_init_semaphore_ex(&node->sem, 1, 0);
-
-		if (ret != kNoErr)
-		{
-			LOGE("%s init semaphore failed\n", __func__);
-			goto out;
-		}
-		node->event = event;
-		node->param = param;
-		ret = msg_send_req_to_media_app_mailbox_sync(node);
-		if (ret != kNoErr)
-		{
-			LOGE("%s failed 0x%x\n", __func__, ret);
-		}
+		LOGE("%s failed 0x%x\n", __func__, ret);
 	}
-out:
-	if (node)
+	return ret;
+}
+
+uint32_t media_send_msg_sync_return_param(uint32_t event, uint32_t in_param, uint32_t *out_param)
+{
+	int ret = BK_FAIL;
+
+	ret = msg_send_req_to_media_app_mailbox_sync(event, in_param, out_param);
+	if (ret != BK_OK)
 	{
-		if(node->sem)
-		{
-			rtos_deinit_semaphore(&node->sem);
-			node->sem = NULL;
-		}
-		os_free(node);
+		LOGE("%s failed 0x%x\n", __func__, ret);
 	}
 
 	return ret;
-}
-uint32_t media_send_msg_sync_return_param(uint32_t event, uint32_t param)
-{
-	int ret = kGeneralErr;
-	uint32_t result = kGeneralErr;
-
-	media_mailbox_msg_t *node = NULL;
-
-	node = os_malloc(sizeof(media_mailbox_msg_t));
-	if (node != NULL)
-	{
-		ret = rtos_init_semaphore_ex(&node->sem, 1, 0);
-
-		if (ret != kNoErr)
-		{
-			LOGE("%s init semaphore failed\n", __func__);
-			goto out;
-		}
-		node->event = event;
-		node->param = param;
-		ret = msg_send_req_to_media_app_mailbox_sync(node);
-		if (ret != kNoErr)
-		{
-			LOGE("%s failed 0x%x\n", __func__, ret);
-		}
-		else
-			result = node->param;
-	}
-out:
-	if (node)
-	{
-		if(node->sem)
-		{
-			rtos_deinit_semaphore(&node->sem);
-			node->sem = NULL;
-		}
-		os_free(node);
-	}
-
-	return result;
 }
 
 bk_err_t media_app_camera_open(media_camera_device_t *device)
@@ -156,9 +102,38 @@ bk_err_t media_app_camera_open(media_camera_device_t *device)
 		LOGI("%s already opened\n", __func__);
 		return BK_OK;
 	}
+	if (device->dualstream == 1)
+	{
+		device->num_uvc_dev = 2;
+	}
+	else
+	{
+		device->num_uvc_dev = 1;
+	}
 
-	LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, device->info.resolution.width, device->info.resolution.height,
-			device->mode, device->type);
+	{
+		device->uvc_device[0].mode                   = device->mode;
+		device->uvc_device[0].fmt                    = device->fmt;
+		device->uvc_device[0].info.fps               = device->info.fps;
+		device->uvc_device[0].info.resolution.width  = device->info.resolution.width;
+		device->uvc_device[0].info.resolution.height = device->info.resolution.height;
+	}
+
+	if (device->num_uvc_dev == 1) {
+		LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, device->uvc_device[0].info.resolution.width, device->uvc_device[0].info.resolution.height,
+		device->uvc_device[0].mode, device->type);
+	} else {
+        device->uvc_device[1].mode                   = device->d_mode;
+        device->uvc_device[1].fmt                    = device->d_fmt;
+        device->uvc_device[1].info.fps               = device->d_info.fps;
+        device->uvc_device[1].info.resolution.width  = device->d_info.resolution.width;
+        device->uvc_device[1].info.resolution.height = device->d_info.resolution.height;
+
+        LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, device->uvc_device[0].info.resolution.width, device->uvc_device[0].info.resolution.height,
+                device->uvc_device[0].mode, device->type);
+        LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, device->uvc_device[1].info.resolution.width, device->uvc_device[1].info.resolution.height,
+                device->uvc_device[1].mode, device->type);
+    }
 
 #ifdef CONFIG_BT_REUSE_MEDIA_MEMORY
 #if CONFIG_BLUETOOTH
@@ -204,6 +179,7 @@ bk_err_t media_app_camera_open(media_camera_device_t *device)
 
 		case H264_MODE:
 		case H264_YUV_MODE:
+		case H265_MODE:
 			app_camera_type = APP_CAMERA_DVP_H264_ENC_LCD;
 			break;
 
@@ -434,7 +410,7 @@ bk_err_t media_app_h264_pipeline_close(void)
 	return ret;
 }
 
-bk_err_t media_app_h264_pipeline_reset(void)
+bk_err_t media_app_h264_regenerate_idr(camera_type_t type)
 {
 	int ret = BK_FAIL;
 
@@ -444,7 +420,14 @@ bk_err_t media_app_h264_pipeline_reset(void)
 		return ret;
 	}
 
-	ret = media_send_msg_sync(EVENT_PIPELINE_H264_RESET_IND, 0);
+	if (type == UVC_CAMERA)
+	{
+		ret = media_send_msg_sync(EVENT_PIPELINE_H264_RESET_IND, 0);
+	}
+	else
+	{
+		ret = media_send_msg_sync(EVENT_CAM_H264_RESET_IND, 0);
+	}
 
 	LOGI("%s complete %x\n", __func__, ret);
 
@@ -463,7 +446,6 @@ bk_err_t media_app_lcd_fmt(pixel_format_t fmt)
 	return ret;
 }
 
-
 bk_err_t media_app_pipline_set_rotate(media_rotate_t rotate)
 {
 	int ret = BK_OK;
@@ -475,6 +457,36 @@ bk_err_t media_app_pipline_set_rotate(media_rotate_t rotate)
 
 bk_err_t media_app_lcd_pipeline_open(void *config)
 {
+    int ret = BK_OK;
+
+    ret = media_app_lcd_pipeline_disp_open(config);
+    if (ret != BK_OK) {
+        LOGE("%s media_app_lcd_pipeline_disp_open fail\n", __func__);
+        return ret;
+    }
+
+    ret = media_app_lcd_pipeline_jdec_open();
+
+    return ret;
+}
+
+bk_err_t media_app_lcd_pipeline_close(void)
+{
+    int ret = BK_OK;
+
+    ret = media_app_lcd_pipeline_jdec_close();
+    if (ret != BK_OK) {
+        LOGE("%s media_app_lcd_pipeline_jdec_close fail\n", __func__);
+        return ret;
+    }
+
+    ret = media_app_lcd_pipeline_disp_close();
+
+    return ret;
+}
+
+bk_err_t media_app_lcd_pipeline_disp_open(void *config)
+{
 	int ret = BK_OK;
 
 	if (config == NULL) {
@@ -482,24 +494,60 @@ bk_err_t media_app_lcd_pipeline_open(void *config)
 		return BK_FAIL;
 	}
 
-#ifdef CONFIG_BT_REUSE_MEDIA_MEMORY
-#if CONFIG_BLUETOOTH
-	bk_bluetooth_deinit();
-#endif
-#endif
-
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_ON);
 
-	ret = media_send_msg_sync(EVENT_PIPELINE_SET_ROTATE_IND, jpeg_decode_pipeline_param.rotate);
-
-	LOGI("%s set rotate %x\n", __func__, ret);
-
-	ret = media_send_msg_sync(EVENT_PIPELINE_LCD_OPEN_IND, (uint32_t)config);
+	ret = media_send_msg_sync(EVENT_PIPELINE_LCD_DISP_OPEN_IND, (uint32_t)config);
 	LOGI("%s complete %x\n", __func__, ret);
 
 	return ret;
 }
 
+bk_err_t media_app_lcd_pipeline_disp_close(void)
+{
+	int ret = BK_OK;
+
+	ret = media_send_msg_sync(EVENT_PIPELINE_LCD_DISP_CLOSE_IND, 0);
+
+	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_OFF);
+
+	LOGI("%s complete %x\n", __func__, ret);
+
+	return ret;
+}
+
+bk_err_t media_app_lcd_pipeline_jdec_open(void)
+{
+    int ret = BK_OK;
+
+#ifdef CONFIG_BT_REUSE_MEDIA_MEMORY
+#if (CONFIG_BLUETOOTH)
+    bk_bluetooth_deinit();
+#endif
+#endif
+
+    bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_DE, PM_POWER_MODULE_STATE_ON);
+
+    ret = media_send_msg_sync(EVENT_PIPELINE_SET_ROTATE_IND, jpeg_decode_pipeline_param.rotate);
+    LOGI("%s set rotate %x\n", __func__, ret);
+
+    ret = media_send_msg_sync(EVENT_PIPELINE_LCD_JDEC_OPEN_IND, 0);
+    LOGI("%s complete %x\n", __func__, ret);
+
+    return ret;
+}
+
+bk_err_t media_app_lcd_pipeline_jdec_close(void)
+{
+	int ret = BK_OK;
+
+	ret = media_send_msg_sync(EVENT_PIPELINE_LCD_JDEC_CLOSE_IND, 0);
+
+	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_DE, PM_POWER_MODULE_STATE_OFF);
+
+	LOGI("%s complete %x\n", __func__, ret);
+
+	return ret;
+}
 
 bk_err_t media_app_lcd_pipline_scale_open(void *config)
 {
@@ -533,18 +581,20 @@ bk_err_t media_app_lcd_pipline_scale_close(void)
 	return ret;
 }
 
-bk_err_t media_app_lcd_pipeline_close(void)
+bk_err_t media_app_lcd_example_display(void *lcd_open)
 {
-	int ret = BK_OK;
+	bk_err_t ret = BK_OK;
+	lcd_open_t *ptr = NULL;
+	ptr = (lcd_open_t *)os_malloc(sizeof(lcd_open_t));
+	os_memcpy(ptr, (lcd_open_t *)lcd_open, sizeof(lcd_open_t));
 
-	ret = media_send_msg_sync(EVENT_PIPELINE_LCD_CLOSE_IND, 0);
+	ret = media_send_msg_sync(EVENT_LCD_EXAMPLE_IND, (uint32_t)ptr);
 
-	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_OFF);
-
-	LOGI("%s complete %x\n", __func__, ret);
-
+	os_free(ptr);
+	LOGI("%s complete\n", __func__);
 	return ret;
 }
+
 
 bk_err_t media_app_mailbox_test(void)
 {
@@ -737,8 +787,13 @@ bk_err_t media_app_lcd_display_beken(void *lcd_display)
 uint32_t media_app_get_lcd_devices_num(void)
 {
 	uint32_t num;
+	bk_err_t ret;
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_ON);
-	num= media_send_msg_sync_return_param(EVENT_LCD_GET_DEVICES_NUM_IND, 0);
+	ret = media_send_msg_sync_return_param(EVENT_LCD_GET_DEVICES_NUM_IND, 0, &num);
+	if (ret != BK_OK)
+	{
+		LOGE("%s error\n", __func__);
+	}
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_OFF);
 	return num;
 }
@@ -746,36 +801,56 @@ uint32_t media_app_get_lcd_devices_num(void)
 // step 2
 uint32_t media_app_get_lcd_devices_list(void)
 {
-	uint32_t device_addr;
+	uint32_t device_addr = 0;
+	bk_err_t ret;
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_ON);
-	device_addr = media_send_msg_sync_return_param(EVENT_LCD_GET_DEVICES_LIST_IND, 0);
+	ret = media_send_msg_sync_return_param(EVENT_LCD_GET_DEVICES_LIST_IND, 0, &device_addr);
+	if (ret != BK_OK)
+	{
+		LOGE("%s error\n", __func__);
+	}
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_OFF);
 	return device_addr;
 }
 
 uint32_t media_app_get_lcd_device_by_id(uint32_t id)
 {
-	uint32_t lcd_device;
+	uint32_t lcd_device = 0;
+	bk_err_t ret;
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_ON);
-	lcd_device = media_send_msg_sync_return_param(EVENT_LCD_GET_DEVICES_IND, id);
+	ret = media_send_msg_sync_return_param(EVENT_LCD_GET_DEVICES_IND, id, &lcd_device);
+	if (ret != BK_OK)
+	{
+		LOGE("%s error\n", __func__);
+	}
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_OFF);
 	return lcd_device;
 }
 
 bk_err_t media_app_get_lcd_status(void)
 {
-	uint32_t lcd_status;
+	uint32_t lcd_status = 0;
+	bk_err_t ret;
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_ON);
-	lcd_status = media_send_msg_sync_return_param(EVENT_LCD_GET_STATUS_IND, 0);
+	ret = media_send_msg_sync_return_param(EVENT_LCD_GET_STATUS_IND, 0, &lcd_status);
+	if (ret != BK_OK)
+	{
+		LOGE("%s error\n", __func__);
+	}
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_OFF);
 	return lcd_status;
 }
 
 bk_err_t media_app_get_uvc_camera_status(void)
 {
-	uint32_t camera_status;
+	uint32_t camera_status = 0;
+	bk_err_t ret;
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_ON);
-	camera_status = media_send_msg_sync_return_param(EVENT_GET_UVC_STATUS_IND, 0);
+	ret = media_send_msg_sync_return_param(EVENT_GET_UVC_STATUS_IND, 0, &camera_status);
+	if (ret != BK_OK)
+	{
+		LOGE("%s error\n", __func__);
+	}
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_OFF);
 	return camera_status;
 }
@@ -1201,6 +1276,108 @@ bk_err_t media_app_pipeline_dump(void)
 
 	return ret;
 }
+
+bk_err_t media_app_frame_buffer_init(fb_type_t type)
+{
+	int ret = BK_FAIL;
+
+	if (CAMERA_STATE_DISABLED == media_modules_state->cam_state)
+	{
+		LOGI("%s camera not opened\n", __func__);
+		return ret;
+	}
+
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_INIT_IND, (uint32_t)type);
+
+	if (ret != BK_OK)
+	{
+		LOGE("%s, malloc fail\r\n", __func__);
+	}
+
+	return ret;
+}
+
+frame_buffer_t *media_app_frame_buffer_jpeg_malloc(void)
+{
+	int ret = BK_FAIL;
+	frame_buffer_t *frame = NULL;
+
+	if (CAMERA_STATE_DISABLED == media_modules_state->cam_state)
+	{
+		LOGI("%s camera not opened!\n", __func__);
+		return frame;
+	}
+
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_JPEG_MALLOC_IND, (uint32_t)&frame);
+
+	if (ret != BK_OK)
+	{
+		LOGE("%s, malloc fail\r\n", __func__);
+	}
+
+	LOGD("%s, %p\r\n", __func__, frame);
+
+	if (frame)
+		frame->fmt = PIXEL_FMT_JPEG;
+
+	return frame;
+}
+
+frame_buffer_t *media_app_frame_buffer_h264_malloc(void)
+{
+	int ret = BK_FAIL;
+	frame_buffer_t *frame = NULL;
+
+	if (CAMERA_STATE_DISABLED == media_modules_state->cam_state)
+	{
+		LOGI("%s camera not opened!\n", __func__);
+		return frame;
+	}
+
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_H264_MALLOC_IND, (uint32_t)&frame);
+
+	if (ret != BK_OK)
+	{
+		LOGE("%s, malloc fail\r\n", __func__);
+	}
+
+	if (frame)
+		frame->fmt = PIXEL_FMT_H264;
+
+	return frame;
+}
+
+bk_err_t media_app_frame_buffer_push(frame_buffer_t *frame)
+{
+	int ret = BK_FAIL;
+
+	if (CAMERA_STATE_DISABLED == media_modules_state->cam_state)
+	{
+		LOGI("%s camera not opened!\n", __func__);
+		return ret;
+	}
+
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_PUSH_IND, (uint32_t)frame);
+
+	return ret;
+}
+
+bk_err_t media_app_frame_buffer_clear(frame_buffer_t *frame)
+{
+	int ret = BK_FAIL;
+
+	if (CAMERA_STATE_DISABLED == media_modules_state->cam_state)
+	{
+		LOGI("%s camera not opened!\n", __func__);
+		return ret;
+	}
+
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_FREE_IND, (uint32_t)frame);
+
+	return ret;
+}
+
+
 
 #if CONFIG_MEDIA_UNIT_TEST
 bk_err_t media_app_pipeline_mem_show(void)

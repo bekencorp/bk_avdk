@@ -15,49 +15,53 @@
 #include "components/bluetooth/bk_dm_gatt_common.h"
 #include "dm_gatt.h"
 #include "bluetooth_storage.h"
+#include "dm_gap_utils.h"
 
 typedef int32_t (* dm_ble_gap_app_cb)(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t *param);
 
+uint8_t g_dm_gap_use_rpa = 1;
+
+static bk_bd_addr_t s_dm_gap_rpa;
 static beken_semaphore_t s_ble_sema = NULL;
 static dm_ble_gap_app_cb s_gap_cb_list[4];
 static bk_bd_addr_t s_peer_bdaddr;
 static bk_ble_bond_dev_t s_dm_gatt_bond_dev_list[GATT_MAX_BOND_COUNT];
 static uint8_t s_dm_gatt_is_inited;
+static uint8_t s_dm_gatt_privacy_enable = 0;
+static bk_ble_local_keys_t s_dm_gap_local_key;
 
 #if 1
     static uint8_t s_dm_gatt_iocap = BK_IO_CAP_NONE;
-    static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_REQ_BOND_MITM;
-    static uint8_t s_dm_gatt_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK;
+    static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_BOND;
+    static uint8_t s_dm_gatt_init_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK;
+    static uint8_t s_dm_gatt_rsp_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK;
 #elif 0
     static uint8_t s_dm_gatt_iocap = BK_IO_CAP_DISPLAY_YESNO;
     static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_REQ_BOND_MITM;
-    static uint8_t s_dm_gatt_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK;
-#elif 0
-    static uint8_t s_dm_gatt_iocap = BK_IO_CAP_DISPLAY_YESNO; //BK_IO_CAP_NONE;
-    static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_REQ_SC_MITM_BOND;
-    static uint8_t s_dm_gatt_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK;
+    static uint8_t s_dm_gatt_init_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK;
+    static uint8_t s_dm_gatt_rsp_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK;
 #elif 1
-    static uint8_t s_dm_gatt_iocap = BK_IO_CAP_DISPLAY_YESNO; //BK_IO_CAP_NONE;
+    static uint8_t s_dm_gatt_iocap = BK_IO_CAP_DISPLAY_YESNO;
     static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_REQ_SC_MITM_BOND;
-    static uint8_t s_dm_gatt_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK | BK_BLE_KEY_DISTR_LINK_KEY_MASK;
+    static uint8_t s_dm_gatt_init_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK;
+    static uint8_t s_dm_gatt_rsp_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK;
+#elif 1
+    static uint8_t s_dm_gatt_iocap = BK_IO_CAP_DISPLAY_YESNO;
+    static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_REQ_SC_MITM_BOND;
+    static uint8_t s_dm_gatt_init_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_CSR_KEY_MASK | BK_BLE_KEY_DISTR_LINK_KEY_MASK;
+    static uint8_t s_dm_gatt_rsp_key_distr = BK_BLE_KEY_DISTR_ENC_KEY_MASK | BK_BLE_KEY_DISTR_ID_KEY_MASK | BK_BLE_KEY_DISTR_LINK_KEY_MASK;
 #endif
 
 static bk_ble_bond_dev_t *dm_ble_find_bond_info_by_nominal_addr(uint8_t *addr, bk_ble_addr_type_t addr_type)
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
-
-    if (!os_memcmp(null_addr, addr, BK_BD_ADDR_LEN) ||
-            !os_memcmp(ff_addr, addr, BK_BD_ADDR_LEN) )
+    if (!dm_gap_is_addr_valid(addr))
     {
         return NULL;
     }
 
     for (int i = 0; i < sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]); ++i)
     {
-        if (os_memcmp(null_addr, s_dm_gatt_bond_dev_list[i].bd_addr, BK_BD_ADDR_LEN) &&
-                os_memcmp(ff_addr, s_dm_gatt_bond_dev_list[i].bd_addr, BK_BD_ADDR_LEN) &&
-                !os_memcmp(s_dm_gatt_bond_dev_list[i].bd_addr, addr, sizeof(addr))
+        if (!os_memcmp(s_dm_gatt_bond_dev_list[i].bd_addr, addr, sizeof(addr))
                 //&& s_dm_gatt_bond_dev_list[i].key.pid_key.addr_type == addr_type  //todo: addr_type not used now.
            )
         {
@@ -70,11 +74,7 @@ static bk_ble_bond_dev_t *dm_ble_find_bond_info_by_nominal_addr(uint8_t *addr, b
 
 static uint8_t dm_ble_del_bond_info_by_nominal_addr(uint8_t *addr)
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
-
-    if (!os_memcmp(null_addr, addr, BK_BD_ADDR_LEN) ||
-            !os_memcmp(ff_addr, addr, BK_BD_ADDR_LEN) )
+    if (!dm_gap_is_addr_valid(addr))
     {
         return 1;
     }
@@ -100,7 +100,6 @@ static uint8_t dm_ble_clean_bond_info(void)
 
 static bk_ble_bond_dev_t *dm_ble_alloc_bond_info_by_nominal_addr(uint8_t *addr)
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
     bk_ble_bond_dev_t *tmp = NULL;
 
     tmp = dm_ble_find_bond_info_by_nominal_addr(addr, 0);
@@ -112,7 +111,7 @@ static bk_ble_bond_dev_t *dm_ble_alloc_bond_info_by_nominal_addr(uint8_t *addr)
 
     for (int i = 0; i < sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]); ++i)
     {
-        if (!os_memcmp(s_dm_gatt_bond_dev_list[i].bd_addr, null_addr, BK_BD_ADDR_LEN))
+        if (!dm_gap_is_addr_valid(s_dm_gatt_bond_dev_list[i].bd_addr))
         {
             return &s_dm_gatt_bond_dev_list[i];
         }
@@ -120,7 +119,6 @@ static bk_ble_bond_dev_t *dm_ble_alloc_bond_info_by_nominal_addr(uint8_t *addr)
 
     return NULL;
 }
-
 
 static void dm_ble_gap_private_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t *param)
 {
@@ -149,11 +147,97 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
 
     switch (event)
     {
+    case BK_BLE_GAP_CONNECT_COMPLETE_EVT:
+    {
+        struct ble_connect_complete_param *evt = (typeof(evt))param;
+
+        gatt_logi("BK_BLE_GAP_CONNECT_COMPLETE_EVT %02x:%02x:%02x:%02x:%02x:%02x status 0x%x role %d",
+                  evt->remote_bda[5],
+                  evt->remote_bda[4],
+                  evt->remote_bda[3],
+                  evt->remote_bda[2],
+                  evt->remote_bda[1],
+                  evt->remote_bda[0],
+                  evt->status,
+                  evt->link_role);
+
+        if (evt->status)
+        {
+            dm_ble_del_app_env_by_addr(evt->remote_bda);
+        }
+    }
+    break;
+
+    case BK_BLE_GAP_DISCONNECT_COMPLETE_EVT:
+    {
+        struct ble_disconnect_complete_param *evt = (typeof(evt))param;
+
+        gatt_logi("BK_BLE_GAP_DISCONNECT_COMPLETE_EVT %02x:%02x:%02x:%02x:%02x:%02x %d status 0x%x reason 0x%x",
+                  evt->remote_bda[5],
+                  evt->remote_bda[4],
+                  evt->remote_bda[3],
+                  evt->remote_bda[2],
+                  evt->remote_bda[1],
+                  evt->remote_bda[0],
+                  evt->remote_bda_type,
+                  evt->status,
+                  evt->reason);
+
+        dm_ble_del_app_env_by_addr(evt->remote_bda);
+
+        if (evt->reason == BK_BT_STATUS_TERMINATED_MIC_FAILURE)
+        {
+            bk_ble_bond_dev_t *tmp_dev = NULL;
+
+            if ((tmp_dev = dm_ble_find_bond_info_by_nominal_addr(evt->remote_bda, evt->remote_bda_type)) == NULL)
+            {
+                gatt_loge("addr %02x:%02x:%02x:%02x:%02x:%02x bond info not found",
+                          evt->remote_bda[5],
+                          evt->remote_bda[4],
+                          evt->remote_bda[3],
+                          evt->remote_bda[2],
+                          evt->remote_bda[1],
+                          evt->remote_bda[0]);
+                break;
+            }
+
+            if (bk_ble_gap_bond_dev_list_operation(BK_GAP_BOND_DEV_LIST_OPERATION_REMOVE, tmp_dev))
+            {
+                gatt_loge("remove bond dev list op err");
+            }
+
+            if (dm_ble_del_bond_info_by_nominal_addr(evt->remote_bda))
+            {
+                gatt_loge("addr %02x:%02x:%02x:%02x:%02x:%02x bond info del err",
+                          evt->remote_bda[5],
+                          evt->remote_bda[4],
+                          evt->remote_bda[3],
+                          evt->remote_bda[2],
+                          evt->remote_bda[1],
+                          evt->remote_bda[0]);
+            }
+
+#if BLE_USE_STORAGE
+            bluetooth_storage_save_ble_key_info(s_dm_gatt_bond_dev_list, sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]));
+            bluetooth_storage_sync_to_flash();
+#endif
+        }
+    }
+    break;
+
+    case BK_BLE_GAP_CONNECT_CANCEL_EVT:
+    {
+        struct ble_connect_cancel_param *evt = (typeof(evt))param;
+
+        gatt_logi("BK_BLE_GAP_CONNECT_CANCEL_EVT status 0x%x", evt->status);
+    }
+    break;
+
     case BK_BLE_GAP_UPDATE_CONN_PARAMS_EVT:
     {
         struct ble_update_conn_params_evt_param *pm = (typeof(pm))param;
 
-        gatt_logi("BK_BLE_GAP_UPDATE_CONN_PARAMS_EVT %d 0x%x 0x%x", pm->status, pm->max_int, pm->min_int);
+        gatt_logi("BK_BLE_GAP_UPDATE_CONN_PARAMS_EVT %d 0x%x 0x%x current intv 0x%x", pm->status, pm->max_int, pm->min_int, pm->conn_int);
 
         if (s_ble_sema != NULL)
         {
@@ -161,6 +245,16 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
         }
     }
 
+    break;
+
+    case BK_BLE_GAP_UPDATE_CONN_PARAMS_REQ_EVT:
+    {
+        struct ble_conntection_update_param_req *pm = (typeof(pm))param;
+
+        gatt_logi("BK_BLE_GAP_UPDATE_CONN_PARAMS_REQ_EVT can_modify %d intv 0x%x 0x%x tout 0x%x", pm->can_modify, pm->param.max_int, pm->param.min_int, pm->param.timeout);
+
+        pm->accept = 1;
+    }
     break;
 
     case BK_BLE_GAP_AUTH_CMPL_EVT: //todo: report when second connect
@@ -200,7 +294,31 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
                 dm_gatt_env_p->is_authen = 0;
             }
 
+            bk_ble_bond_dev_t *tmp_dev = NULL;
+
+            if ((tmp_dev = dm_ble_find_bond_info_by_nominal_addr(pm->auth_cmpl.bd_addr, pm->auth_cmpl.addr_type)) == NULL)
+            {
+                gatt_loge("addr %02x:%02x:%02x:%02x:%02x:%02x bond info not found",
+                          pm->auth_cmpl.bd_addr[5],
+                          pm->auth_cmpl.bd_addr[4],
+                          pm->auth_cmpl.bd_addr[3],
+                          pm->auth_cmpl.bd_addr[2],
+                          pm->auth_cmpl.bd_addr[1],
+                          pm->auth_cmpl.bd_addr[0]);
+                break;
+            }
+
+            if (bk_ble_gap_bond_dev_list_operation(BK_GAP_BOND_DEV_LIST_OPERATION_REMOVE, tmp_dev))
+            {
+                gatt_loge("remove bond dev list op err");
+            }
+
             dm_ble_del_bond_info_by_nominal_addr(pm->auth_cmpl.bd_addr);
+
+#if BLE_USE_STORAGE
+            bluetooth_storage_save_ble_key_info(s_dm_gatt_bond_dev_list, sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]));
+            bluetooth_storage_sync_to_flash();
+#endif
         }
     }
     break;
@@ -210,6 +328,31 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
         struct ble_bond_dev_list_evt_param *pm = (typeof(pm))param;
 
         gatt_logi("BK_BLE_GAP_BOND_DEV_LIST_OPERATEION_COMPLETE_EVT %d %d", pm->status, pm->op);
+
+        if (s_ble_sema != NULL)
+        {
+            rtos_set_semaphore( &s_ble_sema );
+        }
+    }
+    break;
+
+    case BK_BLE_GAP_SET_LOCAL_PRIVACY_COMPLETE_EVT:
+    {
+        struct ble_local_privacy_cmpl_evt_param *pm = (typeof(pm))param;
+
+        gatt_logi("BK_BLE_GAP_SET_LOCAL_PRIVACY_COMPLETE_EVT %d", pm->status);
+
+        if (s_ble_sema != NULL)
+        {
+            rtos_set_semaphore( &s_ble_sema );
+        }
+    }
+    break;
+
+    case BK_BLE_GAP_SET_SECURITY_PARAMS_COMPLETE_EVT:
+    {
+        bk_ble_gap_cb_param_t *pm = (typeof(pm))param;
+        gatt_logi("BK_BLE_GAP_SET_SECURITY_PARAMS_COMPLETE_EVT %d status %d", pm->set_security_params_cmpl.param, pm->set_security_params_cmpl.status);
 
         if (s_ble_sema != NULL)
         {
@@ -457,9 +600,11 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
         }
 
         os_memcpy(dm_bond_dev_p, &pm->bond_dev, sizeof(*dm_bond_dev_p));
-#if 0
 
-        if ((pm->bond_dev.bond_key.key_mask & (BK_LE_KEY_PID | BK_LE_KEY_LLK)) == (BK_LE_KEY_PID | BK_LE_KEY_LLK))
+#if 0//CONFIG_BT
+
+        if ((pm->bond_dev.bond_key.key_mask & (BK_LE_KEY_LENC | BK_LE_KEY_LLK)) == (BK_LE_KEY_LENC | BK_LE_KEY_LLK) &&
+                        pm->bond_dev.bond_key.lenc_key.sec_level == BK_BLE_SECURITY_LEVEL_4)
         {
             extern int32_t bt_a2dp_source_demo_set_linkkey(uint8_t *addr, uint8_t *linkkey);
             bt_a2dp_source_demo_set_linkkey(pm->bond_dev.bond_key.pid_key.static_addr, pm->bond_dev.bond_key.llink_key.key);
@@ -467,15 +612,26 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
 
 #endif
 
+#if BLE_USE_STORAGE
         bluetooth_storage_save_ble_key_info(s_dm_gatt_bond_dev_list, sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]));
         bluetooth_storage_sync_to_flash();
+#endif
     }
     break;
 
     case BK_BLE_GAP_SEC_REQ_EVT:
     {
         bk_ble_gap_cb_param_t *pm = (typeof(pm))param;
-        gatt_logi("BK_BLE_GAP_SEC_REQ_EVT");
+        gatt_logi("BK_BLE_GAP_SEC_REQ_EVT %02x:%02x:%02x:%02x:%02x:%02x %d",
+                  param->ble_security.ble_req.bd_addr[5],
+                  param->ble_security.ble_req.bd_addr[4],
+                  param->ble_security.ble_req.bd_addr[3],
+                  param->ble_security.ble_req.bd_addr[2],
+                  param->ble_security.ble_req.bd_addr[1],
+                  param->ble_security.ble_req.bd_addr[0],
+                  param->ble_security.ble_req.addr_type);
+
+        bk_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, 1);
     }
     break;
 
@@ -492,7 +648,7 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
 
         gatt_logi("BK_BLE_GAP_PASSKEY_REQ_EVT, pls input num that peer device display !!!!");
 
-        os_memcpy(s_peer_bdaddr, pm->ble_security.ble_req.bd_addr, sizeof(pm->ble_security.ble_req.bd_addr));
+        os_memcpy(s_peer_bdaddr, pm->ble_security.key_notif.bd_addr, sizeof(pm->ble_security.key_notif.bd_addr));
         //bk_ble_passkey_reply(pm->ble_req.bd_addr, true, 0);
     }
     break;
@@ -514,22 +670,79 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
     }
     break;
 
-#if 0
+    case BK_BLE_GAP_LOCAL_ER_EVT:
+    {
+        bk_ble_sec_t *pm = (typeof(pm))param;
+        char tmp_log[128] = {0};
+        int32_t index = 0;
+
+        for (int i = 0; i < sizeof(pm->ble_local_keys.er); ++i)
+        {
+            index += snprintf(tmp_log + index, sizeof(tmp_log) - 1 - index, "%02x", pm->ble_local_keys.er[i]);
+        }
+
+        gatt_logi("BK_BLE_GAP_LOCAL_ER_EVT %s", tmp_log);
+
+        os_memcpy(s_dm_gap_local_key.er, pm->ble_local_keys.er, sizeof(pm->ble_local_keys.er));
+
+#if BLE_USE_STORAGE
+        bluetooth_storage_save_local_key(&s_dm_gap_local_key);
+        bluetooth_storage_sync_to_flash();
+#endif
+    }
+    break;
 
     case BK_BLE_GAP_LOCAL_IR_EVT:
     {
         bk_ble_sec_t *pm = (typeof(pm))param;
-        gatt_logi("BK_BLE_GAP_LOCAL_IR_EVT");
+        char tmp_log[128] = {0};
+        int32_t index = 0;
+
+        for (int i = 0; i < sizeof(pm->ble_local_keys.ir); ++i)
+        {
+            index += snprintf(tmp_log + index, sizeof(tmp_log) - 1 - index, "%02x", pm->ble_local_keys.ir[i]);
+        }
+
+        gatt_logi("BK_BLE_GAP_LOCAL_IR_EVT %s", tmp_log);
+
+        os_memcpy(s_dm_gap_local_key.ir, pm->ble_local_keys.ir, sizeof(pm->ble_local_keys.ir));
+
+#if BLE_USE_STORAGE
+        bluetooth_storage_save_local_key(&s_dm_gap_local_key);
+        bluetooth_storage_sync_to_flash();
+#endif
     }
     break;
 
-    case BK_BLE_GAP_LOCAL_ER_EVT:
+    case BK_BLE_GAP_GENERATE_RPA_COMPLETE_EVT:
     {
-        bk_ble_sec_t *pm = (typeof(pm))param;
-        gatt_logi("BK_BLE_GAP_LOCAL_ER_EVT");
+        struct ble_generate_rpa_cmpl *pm = (typeof(pm))param;
+
+        if (pm->status == 0)
+        {
+            gatt_logi("BK_BLE_GAP_GENERATE_RPA_COMPLETE_EVT %02x:%02x:%02x:%02x:%02x:%02x",
+                      pm->addr[5],
+                      pm->addr[4],
+                      pm->addr[3],
+                      pm->addr[2],
+                      pm->addr[1],
+                      pm->addr[0]);
+
+            os_memcpy(s_dm_gap_rpa, pm->addr, sizeof(s_dm_gap_rpa));
+        }
+        else
+        {
+            gatt_loge("BK_BLE_GAP_GENERATE_RPA_COMPLETE_EVT err status %d", pm->status);
+        }
+
+        if (s_ble_sema != NULL)
+        {
+            rtos_set_semaphore( &s_ble_sema );
+        }
     }
     break;
-#endif
+
+#if 0
 
     case BK_BLE_GAP_BOND_KEY_REQ_EVT:
     {
@@ -578,6 +791,7 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
         }
     }
     break;
+#endif
 
     default:
         return DM_BLE_GAP_APP_CB_RET_NO_INTERESTING;
@@ -618,20 +832,19 @@ int dm_gatt_passkey_reply(uint8_t accept, uint32_t passkey)
 static int32_t dm_gatt_set_security_method_private(void)
 {
     int32_t ret = 0;
-    gatt_logi("iocap 0x%x authen mode 0x%x key_dist 0x%x", s_dm_gatt_iocap, s_dm_gatt_auth_req, s_dm_gatt_key_distr);
+    gatt_logi("iocap 0x%x authen mode 0x%x key_dist 0x%x 0x%x", s_dm_gatt_iocap, s_dm_gatt_auth_req, s_dm_gatt_init_key_distr, s_dm_gatt_rsp_key_distr);
 
-    //    if(!s_ble_sema)
-    //    {
-    //        ret = rtos_init_semaphore(&s_ble_sema, 1);
-    //
-    //        if (ret != 0)
-    //        {
-    //            gatt_loge("rtos_init_semaphore err %d", ret);
-    //            return -1;
-    //        }
-    //    }
+    if (!s_ble_sema)
+    {
+        ret = rtos_init_semaphore(&s_ble_sema, 1);
 
-    //todo: add completed evt
+        if (ret != 0)
+        {
+            gatt_loge("rtos_init_semaphore err %d", ret);
+            return -1;
+        }
+    }
+
     ret = bk_ble_gap_set_security_param(BK_BLE_SM_IOCAP_MODE, (void *)&s_dm_gatt_iocap, sizeof(s_dm_gatt_iocap));
 
     if (ret)
@@ -640,13 +853,13 @@ static int32_t dm_gatt_set_security_method_private(void)
         goto error;
     }
 
-    //    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-    //
-    //    if (ret != kNoErr)
-    //    {
-    //        gatt_loge("wait set security param 1 err %d", ret);
-    //        goto error;
-    //    }
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set iocap err %d", ret);
+        goto error;
+    }
 
     ret = bk_ble_gap_set_security_param(BK_BLE_SM_AUTHEN_REQ_MODE, (void *)&s_dm_gatt_auth_req, sizeof(s_dm_gatt_auth_req));
 
@@ -656,15 +869,15 @@ static int32_t dm_gatt_set_security_method_private(void)
         goto error;
     }
 
-    //    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-    //
-    //    if (ret != kNoErr)
-    //    {
-    //        gatt_loge("wait set security param 2 err %d", ret);
-    //        goto error;
-    //    }
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
 
-    ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_INIT_KEY, (void *)&s_dm_gatt_key_distr, sizeof(s_dm_gatt_key_distr));
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set authen err %d", ret);
+        goto error;
+    }
+
+    ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_INIT_KEY, (void *)&s_dm_gatt_init_key_distr, sizeof(s_dm_gatt_init_key_distr));
 
     if (ret)
     {
@@ -672,15 +885,15 @@ static int32_t dm_gatt_set_security_method_private(void)
         goto error;
     }
 
-    //    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-    //
-    //    if (ret != kNoErr)
-    //    {
-    //        gatt_loge("wait set security param 2 err %d", ret);
-    //        goto error;
-    //    }
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
 
-    ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_RSP_KEY, (void *)&s_dm_gatt_key_distr, sizeof(s_dm_gatt_key_distr));
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set init key err %d", ret);
+        goto error;
+    }
+
+    ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_RSP_KEY, (void *)&s_dm_gatt_rsp_key_distr, sizeof(s_dm_gatt_rsp_key_distr));
 
     if (ret)
     {
@@ -688,27 +901,30 @@ static int32_t dm_gatt_set_security_method_private(void)
         goto error;
     }
 
-    //    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
-    //
-    //    if (ret != kNoErr)
-    //    {
-    //        gatt_loge("wait set security param 2 err %d", ret);
-    //        goto error;
-    //    }
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
 
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set rsp key err %d", ret);
+        goto error;
+    }
 
     rtos_delay_milliseconds(100);
 
 error:;
-    //    ret = rtos_deinit_semaphore(&s_ble_sema);
-    //
-    //    if (ret != 0)
-    //    {
-    //        gatt_loge("rtos_deinit_semaphore err %d", ret);
-    //        return -1;
-    //    }
-    //
-    //    s_ble_sema = NULL;
+
+    if (s_ble_sema)
+    {
+        ret = rtos_deinit_semaphore(&s_ble_sema);
+
+        if (ret != 0)
+        {
+            gatt_loge("rtos_deinit_semaphore err %d", ret);
+            return -1;
+        }
+    }
+
+    s_ble_sema = NULL;
 
     return ret;
 }
@@ -717,70 +933,146 @@ int dm_gatt_set_security_method(uint8_t iocap, uint8_t auth_req, uint8_t key_dis
 {
     s_dm_gatt_iocap = iocap;
     s_dm_gatt_auth_req = auth_req;
-    s_dm_gatt_key_distr = key_distr;
+    s_dm_gatt_rsp_key_distr = s_dm_gatt_init_key_distr = key_distr;
     return dm_gatt_set_security_method_private();
 }
 
 bool dm_gatt_is_linkkey_distr_from_ltk(void)
 {
 #if CONFIG_BT
-    return (s_dm_gatt_key_distr & BK_BLE_KEY_DISTR_LINK_KEY_MASK) ? true : false;
-#endif
-    return 0;
-}
 
-int dm_gatt_get_authen_status(uint8_t *addr, uint8_t *addr_type)
-{
-#if 0
-
-    if (s_dm_gatt_env->is_authen)
+    if ((s_dm_gatt_init_key_distr & BK_BLE_KEY_DISTR_LINK_KEY_MASK) &&
+            (s_dm_gatt_rsp_key_distr & BK_BLE_KEY_DISTR_LINK_KEY_MASK))
     {
-        //os_memcpy(addr, s_dm_gatt_env->addr, sizeof(s_dm_gatt_env->addr));
-        //*addr_type = s_dm_gatt_env->addr_type;
-
-        os_memcpy(addr, s_dm_gatt_env->key.pid_key.static_addr, sizeof(s_dm_gatt_env->key.pid_key.static_addr));
-        *addr_type = s_dm_gatt_env->key.pid_key.addr_type;
-
-        gatt_logi("find storage device, addrtype 0x%x 0x%02x:%02x:%02x:%02x:%02x:%02x", *addr_type,
-                  s_dm_gatt_env->key.pid_key.static_addr[5],
-                  s_dm_gatt_env->key.pid_key.static_addr[4],
-                  s_dm_gatt_env->key.pid_key.static_addr[3],
-                  s_dm_gatt_env->key.pid_key.static_addr[2],
-                  s_dm_gatt_env->key.pid_key.static_addr[1],
-                  s_dm_gatt_env->key.pid_key.static_addr[0]);
+        return true;
     }
     else
+#endif
+        return 0;
+}
+
+int32_t dm_gatt_get_authen_status(uint8_t *nominal_addr, uint8_t *nominal_addr_type, uint8_t *identity_addr, uint8_t *identity_addr_type)
+{
+    uint32_t i = 0;
+
+    for (i = 0; i < sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]); ++i)
     {
-        gatt_logi("not found");
+        if (dm_gap_is_addr_valid(s_dm_gatt_bond_dev_list[i].bd_addr))
+        {
+            break;
+        }
     }
 
-    return s_dm_gatt_env->is_authen;
-#else
-    dm_gatt_app_env_t *tmp = dm_ble_find_app_env_by_addr(addr);
-
-    if (!tmp || tmp->is_authen == 0)
+    if (i < sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]))
     {
+        gatt_logi("find storage device 0x%x, nominal addr 0x%x %02x:%02x:%02x:%02x:%02x:%02x, identity addr 0x%x %02x:%02x:%02x:%02x:%02x:%02x",
+                  s_dm_gatt_bond_dev_list[i].bond_key.key_mask,
+                  s_dm_gatt_bond_dev_list[i].addr_type,
+                  s_dm_gatt_bond_dev_list[i].bd_addr[5],
+                  s_dm_gatt_bond_dev_list[i].bd_addr[4],
+                  s_dm_gatt_bond_dev_list[i].bd_addr[3],
+                  s_dm_gatt_bond_dev_list[i].bd_addr[2],
+                  s_dm_gatt_bond_dev_list[i].bd_addr[1],
+                  s_dm_gatt_bond_dev_list[i].bd_addr[0],
+                  s_dm_gatt_bond_dev_list[i].bond_key.pid_key.addr_type,
+                  s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[5],
+                  s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[4],
+                  s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[3],
+                  s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[2],
+                  s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[1],
+                  s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[0]);
+
+        os_memcpy(nominal_addr, s_dm_gatt_bond_dev_list[i].bd_addr, sizeof(s_dm_gatt_bond_dev_list[i].bd_addr));
+        *nominal_addr_type = s_dm_gatt_bond_dev_list[i].addr_type;
+
+        if (s_dm_gatt_bond_dev_list[i].bond_key.key_mask & BK_LE_KEY_PID)
+        {
+            os_memcpy(identity_addr, s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr, sizeof(s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr));
+            *identity_addr_type = s_dm_gatt_bond_dev_list[i].bond_key.pid_key.addr_type;
+        }
+
         return 0;
     }
 
-    return 1;
-#endif
+    return -1;
+}
+
+int32_t dm_gatt_find_id_info_by_nominal_info(uint8_t *nominal_addr, uint8_t nominal_addr_type, uint8_t *identity_addr, uint8_t *identity_addr_type)
+{
+    uint32_t i = 0;
+
+    if (!nominal_addr)
+    {
+        return -1;
+    }
+
+    for (i = 0; i < sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]); ++i)
+    {
+        if (!dm_gap_is_addr_valid(s_dm_gatt_bond_dev_list[i].bd_addr))
+        {
+            continue;
+        }
+
+        if (!os_memcmp(nominal_addr, s_dm_gatt_bond_dev_list[i].bd_addr, sizeof(s_dm_gatt_bond_dev_list[i].bd_addr)) &&
+                s_dm_gatt_bond_dev_list[i].addr_type == nominal_addr_type)
+        {
+            if (s_dm_gatt_bond_dev_list[i].bond_key.key_mask & BK_LE_KEY_PID)
+            {
+                gatt_logi("find storage device 0x%x, nominal addr 0x%x %02x:%02x:%02x:%02x:%02x:%02x, identity addr 0x%x %02x:%02x:%02x:%02x:%02x:%02x",
+                          s_dm_gatt_bond_dev_list[i].bond_key.key_mask,
+                          s_dm_gatt_bond_dev_list[i].addr_type,
+                          s_dm_gatt_bond_dev_list[i].bd_addr[5],
+                          s_dm_gatt_bond_dev_list[i].bd_addr[4],
+                          s_dm_gatt_bond_dev_list[i].bd_addr[3],
+                          s_dm_gatt_bond_dev_list[i].bd_addr[2],
+                          s_dm_gatt_bond_dev_list[i].bd_addr[1],
+                          s_dm_gatt_bond_dev_list[i].bd_addr[0],
+                          s_dm_gatt_bond_dev_list[i].bond_key.pid_key.addr_type,
+                          s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[5],
+                          s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[4],
+                          s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[3],
+                          s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[2],
+                          s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[1],
+                          s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[0]);
+
+                os_memcpy(identity_addr, s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr, sizeof(s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr));
+                *identity_addr_type = s_dm_gatt_bond_dev_list[i].bond_key.pid_key.addr_type;
+
+                return 0;
+            }
+            else
+            {
+                return -1;
+            }
+        }
+    }
+
+    return -1;
 }
 
 int dm_ble_gap_create_bond(uint8_t *addr)
 {
+    if (!s_dm_gatt_is_inited)
+    {
+        gatt_loge("not init");
+        return -1;
+    }
+
     return bk_ble_gap_create_bond(addr);
 }
 
 int dm_ble_gap_remove_bond(uint8_t *addr)
 {
     int32_t ret = 0;
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
     bk_ble_bond_dev_t *tmp_dev = NULL;
 
-    if (!os_memcmp(null_addr, addr, BK_BD_ADDR_LEN) ||
-            !os_memcmp(ff_addr, addr, BK_BD_ADDR_LEN) )
+    if (!s_dm_gatt_is_inited)
+    {
+        gatt_loge("not init");
+        return 0;
+    }
+
+    if (!dm_gap_is_addr_valid(addr))
     {
         gatt_loge("addr invalid");
 
@@ -853,8 +1145,11 @@ int dm_ble_gap_remove_bond(uint8_t *addr)
 
     s_ble_sema = NULL;
 
+#if BLE_USE_STORAGE
     bluetooth_storage_save_ble_key_info(s_dm_gatt_bond_dev_list, sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]));
     bluetooth_storage_sync_to_flash();
+#endif
+
     return ret;
 }
 
@@ -864,9 +1159,11 @@ int32_t dm_ble_gap_clean_bond(void)
 
     if (!s_dm_gatt_is_inited)
     {
-        gatt_loge("dm_gatt not init");
+        gatt_loge("not init");
         return -1;
     }
+
+    dm_ble_clean_bond_info();
 
     if (!s_ble_sema)
     {
@@ -895,8 +1192,6 @@ int32_t dm_ble_gap_clean_bond(void)
         return -1;
     }
 
-    dm_ble_clean_bond_info();
-
     ret = rtos_deinit_semaphore(&s_ble_sema);
 
     if (ret != 0)
@@ -907,9 +1202,113 @@ int32_t dm_ble_gap_clean_bond(void)
 
     s_ble_sema = NULL;
 
-    bluetooth_storage_clean_ble_key_info();
+#if BLE_USE_STORAGE
+    bluetooth_storage_save_ble_key_info(s_dm_gatt_bond_dev_list, sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]));
     bluetooth_storage_sync_to_flash();
+#endif
+
     return ret;
+}
+
+int32_t dm_ble_gap_show_bond_list(void)
+{
+    if (!s_dm_gatt_is_inited)
+    {
+        gatt_loge("not init");
+        return -1;
+    }
+
+    for (int i = 0; i < sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]); ++i)
+    {
+        if (!dm_gap_is_addr_valid(s_dm_gatt_bond_dev_list[i].bd_addr))
+        {
+            continue;
+        }
+
+        if (s_dm_gatt_bond_dev_list[i].bond_key.key_mask & BK_LE_KEY_PID)
+        {
+            gatt_logi("nominal addr %02x:%02x:%02x:%02x:%02x:%02x %d, key 0x%x, identity addr %02x:%02x:%02x:%02x:%02x:%02x %d",
+                      s_dm_gatt_bond_dev_list[i].bd_addr[5],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[4],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[3],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[2],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[1],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[0],
+                      s_dm_gatt_bond_dev_list[i].addr_type,
+                      s_dm_gatt_bond_dev_list[i].bond_key.key_mask,
+                      s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[5],
+                      s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[4],
+                      s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[3],
+                      s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[2],
+                      s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[1],
+                      s_dm_gatt_bond_dev_list[i].bond_key.pid_key.static_addr[0],
+                      s_dm_gatt_bond_dev_list[i].bond_key.pid_key.addr_type
+                     );
+        }
+        else
+        {
+            gatt_logi("nominal addr %02x:%02x:%02x:%02x:%02x:%02x %d, key 0x%x",
+                      s_dm_gatt_bond_dev_list[i].bd_addr[5],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[4],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[3],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[2],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[1],
+                      s_dm_gatt_bond_dev_list[i].bd_addr[0],
+                      s_dm_gatt_bond_dev_list[i].addr_type,
+                      s_dm_gatt_bond_dev_list[i].bond_key.key_mask
+                     );
+        }
+    }
+
+    return 0;
+}
+
+int32_t dm_ble_gap_clean_local_key(void)
+{
+    if (!s_dm_gatt_is_inited)
+    {
+        gatt_loge("not init");
+        return -1;
+    }
+
+    os_memset(&s_dm_gap_local_key, 0, sizeof(s_dm_gap_local_key));
+
+#if BLE_USE_STORAGE
+    bluetooth_storage_save_local_key(&s_dm_gap_local_key);
+    bluetooth_storage_sync_to_flash();
+#endif
+
+    return 0;
+}
+
+int32_t dm_ble_gap_get_rpa(uint8_t *rpa)
+{
+    if (dm_gap_is_data_valid(s_dm_gap_rpa, sizeof(s_dm_gap_rpa)))
+    {
+        if (rpa)
+        {
+            os_memcpy(rpa, s_dm_gap_rpa, sizeof(s_dm_gap_rpa));
+        }
+
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+void dm_ble_gap_get_identity_addr(uint8_t *addr)
+{
+    uint8_t *identity_addr = addr;
+    bk_get_mac((uint8_t *)identity_addr, MAC_TYPE_BLUETOOTH);
+
+    for (int i = 0; i < BK_BD_ADDR_LEN / 2; i++)
+    {
+        uint8_t tmp = identity_addr[i];
+        identity_addr[i] = identity_addr[BK_BD_ADDR_LEN - 1 - i];
+        identity_addr[BK_BD_ADDR_LEN - 1 - i] = tmp;
+    }
 }
 
 int dm_ble_gap_update_param(uint8_t *addr, uint16_t interval, uint16_t tout)
@@ -962,10 +1361,9 @@ int dm_ble_gap_update_param(uint8_t *addr, uint16_t interval, uint16_t tout)
     return 0;
 }
 
-int dm_gatt_main(void)
+int dm_gatt_main(cli_gatt_param_t *param)
 {
     ble_err_t ret = 0;
-    uint32_t list_count = GATT_MAX_BOND_COUNT;
 
     if (s_dm_gatt_is_inited)
     {
@@ -973,9 +1371,52 @@ int dm_gatt_main(void)
         return -1;
     }
 
-    bluetooth_storage_init();
+    if (param)
+    {
+        if (param->p_rpa)
+        {
+            g_dm_gap_use_rpa = *param->p_rpa;
 
+            gatt_logi("set rpa %d", g_dm_gap_use_rpa);
+        }
+
+        if (param->p_privacy)
+        {
+            s_dm_gatt_privacy_enable = *param->p_privacy;
+        }
+
+        if (param->p_iocap)
+        {
+            s_dm_gatt_iocap = *param->p_iocap;
+        }
+
+        if (param->p_auth)
+        {
+            s_dm_gatt_auth_req = *param->p_auth;
+        }
+
+        if (param->p_ikd)
+        {
+            s_dm_gatt_init_key_distr = *param->p_ikd;
+        }
+
+        if (param->p_rkd)
+        {
+            s_dm_gatt_rsp_key_distr = *param->p_rkd;
+        }
+
+        if (param->p_iocap)
+        {
+            s_dm_gatt_iocap = *param->p_iocap;
+        }
+    }
+
+#if BLE_USE_STORAGE
+    uint32_t list_count = GATT_MAX_BOND_COUNT;
+
+    bluetooth_storage_init();
     bluetooth_storage_read_ble_key_info(s_dm_gatt_bond_dev_list, &list_count);
+#endif
 
     ret = rtos_init_semaphore(&s_ble_sema, 1);
 
@@ -988,23 +1429,136 @@ int dm_gatt_main(void)
     bk_ble_gap_register_callback(dm_ble_gap_private_cb);
     dm_gatt_add_gap_callback(dm_ble_gap_common_cb);
 
-    bk_ble_gatt_set_local_mtu(517);
+    // set ir er
+#if BLE_USE_STORAGE
+    bluetooth_storage_read_local_key(&s_dm_gap_local_key);
+#else
+    s_dm_gap_local_key = (typeof(s_dm_gap_local_key))
+    {
+        .er = {0x00U, 0x01U, 0x02U, 0x03U, 0x04U, 0x05U, 0x06U, 0x07U, 0x08U, 0x09U, 0x0AU, 0x0BU, 0x0CU, 0x0DU, 0x0EU, 0x0FU},
+        .ir = {0x0FU, 0x0EU, 0x0DU, 0x0CU, 0x0BU, 0x0AU, 0x09U, 0x08U, 0x07U, 0x06U, 0x05U, 0x04U, 0x03U, 0x02U, 0x01U, 0x00U},
+    };
+#endif
 
-    //    bk_ble_gatt_set_local_mtu(100);
-    //    bk_ble_gatt_set_local_mtu(40);
+    if (!dm_gap_is_data_valid(s_dm_gap_local_key.er, sizeof(s_dm_gap_local_key.er)))
+    {
+        for (int i = 0; i < sizeof(s_dm_gap_local_key.er); ++i)
+        {
+            s_dm_gap_local_key.er[i] = rand();
+        }
+    }
 
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
+    ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_ER, (void *)s_dm_gap_local_key.er, sizeof(s_dm_gap_local_key.er));
 
+    if (ret)
+    {
+        gatt_loge("set security param BK_BLE_SM_SET_ER err %d", ret);
+        return -1;
+    }
+
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set er err %d", ret);
+        return -1;
+    }
+
+    if (!dm_gap_is_data_valid(s_dm_gap_local_key.ir, sizeof(s_dm_gap_local_key.ir)))
+    {
+        for (int i = 0; i < sizeof(s_dm_gap_local_key.ir); ++i)
+        {
+            s_dm_gap_local_key.ir[i] = rand();
+        }
+    }
+
+    ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_IR, (void *)s_dm_gap_local_key.ir, sizeof(s_dm_gap_local_key.ir));
+
+    if (ret)
+    {
+        gatt_loge("set security param BK_BLE_SM_SET_IR err %d", ret);
+        return -1;
+    }
+
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set ir err %d", ret);
+        return -1;
+    }
+
+    if (g_dm_gap_use_rpa)
+    {
+        rtos_delay_milliseconds(100);
+        //generate rpa
+        ret = bk_ble_gap_generate_rpa(NULL);
+
+        if (ret)
+        {
+            gatt_loge("generate rpa err %d", ret);
+            return -1;
+        }
+
+        ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+        if (ret != kNoErr)
+        {
+            gatt_loge("wait generate rpa err %d", ret);
+            return -1;
+        }
+    }
+
+    //set privacy
+    gatt_logi("set privacy %d", s_dm_gatt_privacy_enable);
+
+    ret = bk_ble_gap_config_local_privacy(s_dm_gatt_privacy_enable);
+
+    if (ret)
+    {
+        gatt_loge("set privacy err %d", ret);
+        return -1;
+    }
+
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait privacy err %d", ret);
+        return -1;
+    }
+
+    //add bond list
     for (int i = 0; i < sizeof(s_dm_gatt_bond_dev_list) / sizeof(s_dm_gatt_bond_dev_list[0]); ++i)
     {
-        if (os_memcmp(null_addr, s_dm_gatt_bond_dev_list[i].bd_addr, BK_BD_ADDR_LEN) && os_memcmp(ff_addr, s_dm_gatt_bond_dev_list[i].bd_addr, BK_BD_ADDR_LEN) )
+        if (dm_gap_is_addr_valid(s_dm_gatt_bond_dev_list[i].bd_addr))
         {
             bk_ble_bond_dev_t bond_dev;
 
             os_memset(&bond_dev, 0, sizeof(bond_dev));
 
             os_memcpy(&bond_dev, s_dm_gatt_bond_dev_list + i, sizeof(bond_dev));
+
+            gatt_logi("add bond dev nominal %02x:%02x:%02x:%02x:%02x:%02x 0x%x",
+                      bond_dev.bd_addr[5],
+                      bond_dev.bd_addr[4],
+                      bond_dev.bd_addr[3],
+                      bond_dev.bd_addr[2],
+                      bond_dev.bd_addr[1],
+                      bond_dev.bd_addr[0],
+                      bond_dev.addr_type);
+
+            if (bond_dev.bond_key.key_mask & BK_LE_KEY_PID)
+            {
+                gatt_logi("peer identity info %02x:%02x:%02x:%02x:%02x:%02x 0x%x",
+                          bond_dev.bond_key.pid_key.static_addr[5],
+                          bond_dev.bond_key.pid_key.static_addr[4],
+                          bond_dev.bond_key.pid_key.static_addr[3],
+                          bond_dev.bond_key.pid_key.static_addr[2],
+                          bond_dev.bond_key.pid_key.static_addr[1],
+                          bond_dev.bond_key.pid_key.static_addr[0],
+                          bond_dev.bond_key.pid_key.addr_type);
+            }
 
             ret = bk_ble_gap_bond_dev_list_operation(BK_GAP_BOND_DEV_LIST_OPERATION_ADD, &bond_dev);
 
@@ -1024,14 +1578,21 @@ int dm_gatt_main(void)
         }
     }
 
+    //set other security param
     dm_gatt_set_security_method_private();
 
-    ret = rtos_deinit_semaphore(&s_ble_sema);
+    //set mtu
+    bk_ble_gatt_set_local_mtu(517);
 
-    if (ret != 0)
+    if (s_ble_sema)
     {
-        gatt_loge("rtos_deinit_semaphore err %d", ret);
-        return -1;
+        ret = rtos_deinit_semaphore(&s_ble_sema);
+
+        if (ret != 0)
+        {
+            gatt_loge("rtos_deinit_semaphore err %d", ret);
+            return -1;
+        }
     }
 
     s_ble_sema = NULL;

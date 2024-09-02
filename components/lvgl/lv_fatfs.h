@@ -12,7 +12,7 @@ extern "C" {
 
 void lv_fatfs_init(void);
 
-void lv_fatfs_deinit(int number);
+void lv_fatfs_deinit(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

@@ -127,20 +127,31 @@ bk_err_t media_app_rtsp_close();
 
 bk_err_t media_app_lcd_pipeline_open(void *config);
 bk_err_t media_app_lcd_pipeline_close(void);
+bk_err_t media_app_lcd_pipeline_disp_open(void *config);
+bk_err_t media_app_lcd_pipeline_disp_close(void);
+bk_err_t media_app_lcd_pipeline_jdec_open(void);
+bk_err_t media_app_lcd_pipeline_jdec_close(void);
 bk_err_t media_app_pipline_set_rotate(media_rotate_t rotate);
 
 bk_err_t media_app_h264_pipeline_open(void);
 bk_err_t media_app_h264_pipeline_close(void);
-bk_err_t media_app_h264_pipeline_reset(void);
+bk_err_t media_app_h264_regenerate_idr(camera_type_t type);
 
 bk_err_t media_app_lcd_fmt(pixel_format_t fmt);
 bk_err_t media_app_lcd_pipline_scale_open(void *config);
 bk_err_t media_app_lcd_pipline_scale_close(void);
+bk_err_t media_app_lcd_example_display(void *lcd_open);
 
 bk_err_t media_app_pipeline_dump(void);
 
 bk_err_t media_app_pipeline_mem_show(void);
 bk_err_t media_app_pipeline_mem_leak(void);
+
+bk_err_t media_app_frame_buffer_init(fb_type_t type);
+frame_buffer_t *media_app_frame_buffer_jpeg_malloc(void);
+frame_buffer_t *media_app_frame_buffer_h264_malloc(void);
+bk_err_t media_app_frame_buffer_push(frame_buffer_t *frame);
+bk_err_t media_app_frame_buffer_clear(frame_buffer_t *frame);
 
 #ifdef __cplusplus
 }

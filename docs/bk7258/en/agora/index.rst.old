@@ -3,12 +3,12 @@ agora development guide
 
 :link_to_translation:`zh_CN:[中文]`
 
-1、Functional Overview
+1.Functional Overview
 ---------------------------------
 
 	The main function of Agora-iot-sdk is to connect to the Agora cloud to realize the transmission of audio and video data streams between the device and the cloud server.
 
-2、development data
+2.development data
 ---------------------------------
 
 	The armino platform has adapted and integrated the Agora-iot-sdk library of Agora as a platform component, so customers only need to focus on the development of audio and video transmission applications of Agora.
@@ -28,7 +28,7 @@ Customers have two development options:
 	1. It is recommended to adopt the second development plan, which is less difficult to develop and provides a reference demo. The following chapters will describe in detail how to use the packaged AVoice components to quickly develop application codes for common functional scenarios.
 	2. If you choose the first development plan, please refer directly to the development guide provided by agora.
 
-3、Audio and video transmission scene development
+3.Audio and video transmission scene development
 ----------------------------------------------------------
 
 The process of developing voice calls and one-way image transmission from devices to the cloud based on Acoustics Cloud is as follows:
@@ -113,7 +113,7 @@ The process of developing voice calls and one-way image transmission from device
 
 ::
 
-	Please refer to the source code for the complete demo： ``\projects\thirdparty\agora\main\agora_rtc_demo.c``
+	Please refer to the source code for the complete demo: ``\projects\thirdparty\agora\main\agora_rtc_demo.c``
 
 Reference link
 --------------------------

@@ -1,18 +1,12 @@
-menu "dual_device_transmission"
+menu "INTEGRATION_DOORBELL"
 
-	choice AV_DEMO_MODE
-		prompt "Select Av Demo Mode"
-		default AV_DEMO_MODE_UDP
-
-		config AV_DEMO_MODE_UDP
-			bool "AV_DEMO_MODE_UDP"
-			help
-				AV demo work in UDP mode
-
-		config AV_DEMO_MODE_TCP
-			bool "AV_DEMO_MODE_TCP"
-			help
-				AV demo work in TCP mode
-
-	endchoice
+    config INTEGRATION_DOORBELL
+        bool "Doorbell integration"
+        default n
+    config INTEGRATION_DOORBELL_CS2
+        bool "Doorbell integration CS2"
+        default n
+    config AV_DEMO_MODE_TCP
+        bool "AV DEMO TCP MODE"
+        default n
 endmenu

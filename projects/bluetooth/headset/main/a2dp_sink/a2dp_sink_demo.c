@@ -43,6 +43,9 @@
 #include "bk_aac_decoder.h"
 #endif
 
+#include <driver/aud_dac.h>
+#include <driver/aud_dac_types.h>
+
 #define TAG "a2dp_sink"
 
 #define LOGI(...) BK_LOGI(TAG, ##__VA_ARGS__)
@@ -80,6 +83,8 @@
 #define A2DP_ACC_SINGLE_CHANNEL_MAX_FRAM_SIZE   768   //1024(samples)/48k/s(sample rate)*288k/s (max bitrate)/8
 #define A2DP_AAC_MAX_FRAME_NUMS                 5     //21ms/frame*5
 #endif
+
+#define AVRCP_PASSTHROUTH_CMD_TIMEOUT                     2000
 
 #if CONFIG_USE_AUDIO_LEGACY_INTERFACE
 extern int32_t bt_a2dp_aac_decoder_init(void* aac_decoder, uint32_t sample_rate, uint32_t channels);
@@ -154,6 +159,24 @@ static coex_to_bt_func_p_t s_coex_to_bt_func = {0};
 #endif
 
 static beken_semaphore_t s_bt_api_event_cb_sema = NULL;
+static beken_semaphore_t s_bt_avrcp_event_cb_sema = NULL;
+
+
+static bk_err_t bk_bt_dac_set_gain(uint8_t gain)
+{
+    bk_aud_dac_set_gain(gain);
+
+    if (gain == 0)
+    {
+        bk_aud_dac_mute();
+    }
+    else
+    {
+        bk_aud_dac_unmute();
+    }
+
+    return BK_OK;
+}
 
 void avrcp_connect_timer_hdl(void *param, unsigned int ulparam)
 {
@@ -522,6 +545,7 @@ void bt_audio_sink_demo_main(void *arg)
                             else
                             {
                                 LOGI("A2DP frame nodes buffer(sbc) is full\n");
+                                //os_free(msg.data);
                                 break;
                             }
                         }
@@ -547,7 +571,8 @@ void bt_audio_sink_demo_main(void *arg)
                             }
                             else
                             {
-                                LOGI("A2DP frame nodes buffer(sbc) is full\n");
+                                LOGI("A2DP frame nodes buffer(aac) is full\n");
+                                os_free(msg.data);
                                 break;
                             }
                         }
@@ -1022,6 +1047,17 @@ static void bk_bt_app_avrcp_ct_cb(bk_avrcp_ct_cb_event_t event, bk_avrcp_ct_cb_p
                        pm->remote_bda[2],
                        pm->remote_bda[1],
                        pm->remote_bda[0]);
+            if(s_bt_avrcp_event_cb_sema 
+                && pm->key_state == BK_AVRCP_PT_CMD_STATE_PRESSED //press state set sem
+                && (pm->key_code == BK_AVRCP_PT_CMD_PLAY
+                ||  pm->key_code == BK_AVRCP_PT_CMD_PAUSE
+                ||  pm->key_code == BK_AVRCP_PT_CMD_FORWARD
+                ||  pm->key_code == BK_AVRCP_PT_CMD_BACKWARD
+                ||  pm->key_code == BK_AVRCP_PT_CMD_VOL_DOWN
+                ||  pm->key_code == BK_AVRCP_PT_CMD_VOL_UP) )
+            {
+                rtos_set_semaphore(&s_bt_avrcp_event_cb_sema);
+            }
         }
         break;
 
@@ -1150,8 +1186,7 @@ static void avrcp_tg_cb(bk_avrcp_tg_cb_event_t event, bk_avrcp_tg_cb_param_t *pa
 
         s_a2dp_vol = param->set_abs_vol.volume;
 
-        bk_aud_intf_set_spk_gain(s_a2dp_vol >> 1);
-
+        bk_bt_dac_set_gain(s_a2dp_vol >> 1);
         if (s_a2dp_vol)
         {
             //sys_hal_aud_dacmute_en(0); //TODO
@@ -1211,24 +1246,40 @@ error:;
 void bk_bt_app_avrcp_ct_play(void)
 {
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_PLAY, BK_AVRCP_PT_CMD_STATE_PRESSED);
+    if(s_bt_avrcp_event_cb_sema)
+    {
+        rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
+    }
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_PLAY, BK_AVRCP_PT_CMD_STATE_RELEASED);
 }
 
 void bk_bt_app_avrcp_ct_pause(void)
 {
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_PAUSE, BK_AVRCP_PT_CMD_STATE_PRESSED);
+    if(s_bt_avrcp_event_cb_sema)
+    {
+        rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
+    }
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_PAUSE, BK_AVRCP_PT_CMD_STATE_RELEASED);
 }
 
 void bk_bt_app_avrcp_ct_next(void)
 {
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_FORWARD, BK_AVRCP_PT_CMD_STATE_PRESSED);
+    if(s_bt_avrcp_event_cb_sema)
+    {
+        rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
+    }
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_FORWARD, BK_AVRCP_PT_CMD_STATE_RELEASED);
 }
 
 void bk_bt_app_avrcp_ct_prev(void)
 {
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_BACKWARD, BK_AVRCP_PT_CMD_STATE_PRESSED);
+    if(s_bt_avrcp_event_cb_sema)
+    {
+        rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
+    }
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_BACKWARD, BK_AVRCP_PT_CMD_STATE_RELEASED);
 }
 
@@ -1236,7 +1287,7 @@ void bk_bt_app_avrcp_ct_rewind(uint32_t ms)
 {
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_REWIND, BK_AVRCP_PT_CMD_STATE_PRESSED);
 
-    if (ms)
+    if(ms)
     {
         rtos_delay_milliseconds(ms);
     }
@@ -1248,7 +1299,7 @@ void bk_bt_app_avrcp_ct_fast_forward(uint32_t ms)
 {
     bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_FAST_FORWARD, BK_AVRCP_PT_CMD_STATE_PRESSED);
 
-    if (ms)
+    if(ms)
     {
         rtos_delay_milliseconds(ms);
     }
@@ -1264,8 +1315,7 @@ void bk_bt_app_avrcp_ct_vol_up(void)
         idx += 1;
         s_a2dp_vol = (idx <= 0) ? 0 : (idx >= 16) ? 0x7f :((idx-1) * 8 + 9);
 #ifdef CONFIG_A2DP_AUDIO
-        bk_aud_intf_set_spk_gain(s_a2dp_vol >> 1);
-
+        bk_bt_dac_set_gain(s_a2dp_vol >> 1);
         if (s_a2dp_vol)
         {
             //sys_hal_aud_dacmute_en(0);//TODO
@@ -1275,7 +1325,7 @@ void bk_bt_app_avrcp_ct_vol_up(void)
             //sys_hal_aud_dacmute_en(1);//TODO
         }
 
-        if (s_tg_current_registered_noti &= (1 << BK_AVRCP_RN_VOLUME_CHANGE))
+        if (s_tg_current_registered_noti & (1 << BK_AVRCP_RN_VOLUME_CHANGE))
         {
             bk_avrcp_rn_param_t cmd;
             int ret = 0;
@@ -1296,6 +1346,10 @@ void bk_bt_app_avrcp_ct_vol_up(void)
         else
         {
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_UP, BK_AVRCP_PT_CMD_STATE_PRESSED);
+            if(s_bt_avrcp_event_cb_sema)
+            {
+                rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
+            }
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_UP, BK_AVRCP_PT_CMD_STATE_RELEASED);
         }
 #endif
@@ -1311,8 +1365,7 @@ void bk_bt_app_avrcp_ct_vol_down(void)
         idx -= 1;
         s_a2dp_vol = (idx <= 0) ? 0 : (idx >= 16) ? 0x7f :((idx-1) * 8 + 9);
 #ifdef CONFIG_A2DP_AUDIO
-        bk_aud_intf_set_spk_gain(s_a2dp_vol >> 1);
-
+        bk_bt_dac_set_gain(s_a2dp_vol >> 1);
         if (s_a2dp_vol)
         {
             //sys_hal_aud_dacmute_en(0);//TODO
@@ -1322,7 +1375,7 @@ void bk_bt_app_avrcp_ct_vol_down(void)
             //sys_hal_aud_dacmute_en(1);//TODO
         }
 
-        if (s_tg_current_registered_noti &= (1 << BK_AVRCP_RN_VOLUME_CHANGE))
+        if (s_tg_current_registered_noti & (1 << BK_AVRCP_RN_VOLUME_CHANGE))
         {
             bk_avrcp_rn_param_t cmd;
             int ret = 0;
@@ -1343,6 +1396,10 @@ void bk_bt_app_avrcp_ct_vol_down(void)
         else
         {
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_DOWN, BK_AVRCP_PT_CMD_STATE_PRESSED);
+            if(s_bt_avrcp_event_cb_sema)
+            {
+                rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
+            }
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_DOWN, BK_AVRCP_PT_CMD_STATE_RELEASED);
         }
 #endif
@@ -1466,7 +1523,17 @@ int a2dp_sink_demo_init(uint8_t aac_supported)
 
         if (ret)
         {
-            LOGI("%s sem init err %d\n", __func__, ret);
+            LOGE("%s sem init err %d\n", __func__, ret);
+            return -1;
+        }
+    }
+    if(!s_bt_avrcp_event_cb_sema)
+    {
+        ret = rtos_init_semaphore(&s_bt_avrcp_event_cb_sema, 1);
+
+        if (ret)
+        {
+            LOGE("%s avrcp evt sem init err %d\n", __func__, ret);
             return -1;
         }
     }
@@ -1584,6 +1651,8 @@ static void speaker_task(void *arg)
     onboard_speaker_cfg.samp_rate = (bt_audio_a2dp_sink_codec.type == CODEC_AUDIO_SBC ? bt_audio_a2dp_sink_codec.cie.sbc_codec.sample_rate : bt_audio_a2dp_sink_codec.cie.aac_codec.sample_rate);
     onboard_speaker_cfg.chl_num = CONFIG_BOARD_AUDIO_CHANNLE_NUM;
     onboard_speaker_cfg.spk_gain = 0x10;
+    onboard_speaker_cfg.pool_frame_num = 2;
+    onboard_speaker_cfg.pool_play_thold = 2;
     onboard_speaker = onboard_speaker_stream_init(&onboard_speaker_cfg);
     CHECK_NULL(onboard_speaker);
 

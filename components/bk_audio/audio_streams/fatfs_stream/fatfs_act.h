@@ -61,17 +61,20 @@ typedef struct {
 
 typedef struct {
 	void *fp;
+	uint32_t size;
 } fatfs_fp_param_t;
 
 typedef struct {
 	void *fp;
 	void *buff;
-	uint32_t len;
+	uint32_t len;        /*!< length need to read or write */
+	uint32_t result;     /*!< length actually read or write */
 } fatfs_rw_param_t;
 
 typedef struct {
 	void* fp;
 	uint64 ofs; 	/* File pointer from top of file */
+	uint32_t result;
 } fatfs_lseek_param_t;
 #endif
 

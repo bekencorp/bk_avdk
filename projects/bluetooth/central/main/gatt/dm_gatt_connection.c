@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include <components/log.h>
 #include <os/mem.h>
 #include <os/str.h>
@@ -11,16 +12,13 @@
 #include "components/bluetooth/bk_dm_gatt_common.h"
 #include "dm_gatt.h"
 #include "dm_gatt_connection.h"
+#include "dm_gap_utils.h"
 
 static dm_gatt_app_env_t s_dm_gatt_env_array[GATT_MAX_CONNECTION_COUNT];
 
 dm_gatt_app_env_t *dm_ble_find_app_env_by_addr(uint8_t *addr)
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
-
-    if (!os_memcmp(null_addr, addr, BK_BD_ADDR_LEN) ||
-            !os_memcmp(ff_addr, addr, BK_BD_ADDR_LEN) )
+    if (!dm_gap_is_addr_valid(addr))
     {
         return NULL;
     }
@@ -38,14 +36,9 @@ dm_gatt_app_env_t *dm_ble_find_app_env_by_addr(uint8_t *addr)
 
 dm_gatt_app_env_t *dm_ble_find_app_env_by_conn_id(uint16_t conn_id)
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
-
     for (int i = 0; i < sizeof(s_dm_gatt_env_array) / sizeof(s_dm_gatt_env_array[0]); ++i)
     {
-        if (os_memcmp(null_addr, s_dm_gatt_env_array[i].addr, BK_BD_ADDR_LEN) &&
-                os_memcmp(ff_addr, s_dm_gatt_env_array[i].addr, BK_BD_ADDR_LEN) &&
-                s_dm_gatt_env_array[i].conn_id == conn_id)
+        if (dm_gap_is_addr_valid(s_dm_gatt_env_array[i].addr) && s_dm_gatt_env_array[i].conn_id == conn_id)
         {
             return s_dm_gatt_env_array + i;
         }
@@ -56,11 +49,7 @@ dm_gatt_app_env_t *dm_ble_find_app_env_by_conn_id(uint16_t conn_id)
 
 uint8_t dm_ble_del_app_env_by_addr(uint8_t *addr)
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
-
-    if (!os_memcmp(null_addr, addr, BK_BD_ADDR_LEN) ||
-            !os_memcmp(ff_addr, addr, BK_BD_ADDR_LEN) )
+    if (!dm_gap_is_addr_valid(addr))
     {
         return 1;
     }
@@ -85,7 +74,6 @@ uint8_t dm_ble_del_app_env_by_addr(uint8_t *addr)
 
 dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len)
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
     dm_gatt_app_env_t *tmp = NULL;
 
     tmp = dm_ble_find_app_env_by_addr(addr);
@@ -98,7 +86,7 @@ dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len
 
     for (int i = 0; i < sizeof(s_dm_gatt_env_array) / sizeof(s_dm_gatt_env_array[0]); ++i)
     {
-        if (!os_memcmp(s_dm_gatt_env_array[i].addr, null_addr, BK_BD_ADDR_LEN))
+        if (!dm_gap_is_addr_valid(s_dm_gatt_env_array[i].addr))
         {
             os_memcpy(s_dm_gatt_env_array[i].addr, addr, BK_BD_ADDR_LEN);
 
@@ -110,6 +98,7 @@ dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len
                 if (!s_dm_gatt_env_array[i].data)
                 {
                     gatt_loge("malloc err");
+                    os_memset(&s_dm_gatt_env_array[i], 0, sizeof(s_dm_gatt_env_array[0]));
                     return NULL;
                 }
 
@@ -125,13 +114,9 @@ dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len
 
 uint8_t dm_ble_app_env_foreach( int32_t (*func) (dm_gatt_app_env_t *env, void *arg), void *arg )
 {
-    const uint8_t null_addr[BK_BD_ADDR_LEN] = {0};
-    const uint8_t ff_addr[BK_BD_ADDR_LEN] = {[0 ... (BK_BD_ADDR_LEN - 1)] = 0xff};
-
     for (int i = 0; i < sizeof(s_dm_gatt_env_array) / sizeof(s_dm_gatt_env_array[0]); ++i)
     {
-        if (os_memcmp(null_addr, s_dm_gatt_env_array[i].addr, BK_BD_ADDR_LEN) &&
-                os_memcmp(ff_addr, s_dm_gatt_env_array[i].addr, BK_BD_ADDR_LEN))
+        if (dm_gap_is_addr_valid(s_dm_gatt_env_array[i].addr))
         {
             func(s_dm_gatt_env_array + i, arg);
         }

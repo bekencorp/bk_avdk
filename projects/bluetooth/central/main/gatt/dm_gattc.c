@@ -24,7 +24,9 @@
 #include <os/str.h>
 #include <os/os.h>
 
-#include "components/bluetooth/bk_dm_ble.h"
+#include "components/bluetooth/bk_dm_bluetooth_types.h"
+#include "components/bluetooth/bk_dm_gap_ble_types.h"
+#include "components/bluetooth/bk_dm_gap_ble.h"
 #include "dm_gattc.h"
 #include "dm_gatt_connection.h"
 
@@ -72,6 +74,38 @@ static uint16_t s_peer_service_start_handle = 0;
 static uint16_t s_peer_service_end_handle = 0;
 static uint16_t s_peer_service_char_handle = 0;
 static uint16_t s_peer_service_char_desc_handle = 0;
+
+static uint8_t s_dm_gattc_local_addr_is_public = 0;
+
+static int32_t dm_ble_gap_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t *param)
+{
+    gatt_logd("event %d", event);
+
+    switch (event)
+    {
+    case BK_BLE_GAP_SET_STATIC_RAND_ADDR_EVT:
+    {
+        struct ble_set_rand_cmpl_evt_param *pm = (typeof(pm))param;
+
+        if (pm->status)
+        {
+            gatt_loge("set rand addr err %d", pm->status);
+        }
+
+        if (s_ble_sema != NULL)
+        {
+            rtos_set_semaphore( &s_ble_sema );
+        }
+    }
+    break;
+
+    default:
+        return DM_BLE_GAP_APP_CB_RET_NO_INTERESTING;
+        break;
+    }
+
+    return DM_BLE_GAP_APP_CB_RET_PROCESSED;
+}
 
 static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk_ble_gattc_cb_param_t *comm_param)
 {
@@ -170,7 +204,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
             gatt_logi("0x%04x %d~%d", short_uuid, param->array[i].start_handle, param->array[i].end_handle);
 
-            if (0x1234 == short_uuid)
+            if (INTERESTING_SERIVCE_UUID == short_uuid)
             {
                 s_peer_service_start_handle = param->array[i].start_handle;
                 s_peer_service_end_handle = param->array[i].end_handle;
@@ -209,7 +243,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
             if ( s_peer_service_start_handle <= param->array[i].char_value_handle &&
                     s_peer_service_end_handle >= param->array[i].char_value_handle &&
-                    0x5678 == short_uuid)
+                    INTERESTING_CHAR_UUID == short_uuid)
             {
                 s_peer_service_char_handle = param->array[i].char_value_handle;
 
@@ -609,7 +643,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     {
         struct gattc_connect_evt_param *param = (typeof(param))comm_param;
 
-        gatt_logi("BK_GATTC_CONNECT_EVT %d %02X:%02X:%02X:%02X:%02X:%02X %d", param->link_role,
+        gatt_logi("BK_GATTC_CONNECT_EVT role %d %02X:%02X:%02X:%02X:%02X:%02X %d", param->link_role,
                   param->remote_bda[5],
                   param->remote_bda[4],
                   param->remote_bda[3],
@@ -648,7 +682,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         common_env_tmp->conn_id = param->conn_id;
         common_env_tmp->local_is_master = (param->link_role == 0 ? 1 : 0);
 
-        gatt_logi("local role %d", common_env_tmp->local_is_master);
+        gatt_logi("local is master %d", common_env_tmp->local_is_master);
 
         if (common_env_tmp->local_is_master)
         {
@@ -699,52 +733,26 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     return ret;
 }
 
-static uint32_t dm_ble_legacy_event_cb(ble_event_enum_t event, void *param)
-{
-    switch (event)
-    {
-
-    case BK_DM_BLE_EVENT_CONNECT:
-    {
-        ble_conn_att_t *conn_att = (typeof(conn_att)) param;
-        gatt_logi("ethermind connected, ATT_CON_ID %d atype %d addr 0x%02X:%02X:%02X:%02X:%02X:%02X",
-                  conn_att->conn_handle, conn_att->peer_addr_type,
-                  conn_att->peer_addr[5], conn_att->peer_addr[4],
-                  conn_att->peer_addr[3], conn_att->peer_addr[2],
-                  conn_att->peer_addr[1], conn_att->peer_addr[0]);
-    }
-    break;
-
-    case BK_DM_BLE_EVENT_DISCONNECT:
-    {
-        ble_conn_att_t *att_handle = (typeof(att_handle)) param;
-        gatt_logi("ethermind disconnect reason %d attid %d atype %d addr 0x%02X:%02X:%02X:%02X:%02X:%02X",
-                  att_handle->event_result, att_handle->conn_handle,
-                  att_handle->peer_addr_type, att_handle->peer_addr[5],
-                  att_handle->peer_addr[4], att_handle->peer_addr[3],
-                  att_handle->peer_addr[2], att_handle->peer_addr[1],
-                  att_handle->peer_addr[0]);
-    }
-    break;
-
-    default:
-        break;
-    }
-
-    return 0;
-}
-
-int32_t dm_gattc_connect(uint8_t *addr)
+int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type)
 {
     dm_gatt_app_env_t *common_env_tmp = NULL;
+    int32_t err = 0;
 
-    gatt_logi("0x%02x:%02x:%02x:%02x:%02x:%02x",
+    gatt_logi("0x%02x:%02x:%02x:%02x:%02x:%02x %d",
               addr[5],
               addr[4],
               addr[3],
               addr[2],
               addr[1],
-              addr[0]);
+              addr[0],
+              addr_type);
+
+    if (!s_gattc_if)
+    {
+        gatt_loge("gattc not init");
+
+        return -1;
+    }
 
     common_env_tmp = dm_ble_alloc_app_env_by_addr(addr, sizeof(dm_gattc_app_env_t));
 
@@ -760,36 +768,40 @@ int32_t dm_gattc_connect(uint8_t *addr)
         return -1;
     }
 
-    //todo: use new connect api
-    typedef struct
+    bk_gap_create_conn_params_t param = {0};
+    bk_bd_addr_t peer_id_addr = {0};
+    bk_ble_addr_type_t peer_id_addr_type = BLE_ADDR_TYPE_PUBLIC;
+
+    param.scan_interval = 800;
+    param.scan_window = param.scan_interval / 2;
+    param.initiator_filter_policy = 0;
+
+    /* attention: some device could only send rpa adv after pair, some device is opposite.
+     * so we need to decide if rpa should be used in connection.
+     */
+
+    if (g_dm_gap_use_rpa && 0 == dm_gatt_find_id_info_by_nominal_info(addr, addr_type, peer_id_addr, &peer_id_addr_type))
     {
-        uint8_t    peer_address_type;
-        bd_addr_t  peer_address;
-        uint8_t    initiating_phys;
+        gatt_logi("local use rpa");
+        param.local_addr_type = (s_dm_gattc_local_addr_is_public ? BLE_ADDR_TYPE_RPA_PUBLIC : BLE_ADDR_TYPE_RPA_RANDOM);
+        os_memcpy(param.peer_addr, addr, sizeof(param.peer_addr));
+        param.peer_addr_type = addr_type;
+    }
+    else
+    {
+        param.local_addr_type = (s_dm_gattc_local_addr_is_public ? BLE_ADDR_TYPE_PUBLIC : BLE_ADDR_TYPE_RANDOM);
+        os_memcpy(param.peer_addr, addr, sizeof(param.peer_addr));
+        param.peer_addr_type = addr_type;
+    }
 
-        uint16_t conn_interval_min;
-        uint16_t conn_interval_max;
-        uint16_t conn_latency;
-        uint16_t supervision_timeout;
-    } ble_conn_param_normal_t;
+    param.conn_interval_min = 16;
+    param.conn_interval_max = 16;
+    param.conn_latency = 0;
+    param.supervision_timeout = 500;
+    param.min_ce = 0;
+    param.max_ce = 0;
 
-
-    ble_conn_param_normal_t tmp;
-    int32_t err = 0;
-
-    tmp.conn_interval_min = 6;
-    tmp.conn_interval_max = 6;
-    tmp.conn_latency = 0;
-    tmp.supervision_timeout = 0x200;
-    tmp.initiating_phys = 1;
-
-    tmp.peer_address_type = 1;
-    memcpy(tmp.peer_address.addr, addr, sizeof(tmp.peer_address.addr));
-
-    //todo: not impl bk_ble_create_connection in ethermind
-    bk_ble_set_event_callback(dm_ble_legacy_event_cb);
-    extern ble_err_t bk_ble_create_connection(ble_conn_param_normal_t *conn_param, void *callback);
-    err = bk_ble_create_connection(&tmp, NULL);
+    err = bk_ble_gap_connect(&param);
 
     if (err)
     {
@@ -807,6 +819,7 @@ int32_t dm_gattc_connect(uint8_t *addr)
 int32_t dm_gattc_disconnect(uint8_t *addr)
 {
     dm_gatt_app_env_t *common_env_tmp = NULL;
+    int32_t err = 0;
 
     gatt_logi("0x%02x:%02x:%02x:%02x:%02x:%02x",
               addr[5],
@@ -816,11 +829,18 @@ int32_t dm_gattc_disconnect(uint8_t *addr)
               addr[1],
               addr[0]);
 
+    if (!s_gattc_if)
+    {
+        gatt_loge("gattc not init");
+
+        return -1;
+    }
+
     common_env_tmp = dm_ble_find_app_env_by_addr(addr);
 
     if (!common_env_tmp || !common_env_tmp->data)
     {
-        gatt_loge("conn max %p %p !!!!", common_env_tmp, common_env_tmp ? common_env_tmp->data : NULL);
+        gatt_loge("conn not found !!!!");
         return -1;
     }
 
@@ -830,12 +850,10 @@ int32_t dm_gattc_disconnect(uint8_t *addr)
         return -1;
     }
 
-    bd_addr_t connect_addr;
-    int32_t err = 0;
+    bk_bd_addr_t peer_addr;
+    os_memcpy(peer_addr, addr, sizeof(peer_addr));
 
-    os_memcpy(connect_addr.addr, addr, sizeof(connect_addr.addr));
-    //todo: use new api
-    err = bk_ble_disconnect_connection(&connect_addr, NULL);
+    err = bk_ble_gap_disconnect(peer_addr);
 
     if (err)
     {
@@ -849,8 +867,36 @@ int32_t dm_gattc_disconnect(uint8_t *addr)
     return err;
 }
 
+int32_t dm_gattc_connect_cancel(void)
+{
+    int32_t err = 0;
+
+    if (!s_gattc_if)
+    {
+        gatt_loge("gattc not init");
+
+        return -1;
+    }
+
+    err = bk_ble_gap_cancel_connect();
+
+    if (err)
+    {
+        gatt_loge("cancel fail %d", err);
+    }
+
+    return err;
+}
+
 int32_t dm_gattc_discover(uint16_t conn_id)
 {
+    if (!s_gattc_if)
+    {
+        gatt_loge("gattc not init");
+
+        return -1;
+    }
+
     if (bk_ble_gattc_discover(s_gattc_if, conn_id, BK_GATT_AUTH_REQ_NONE))
     {
         gatt_loge("err");
@@ -862,6 +908,13 @@ int32_t dm_gattc_discover(uint16_t conn_id)
 //ble_gatt_demo gattc write 5 18 111111111111111111111
 int32_t dm_gattc_write(uint16_t conn_id, uint16_t attr_handle, uint8_t *data, uint32_t len)
 {
+    if (!s_gattc_if)
+    {
+        gatt_loge("gattc not init");
+
+        return -1;
+    }
+
     if (0 != bk_ble_gattc_write_char_descr(s_gattc_if, conn_id, attr_handle, len, data, BK_GATT_WRITE_TYPE_RSP, BK_GATT_AUTH_REQ_NONE))
     {
         gatt_loge("err");
@@ -870,7 +923,7 @@ int32_t dm_gattc_write(uint16_t conn_id, uint16_t attr_handle, uint8_t *data, ui
     return 0;
 }
 
-int dm_gattc_main(void)
+int dm_gattc_main(cli_gatt_param_t *param)
 {
     ble_err_t ret = 0;
 
@@ -882,7 +935,33 @@ int dm_gattc_main(void)
         return -1;
     }
 
+    if (param)
+    {
+        if (param->p_pa)
+        {
+            s_dm_gattc_local_addr_is_public = *param->p_pa;
+        }
+    }
+
+    dm_gatt_add_gap_callback(dm_ble_gap_cb);
     bk_ble_gattc_register_callback(bk_gattc_cb);
+
+    bk_bd_addr_t current_addr = {0}, identity_addr = {0};
+    char dev_name[64] = {0};
+
+    dm_ble_gap_get_identity_addr(identity_addr);
+
+    os_memcpy(current_addr, identity_addr, sizeof(identity_addr));
+
+    snprintf((char *)(dev_name), sizeof(dev_name) - 1, "CENTRAL-%02X%02X%02X", identity_addr[2], identity_addr[1], identity_addr[0]);
+
+    ret = bk_ble_gap_set_device_name(dev_name);
+
+    if (ret)
+    {
+        gatt_loge("bk_ble_gap_set_device_name err %d", ret);
+        return -1;
+    }
 
     ret = bk_ble_gattc_app_register(0);
 
@@ -900,5 +979,43 @@ int dm_gattc_main(void)
         return -1;
     }
 
+    uint8_t need_set_random_addr = 0;
+
+    if (g_dm_gap_use_rpa && dm_ble_gap_get_rpa(current_addr) == 0)
+    {
+        gatt_logw("set connect/scan random addr with generate rpa");
+        need_set_random_addr = 1;
+    }
+    else if (!s_dm_gattc_local_addr_is_public)
+    {
+        gatt_logw("set connect/scan random addr with user define");
+
+        current_addr[0]++;
+        current_addr[5] |= 0xc0; // static random addr[47:46] must be 0b11 in msb !!!
+        need_set_random_addr = 1;
+    }
+
+    if (need_set_random_addr)
+    {
+        ret = bk_ble_gap_set_rand_addr(current_addr);
+
+        if (ret)
+        {
+            gatt_loge("bk_ble_gap_set_rand_addr err %d", ret);
+            goto error;
+        }
+
+        ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+        if (ret != kNoErr)
+        {
+            gatt_loge("wait set rand addr err %d", ret);
+            goto error;
+        }
+    }
+
     return 0;
+
+error:;
+    return -1;
 }

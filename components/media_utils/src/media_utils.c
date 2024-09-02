@@ -88,6 +88,14 @@ char * get_string_to_lcd_name(char *string)
 	{
 		value = "aml01";
 	}
+	else if (os_strcmp(string, "st77903_h0165y008t") == 0)
+	{
+		value = "st77903_h0165y008t";
+	}
+	else if (os_strcmp(string, "spd2010") == 0)
+	{
+		value = "spd2010";
+	}
 
 	return value;
 }

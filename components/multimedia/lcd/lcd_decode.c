@@ -213,7 +213,7 @@ bk_err_t lcd_sw_jpegdec_start(frame_buffer_t *frame, frame_buffer_t *dst_frame)
 	}
 
 	jd_set_output_format(format);
-	ret = bk_jpeg_dec_sw_start(JPEGDEC_BY_FRAME, frame->frame, dst_frame->frame, frame->length, 0, &result);
+	ret = bk_jpeg_dec_sw_start(JPEGDEC_BY_FRAME, frame->frame, dst_frame->frame, frame->length, dst_frame->size, &result);
 	if (ret != BK_OK)
 	{
 		LOGE("%s sw decoder error\n", __func__);
@@ -356,7 +356,7 @@ bk_err_t lcd_sw_decode_init(media_decode_mode_t sw_dec_mode)
 	}
 	else
 	{
-		ret = bk_jpeg_dec_sw_init();
+		ret = bk_jpeg_dec_sw_init(NULL, 0);
 		if (ret != BK_OK)
 		{
 			LOGE("%s dec_sem init failed: %d\n", __func__, ret);

@@ -39,11 +39,80 @@ typedef struct mp3_decoder {
 } mp3_decoder_t;
 
 
+/* skip id3 tag */
+static int codec_mp3_skip_idtag(audio_element_handle_t self)
+{
+	int  offset = 0;
+	uint8_t *tag;
+	int r_size = 0;
+
+	mp3_decoder_t *mp3_dec = (mp3_decoder_t *)audio_element_getdata(self);
+
+	tag = mp3_dec->main_buff_readptr;
+	/* read idtag v2 */
+
+	r_size = audio_element_input(self, (char *)(mp3_dec->main_buff), 3);
+	if (r_size != 3) {
+		BK_LOGE(TAG, "[%s] %s, %d, audio_element_input fail, r_size:%d \n", audio_element_get_tag(self), __func__, __LINE__, r_size);
+		return -1;
+	} else {
+		mp3_dec->main_buff_remain_size = 3;
+	}
+
+	if (tag[0] == 'I' && tag[1] == 'D' && tag[2] == '3') {
+		int  size;
+
+		if (audio_element_input(self, (char *)(mp3_dec->main_buff + 3), 7) != 7) {
+			BK_LOGE(TAG, "[%s] %s, %d, audio_element_input fail \n", audio_element_get_tag(self), __func__, __LINE__);
+			return -1;
+		}
+
+		size = ((tag[6] & 0x7F) << 21) | ((tag[7] & 0x7F) << 14) | ((tag[8] & 0x7F) << 7) | ((tag[9] & 0x7F));
+
+		offset = size + 10;
+
+		/* read all of idv3 */
+		{
+			int rest_size = size;
+			while (rest_size)
+			{
+				int length;
+				int chunk;
+
+				if (rest_size > mp3_dec->main_buff_size) {
+					chunk = mp3_dec->main_buff_size;
+				} else  {
+					chunk = rest_size;
+				}
+
+				length = audio_element_input(self, (char *)(mp3_dec->main_buff), chunk);
+				if (length > 0) {
+					rest_size -= length;
+				} else {
+					BK_LOGE(TAG, "[%s] %s, %d, audio_element_input fail, length:%d \n", audio_element_get_tag(self), __func__, __LINE__, length);
+					return -1; /* read failed */
+				}
+			}
+
+			mp3_dec->main_buff_remain_size = 0;
+			mp3_dec->main_buff_readptr = mp3_dec->main_buff;
+		}
+	}
+
+	return offset;
+}
+
 static bk_err_t _mp3_decoder_open(audio_element_handle_t self)
 {
 	BK_LOGD(TAG, "[%s] _mp3_decoder_open \n", audio_element_get_tag(self));
 	mp3_decoder_t *mp3_dec = (mp3_decoder_t *)audio_element_getdata(self);
 	mp3_dec->main_buff_readptr = mp3_dec->main_buff;
+
+	int ret = codec_mp3_skip_idtag(self);
+	if (ret < 0) {
+		BK_LOGE(TAG, "[%s] codec_mp3_skip_idtag fail \n", audio_element_get_tag(self));
+		return BK_FAIL;
+	}
 
 	return BK_OK;
 }
@@ -87,6 +156,49 @@ static bk_err_t music_info_report(audio_element_handle_t self)
 	return BK_OK;
 }
 
+static int check_mp3_sync_word(mp3_decoder_t *mp3_dec)
+{
+	int err;
+
+	MP3FrameInfo frame_info = {0};
+
+	err = MP3GetNextFrameInfo(mp3_dec->dec_handle, &frame_info, mp3_dec->main_buff_readptr);
+	if (err == ERR_MP3_INVALID_FRAMEHEADER)
+	{
+		BK_LOGE(TAG, "%s, ERR_MP3_INVALID_FRAMEHEADER, %d\n", __func__, __LINE__);
+		goto __err;
+	}
+	else if (err != ERR_MP3_NONE)
+	{
+		BK_LOGE(TAG, "%s, MP3GetNextFrameInfo fail, err=%d, %d\n", __func__, err, __LINE__);
+		goto __err;
+	}
+	else if (frame_info.nChans != 1 && frame_info.nChans != 2)
+	{
+		BK_LOGE(TAG, "%s, nChans is not 1 or 2, nChans=%d, %d\n", __func__, frame_info.nChans, __LINE__);
+		goto __err;
+	}
+	else if (frame_info.bitsPerSample != 16 && frame_info.bitsPerSample != 8)
+	{
+		BK_LOGE(TAG, "%s, bitsPerSample is not 16 or 8, bitsPerSample=%d, %d\n", __func__, frame_info.bitsPerSample, __LINE__);
+		goto __err;
+	}
+	else if (frame_info.version != MPEG1)     //not support MPEG2 and MPEG2.5, filter MPEG2 and MPEG2.5 packages
+	{
+		BK_LOGE(TAG, "%s, version is not MPEG1, version=%d, %d\n", __func__, frame_info.version, __LINE__);
+		goto __err;
+	}
+	else
+	{
+		//noting todo
+	}
+
+	return 0;
+
+__err:
+	return -1;
+}
+
 static int _mp3_decoder_process(audio_element_handle_t self, char *in_buffer, int in_len)
 {
 	bk_err_t ret = BK_OK;
@@ -95,6 +207,7 @@ static int _mp3_decoder_process(audio_element_handle_t self, char *in_buffer, in
 	BK_LOGD(TAG, "[%s] _mp3_decoder_process \n", audio_element_get_tag(self));
 	mp3_decoder_t *mp3_dec = (mp3_decoder_t *)audio_element_getdata(self);
 
+__retry:
 	if (mp3_dec->main_buff_remain_size < mp3_dec->main_buff_size) {
 		os_memmove(mp3_dec->main_buff, mp3_dec->main_buff_readptr, mp3_dec->main_buff_remain_size);
 		//fr = f_read(&mp3file, (void *)(readBuf + bytesLeft), MAINBUF_SIZE - bytesLeft, &uiTemp);
@@ -111,6 +224,19 @@ static int _mp3_decoder_process(audio_element_handle_t self, char *in_buffer, in
 		mp3_dec->main_buff_readptr += offset;
 		mp3_dec->main_buff_remain_size -= offset;
 
+		if (check_mp3_sync_word(mp3_dec) == -1)
+		{
+			if (mp3_dec->main_buff_remain_size > 0)
+			{
+				mp3_dec->main_buff_remain_size --;
+				mp3_dec->main_buff_readptr ++;
+				goto __retry;
+			} else {
+				BK_LOGE(TAG, "[%s] check_mp3_sync_word fail \n", audio_element_get_tag(self));
+				return 0;
+			}
+		}
+
 		ret = MP3Decode(mp3_dec->dec_handle, &mp3_dec->main_buff_readptr, (int *)&mp3_dec->main_buff_remain_size, mp3_dec->out_pcm_buff, 0);
 		if (ret != ERR_MP3_NONE) {
 			BK_LOGE(TAG, "MP3Decode failed, code is %d \n", ret);
@@ -126,13 +252,11 @@ static int _mp3_decoder_process(audio_element_handle_t self, char *in_buffer, in
 		}
 	}
 #if 1
-//	addAON_GPIO_Reg0x8 = 2;
 	ret = music_info_report(self);
 	if (ret != BK_OK) {
 		BK_LOGE(TAG, "music_info_report \n");
 		return 0;
 	}
-//	addAON_GPIO_Reg0x8 = 0;
 #endif
 
 	int w_size = 0;

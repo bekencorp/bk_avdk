@@ -25,6 +25,18 @@ PAPER         =
 BUILDDIR      = _build
 DOCS_VERSION := latest
 
+ifneq ("$(TARGET_DIR)", "")
+	export BUILDDIR = $(TARGET_DIR)
+endif
+
+ifneq ("$(TARGET_VERSION)", "")
+	export DOCS_VERSION = $(TARGET_VERSION)
+endif
+
+export DOCUMENTS_NAME := AVDKDocument
+export DOCUMENTS_TITLE := Audio Video Development Kits Document
+export DOCUMENTS_AUTHOR := Bekencorp
+
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
 PAPEROPT_letter = -D latex_paper_size=letter
@@ -74,16 +86,6 @@ html: | check_python_packages
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html $(PROCESSES)
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
-
-arminodocs: | check_python_packages
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/${DOCS_VERSION} $(PROCESSES)
-	@echo "check_python_packages"
-	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
-	@current_time=`date +%s`; \
-	time_interval=`expr $${current_time} - $(START_TIME)`; \
-	runtime=`date -u -d @$${time_interval} +%Hh:%Mm:%Ss`; \
-	echo ${YELLOW}"######## runtime: $${runtime} ########"${DEFAULT}
-	../check_doc_warnings.sh
 
 dirhtml: | check_python_packages
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml $(PROCESSES)
@@ -211,3 +213,20 @@ pseudoxml: | check_python_packages
 	$(SPHINXBUILD) -b pseudoxml $(ALLSPHINXOPTS) $(BUILDDIR)/pseudoxml $(PROCESSES)
 	@echo
 	@echo "Build finished. The pseudo-XML files are in $(BUILDDIR)/pseudoxml."
+
+arminodocs: | check_python_packages
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/${DOCS_VERSION} $(PROCESSES)
+	../check_doc_warnings.sh html
+
+	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex $(PROCESSES)
+	../latex_format.py --tex $(BUILDDIR)/latex/$(DOCUMENTS_NAME).tex
+	@echo "Running LaTeX files through pdflatex..."
+	$(MAKE) -C $(BUILDDIR)/latex all-pdf
+	../check_doc_warnings.sh pdf
+
+	@echo "check_python_packages"
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+	@current_time=`date +%s`; \
+	time_interval=`expr $${current_time} - $(START_TIME)`; \
+	runtime=`date -u -d @$${time_interval} +%Hh:%Mm:%Ss`; \
+	echo ${YELLOW}"######## runtime: $${runtime} ########"${DEFAULT}

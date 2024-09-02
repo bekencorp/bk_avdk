@@ -20,7 +20,9 @@
 #if CONFIG_LCD_QSPI
 #include <lcd_qspi_display_service.h>
 #endif
-
+#if (CONFIG_LCD_SPI_DISPLAY)
+#include <lcd_spi_display_service.h>
+#endif
 
 #define TAG "LVGL_DISP"
 
@@ -42,6 +44,8 @@
  **********************/
 
 static void disp_init(void);
+
+static void disp_deinit(void);
 
 static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
 
@@ -65,7 +69,6 @@ static uint8_t lv_dma2d_use_flag = 0;
 frame_buffer_t *lvgl_frame_buffer = NULL;
 extern lv_vnd_config_t vendor_config;
 extern media_debug_t *media_debug;
-uint8_t lvgl_camera_switch_flag = 0;
 
 
 int lv_port_disp_init(void)
@@ -191,6 +194,8 @@ void lv_port_disp_deinit(void)
     }
 
     lv_disp_remove(lv_disp_get_default());
+
+    disp_deinit();
 }
 
 /**********************
@@ -218,14 +223,26 @@ static void lv_dma2d_transfer_complete(void)
 
 static void lv_dma2d_memcpy_init(void)
 {
-    rtos_init_semaphore_ex(&lv_dma2d_sem, 1, 0);
+    bk_err_t ret;
+
+    ret = rtos_init_semaphore_ex(&lv_dma2d_sem, 1, 0);
+    if (BK_OK != ret) {
+        LOGE("%s %d lv_dma2d_sem init failed\n", __func__, __LINE__);
+        return;
+    }
 
     bk_dma2d_driver_init();
-//    dma2d_driver_transfes_ability(TRANS_128BYTES);
-    bk_dma2d_int_enable(DMA2D_CFG_ERROR | DMA2D_TRANS_ERROR | DMA2D_TRANS_COMPLETE,1);
     bk_dma2d_register_int_callback_isr(DMA2D_CFG_ERROR_ISR, lv_dma2d_config_error);
     bk_dma2d_register_int_callback_isr(DMA2D_TRANS_ERROR_ISR, lv_dma2d_transfer_error);
     bk_dma2d_register_int_callback_isr(DMA2D_TRANS_COMPLETE_ISR, lv_dma2d_transfer_complete);
+    bk_dma2d_int_enable(DMA2D_CFG_ERROR | DMA2D_TRANS_ERROR | DMA2D_TRANS_COMPLETE, 1);
+}
+
+static void lv_dma2d_memcpy_deinit(void)
+{
+    bk_dma2d_int_enable(DMA2D_CFG_ERROR | DMA2D_TRANS_ERROR | DMA2D_TRANS_COMPLETE, 0);
+    bk_dma2d_driver_deinit();
+    rtos_deinit_semaphore(&lv_dma2d_sem);
 }
 
 static void lv_dma2d_memcpy(void *Psrc, uint32_t src_xsize, uint32_t src_ysize,
@@ -293,6 +310,15 @@ static void lv_dma2d_memcpy_draw_buffer(void *Psrc, uint32_t src_xsize, uint32_t
     lv_dma2d_use_flag = 1;
 }
 
+static void lvgl_frame_buffer_free(frame_buffer_t *frame_buffer)
+{
+}
+
+const frame_buffer_callback_t lvgl_frame_buffer_cb =
+{
+    .free = lvgl_frame_buffer_free,
+};
+
 /*Initialize your display and the required peripherals.*/
 static void disp_init(void)
 {
@@ -301,18 +327,34 @@ static void disp_init(void)
         lv_dma2d_memcpy_init();
     }
 
-    if (!lvgl_camera_switch_flag) {
-        lvgl_frame_buffer = os_malloc(sizeof(frame_buffer_t));
-        os_memset(lvgl_frame_buffer, 0, sizeof(frame_buffer_t));
+    lvgl_frame_buffer = os_malloc(sizeof(frame_buffer_t));
+    if (!lvgl_frame_buffer) {
+        LOGI("%s %d lvgl_frame_buffer malloc fail\r\n", __func__, __LINE__);
+        return;
+    }
+    os_memset(lvgl_frame_buffer, 0, sizeof(frame_buffer_t));
 
-        lvgl_frame_buffer->width = vendor_config.lcd_hor_res;
-        lvgl_frame_buffer->height = vendor_config.lcd_ver_res;
+    lvgl_frame_buffer->width = vendor_config.lcd_hor_res;
+    lvgl_frame_buffer->height = vendor_config.lcd_ver_res;
 
-        #if (LV_COLOR_DEPTH == 16)
-        lvgl_frame_buffer->fmt = PIXEL_FMT_RGB565;
-        #elif (LV_COLOR_DEPTH == 32)
-        lvgl_frame_buffer->fmt = PIXEL_FMT_RGB888;
-        #endif
+    #if (LV_COLOR_DEPTH == 16)
+    lvgl_frame_buffer->fmt = PIXEL_FMT_RGB565;
+    #elif (LV_COLOR_DEPTH == 32)
+    lvgl_frame_buffer->fmt = PIXEL_FMT_RGB888;
+    #endif
+
+    lvgl_frame_buffer->cb = &lvgl_frame_buffer_cb;
+}
+
+static void disp_deinit(void)
+{
+    if (lv_vendor_display_frame_cnt() == 2 || lv_vendor_draw_buffer_cnt() == 2) {
+        lv_dma2d_memcpy_deinit();
+    }
+
+    if (lvgl_frame_buffer) {
+        os_free(lvgl_frame_buffer);
+        lvgl_frame_buffer = NULL;
     }
 }
 
@@ -461,11 +503,16 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
         if (lv_disp_flush_is_last(disp_drv)) {
             media_debug->lvgl_draw++;
             #if (CONFIG_LCD_QSPI)
-            bk_lcd_qspi_display((uint32_t)disp_buf);
+                bk_lcd_qspi_display((uint32_t)disp_buf);
+            #elif (CONFIG_LCD_SPI_DISPLAY)
+                lcd_spi_display_frame((uint8_t *)disp_buf, lv_hor, lv_ver);
             #else
-            if (!lvgl_camera_switch_flag) {
-                lvgl_frame_buffer->frame = (uint8_t *)disp_buf;
-            }
+            lvgl_frame_buffer->frame = (uint8_t *)disp_buf;
+            #if (!CONFIG_LV_USE_DEMO_BENCHMARK)
+                if (lv_vendor_draw_buffer_cnt() == 2) {
+                    lv_dma2d_memcpy_wait_transfer_finish();
+                }
+            #endif
             lcd_display_frame_request(lvgl_frame_buffer);
             #endif
 

@@ -4,6 +4,14 @@ menu "Display Service"
 		depends on SYS_CPU1
 		bool "Enable Display Service"
 		default y
-		help
 
+	config LCD_SPI_DISPLAY
+		depends on SPI
+		bool "Enable LCD SPI Display"
+		default n
+		
+	config LCD_EXAMPLE
+		depends on SPI
+		bool "Enable LCD SPI Display"
+		default n
 endmenu

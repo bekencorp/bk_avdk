@@ -87,7 +87,7 @@ beken_semaphore_t mailbox_media_aud_mic_sem = NULL;
 #endif
 aud_tras_drv_mic_notify_t mic_nofity = {0, 0};
 
-static beken_semaphore_t aud_tras_task_sem = NULL;
+static beken_semaphore_t aud_tras_drv_task_sem = NULL;
 
 #if CONFIG_AUD_TRAS_AEC_MIC_DELAY_DEBUG
 static uint8_t mic_delay_num = 0;
@@ -141,12 +141,20 @@ static bk_err_t aud_tras_drv_set_spk_gain(uint16_t value);
 
 void *audio_tras_drv_malloc(uint32_t size)
 {
-	return bk_psram_frame_buffer_malloc(PSRAM_HEAP_AUDIO, size);
+#if CONFIG_AUD_TRAS_USE_SRAM
+    return os_malloc(size);
+#else
+    return bk_psram_frame_buffer_malloc(PSRAM_HEAP_AUDIO, size);
+#endif
 }
 
 void audio_tras_drv_free(void *mem)
 {
-	return bk_psram_frame_buffer_free(mem);
+#if CONFIG_AUD_TRAS_USE_SRAM
+    os_free(mem);
+#else
+    return bk_psram_frame_buffer_free(mem);
+#endif
 }
 
 #ifdef CONFIG_UAC_MIC_SPK_COUNT_DEBUG
@@ -474,8 +482,10 @@ static void aud_tras_adc_dma_finish_isr(void)
 static bk_err_t aud_tras_adc_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr, uint32_t ring_buff_size, uint32_t transfer_len, aud_intf_mic_chl_t mic_chl)
 {
 	bk_err_t ret = BK_OK;
-	dma_config_t dma_config;
+	dma_config_t dma_config = {0};
 	uint32_t adc_port_addr;
+
+    os_memset(&dma_config, 0, sizeof(dma_config));
 
 	dma_config.mode = DMA_WORK_MODE_REPEAT;
 	dma_config.chan_prio = 1;
@@ -551,8 +561,10 @@ static void aud_tras_dac_dma_finish_isr(void)
 static bk_err_t aud_tras_dac_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr, uint32_t ring_buff_size, uint32_t transfer_len, aud_intf_spk_chl_t spk_chl)
 {
 	bk_err_t ret = BK_OK;
-	dma_config_t dma_config;
+	dma_config_t dma_config = {0};
 	uint32_t dac_port_addr;
+
+    os_memset(&dma_config, 0, sizeof(dma_config));
 
 	dma_config.mode = DMA_WORK_MODE_REPEAT;
 	dma_config.chan_prio = 1;
@@ -790,6 +802,10 @@ static void aud_uac_push_packet(audio_packet_t *packet)
 {
 	bk_err_t ret = BK_OK;
 
+#ifdef CONFIG_UAC_MIC_SPK_COUNT_DEBUG
+    uac_mic_spk_count_add_mic_size(packet->data_buffer_size);
+#endif
+
 	if (aud_tras_drv_info.mic_info.status == AUD_TRAS_DRV_MIC_STA_START && packet->data_buffer_size > 0) {
 		if (ring_buffer_get_free_size(&aud_tras_drv_info.mic_info.mic_rb) >= packet->data_buffer_size) {
 			ring_buffer_write(&aud_tras_drv_info.mic_info.mic_rb, (uint8_t *)packet->data_buffer, packet->data_buffer_size);
@@ -813,6 +829,10 @@ static void aud_uac_free_packet(audio_packet_t *packet)
 		os_memcpy(packet->data_buffer, aud_tras_drv_info.spk_info.uac_spk_buff, packet->data_buffer_size);
 		os_memset(aud_tras_drv_info.spk_info.uac_spk_buff, 0x00, aud_tras_drv_info.spk_info.frame_size);
 	}
+
+#ifdef CONFIG_UAC_MIC_SPK_COUNT_DEBUG
+    uac_mic_spk_count_add_spk_size(packet->data_buffer_size);
+#endif
 
 	/* send msg to notify app to write speaker data */
 	ret = aud_tras_drv_send_msg(AUD_TRAS_DRV_SPK_REQ_DATA, (void *)packet);
@@ -998,6 +1018,10 @@ static bk_err_t aud_tras_uac_connect_handle(void)
 			LOGI("%s, %d, uac not automatically connect, need user todo \n", __func__, __LINE__);
 			return BK_OK;
 		}
+	}
+
+	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_NULL && aud_tras_drv_info.work_mode == AUD_INTF_WORK_MODE_VOICE) {
+		return BK_OK;
 	}
 
 	/* config uac */
@@ -1205,6 +1229,7 @@ static bk_err_t aud_tras_enc(void)
 		}
 	}
 
+#if 0
 	/* send mic notify mailbox msg to media app */
 	if (aud_tras_drv_info.aud_tras_tx_mic_data != NULL) {
 		uint32_t result = BK_OK;
@@ -1233,6 +1258,7 @@ static bk_err_t aud_tras_enc(void)
 		}
 #endif
 	}
+#endif
 
 	return ret;
 
@@ -1510,6 +1536,12 @@ static bk_err_t aud_tras_drv_mic_tx_data(void)
 	bk_err_t ret = BK_OK;
 	uint32_t size = 0;
 
+	if (aud_tras_drv_info.mic_info.mic_type == AUD_INTF_MIC_TYPE_BOARD) {
+#if (CONFIG_CACHE_ENABLE)
+		flush_all_dcache();
+#endif
+	}
+
 	/* get a fram mic data from mic_ring_buff */
 	if (ring_buffer_get_fill_size(&(aud_tras_drv_info.mic_info.mic_rb)) >= aud_tras_drv_info.mic_info.frame_size) {
 		size = ring_buffer_read(&(aud_tras_drv_info.mic_info.mic_rb), (uint8_t*)aud_tras_drv_info.mic_info.temp_mic_addr, aud_tras_drv_info.mic_info.frame_size);
@@ -1525,7 +1557,6 @@ static bk_err_t aud_tras_drv_mic_tx_data(void)
 		mic_nofity.length = (uint32_t)aud_tras_drv_info.mic_info.frame_size;
 		mic_to_media_app_msg.event = EVENT_AUD_MIC_DATA_NOTIFY;
 		mic_to_media_app_msg.param = (uint32_t)&mic_nofity;
-		mic_to_media_app_msg.sem = NULL;
 //		LOGE("%s, size:%d \n", __func__, aud_tras_drv_info.mic_info.frame_size);
 		msg_send_notify_to_media_major_mailbox(&mic_to_media_app_msg, APP_MODULE);
 	}
@@ -1537,6 +1568,10 @@ static bk_err_t aud_tras_drv_spk_req_data(audio_packet_t * packet)
 {
 	bk_err_t ret = BK_OK;
 	uint32_t size = 0;
+
+#if (CONFIG_CACHE_ENABLE)
+	flush_all_dcache();
+#endif
 
 	if (aud_tras_drv_info.spk_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 		/* get speaker data from spk_rx_ring_buff */
@@ -1564,8 +1599,6 @@ static bk_err_t aud_tras_drv_spk_req_data(audio_packet_t * packet)
 		{
 			spk_to_media_app_msg.event = EVENT_AUD_SPK_DATA_NOTIFY;
 			spk_to_media_app_msg.param = aud_tras_drv_info.spk_info.frame_size;
-			spk_to_media_app_msg.sem = NULL;
-
 			msg_send_notify_to_media_major_mailbox(&spk_to_media_app_msg, APP_MODULE);
 			//ret = aud_tras_drv_info.aud_tras_rx_spk_data((unsigned int)aud_tras_drv_info.spk_info.frame_size);
 		}
@@ -1608,8 +1641,6 @@ static bk_err_t aud_tras_drv_spk_req_data(audio_packet_t * packet)
 			{
 				spk_to_media_app_msg.event = EVENT_AUD_SPK_DATA_NOTIFY;
 				spk_to_media_app_msg.param = aud_tras_drv_info.spk_info.frame_size;
-				spk_to_media_app_msg.sem = NULL;
-
 				msg_send_notify_to_media_major_mailbox(&spk_to_media_app_msg, APP_MODULE);
 				//ret = aud_tras_drv_info.aud_tras_rx_spk_data((unsigned int)aud_tras_drv_info.spk_info.frame_size);
 			}
@@ -3658,7 +3689,7 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 	/* set work status to IDLE */
 	aud_tras_drv_info.status = AUD_TRAS_DRV_STA_IDLE;
 
-	rtos_set_semaphore(&aud_tras_task_sem);
+	rtos_set_semaphore(&aud_tras_drv_task_sem);
 
 //	bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_320M);
 
@@ -3987,7 +4018,7 @@ aud_tras_drv_exit:
 	aud_tras_drv_info.uac_status = AUD_INTF_UAC_NORMAL_DISCONNECTED;
 	aud_tras_drv_info.uac_auto_connect = true;
 
-	rtos_set_semaphore(&aud_tras_task_sem);
+	rtos_set_semaphore(&aud_tras_drv_task_sem);
 
 	/* delete task */
 	aud_trs_drv_thread_hdl = NULL;
@@ -4012,17 +4043,17 @@ bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg)
 	}
 #endif
 
-	if (aud_tras_task_sem == NULL) {
-		ret = rtos_init_semaphore(&aud_tras_task_sem, 1);
+	if (aud_tras_drv_task_sem == NULL) {
+		ret = rtos_init_semaphore(&aud_tras_drv_task_sem, 1);
 		if (ret != BK_OK)
 		{
-			LOGE("%s, %d, create audio tras task semaphore failed \n", __func__, __LINE__);
+			LOGE("%s, %d, create audio tras drv task semaphore failed \n", __func__, __LINE__);
 			goto fail;
 		}
 	}
 
 	if ((!aud_trs_drv_thread_hdl) && (!aud_trs_drv_int_msg_que)) {
-		LOGI("%s, %d, init audio transfer driver \n", __func__, __LINE__);
+		LOGD("%s, %d, init audio transfer driver \n", __func__, __LINE__);
 		os_memcpy(&aud_trs_drv_setup_bak, setup_cfg, sizeof(aud_intf_drv_config_t));
 
 		ret = rtos_init_queue(&aud_trs_drv_int_msg_que,
@@ -4030,10 +4061,10 @@ bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg)
 							  sizeof(aud_tras_drv_msg_t),
 							  TU_QITEM_COUNT);
 		if (ret != kNoErr) {
-			LOGE("%s, %d, ceate audio transfer driver internal message queue fail \n", __func__, __LINE__);
+			LOGE("%s, %d, create audio transfer driver internal message queue fail \n", __func__, __LINE__);
 			goto fail;
 		}
-		LOGI("%s, %d, ceate audio transfer driver internal message queue complete \n", __func__, __LINE__);
+		LOGD("%s, %d, create audio transfer driver internal message queue complete \n", __func__, __LINE__);
 
 		//create audio transfer driver task
 		ret = rtos_create_thread(&aud_trs_drv_thread_hdl,
@@ -4050,20 +4081,26 @@ bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg)
 			goto fail;
 		}
 
-		ret = rtos_get_semaphore(&aud_tras_task_sem, BEKEN_WAIT_FOREVER);
+		ret = rtos_get_semaphore(&aud_tras_drv_task_sem, BEKEN_WAIT_FOREVER);
 		if (ret != BK_OK)
 		{
 			LOGE("%s, %d, rtos_get_semaphore\n", __func__, __LINE__);
 			goto fail;
 		}
 
-		LOGI("%s, %d, create audio transfer driver task complete \n", __func__, __LINE__);
+		LOGD("%s, %d, create audio transfer driver task complete \n", __func__, __LINE__);
 	}
 
 	return BK_OK;
 
 fail:
-	LOGE("%s, %d, aud_tras_drv_init fail, ret: %d \n", __func__, __LINE__, ret);
+	//LOGE("%s, %d, aud_tras_drv_init fail, ret: %d \n", __func__, __LINE__, ret);
+
+	if(aud_tras_drv_task_sem)
+	{
+		rtos_deinit_semaphore(&aud_tras_drv_task_sem);
+		aud_tras_drv_task_sem = NULL;
+	}
 
 	return BK_FAIL;
 }
@@ -4081,17 +4118,17 @@ bk_err_t aud_tras_drv_deinit(void)
 			return kOverrunErr;
 		}
 
-		ret = rtos_get_semaphore(&aud_tras_task_sem, BEKEN_WAIT_FOREVER);
+		ret = rtos_get_semaphore(&aud_tras_drv_task_sem, BEKEN_WAIT_FOREVER);
 		if (ret != BK_OK)
 		{
 			LOGE("%s, %d, rtos_get_semaphore\n", __func__, __LINE__);
 			return BK_FAIL;
 		}
 
-		if(aud_tras_task_sem)
+		if(aud_tras_drv_task_sem)
 		{
-			rtos_deinit_semaphore(&aud_tras_task_sem);
-			aud_tras_task_sem = NULL;
+			rtos_deinit_semaphore(&aud_tras_drv_task_sem);
+			aud_tras_drv_task_sem = NULL;
 		}
 	} else {
 		LOGW("%s, %d, aud_trs_drv_int_msg_que is NULL\n", __func__, __LINE__);

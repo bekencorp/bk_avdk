@@ -338,7 +338,7 @@
 
 /*Montserrat fonts with ASCII range and some symbols using bpp = 4
  *https://fonts.google.com/specimen/Montserrat*/
-
+#define LV_FONT_MONTSERRAT_14 1
 
 /*Demonstrate special features*/
 #define LV_FONT_MONTSERRAT_12_SUBPX      0
@@ -605,7 +605,7 @@
 #if LV_USE_FS_FATFS
     #define LV_FS_FATFS_LETTER '/'      /*Set an upper cased letter on which the drive will accessible (e.g. 'A')*/
     #define LV_FS_FATFS_CACHE_SIZE 0    /*>0 to cache this number of bytes in lv_fs_read()*/
-    #define LV_FS_FATFS_DISK_NUM 1      /* 0: RAM, 1: SDIO_SD, 2: UDISK, 3: FLASH. */
+    #define LV_FS_FATFS_DISK_NUM 3      /* 0: RAM, 1: SDIO_SD, 2: UDISK, 3: FLASH. */
 #endif
 
 
@@ -643,7 +643,7 @@
         /* 1: bitmap cache use the sbit cache, 0:bitmap cache use the image cache. */
         /* sbit cache:it is much more memory efficient for small bitmaps(font size < 256) */
         /* if font size >= 256, must be configured as image cache */
-        #define LV_FREETYPE_SBIT_CACHE 0
+        #define LV_FREETYPE_SBIT_CACHE (16 * 1024)
         /* Maximum number of opened FT_Face/FT_Size objects managed by this cache instance. */
         /* (0:use system defaults) */
         #define LV_FREETYPE_CACHE_FT_FACES 0

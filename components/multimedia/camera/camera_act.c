@@ -56,12 +56,10 @@ void camera_uvc_device_info_notify_to_cp0(bk_uvc_device_brief_info_t *info, uvc_
 	camera_media_msg.event = EVENT_UVC_DEVICE_INFO_NOTIFY;
 	camera_media_msg.param = (uint32_t)info;
 	camera_media_msg.result = state;
-	camera_media_msg.sem = NULL;
-
 	msg_send_notify_to_media_major_mailbox(&camera_media_msg, APP_MODULE);
 }
 
-bk_err_t camera_dvp_reset_open_handle(media_mailbox_msg_t *msg)
+static bk_err_t camera_dvp_reset_open_handle(media_mailbox_msg_t *msg)
 {
 	bk_err_t ret = BK_OK;
 
@@ -89,7 +87,7 @@ bk_err_t camera_dvp_reset_open_handle(media_mailbox_msg_t *msg)
 	return ret;
 }
 
-bk_err_t camera_dvp_open_handle(media_mailbox_msg_t *msg)
+static bk_err_t camera_dvp_open_handle(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 
@@ -128,7 +126,7 @@ end:
 	return ret;
 }
 
-bk_err_t camera_dvp_close_handle(media_mailbox_msg_t *msg)
+static bk_err_t camera_dvp_close_handle(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 
@@ -158,7 +156,7 @@ end:
 	return ret;
 }
 
-bk_err_t camera_dvp_free_encode_mem_handle(media_mailbox_msg_t *msg)
+static bk_err_t camera_dvp_free_encode_mem_handle(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 
@@ -171,6 +169,32 @@ bk_err_t camera_dvp_free_encode_mem_handle(media_mailbox_msg_t *msg)
 
 	return ret;
 }
+
+static bk_err_t camera_dvp_h264_reset_handle(media_mailbox_msg_t *msg)
+{
+	int ret = BK_FAIL;
+
+#ifdef CONFIG_DVP_CAMERA
+
+	if (CAMERA_STATE_DISABLED == get_camera_state())
+	{
+		LOGI("%s already close\n", __func__);
+		msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+
+		return ret;
+	}
+
+	ret = bk_dvp_camera_h264_regenerate_idr_frame();
+
+#endif
+
+	LOGI("%s complete\n", __func__);
+
+	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+
+	return ret;
+}
+
 
 static void camera_uvc_connect_state_change_task_entry(beken_thread_arg_t data)
 {
@@ -523,6 +547,10 @@ bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 
 		case EVENT_CAM_DVP_RESET_OPEN_IND:
 			ret = camera_dvp_reset_open_handle(msg);
+			break;
+
+		case EVENT_CAM_H264_RESET_IND:
+			ret = camera_dvp_h264_reset_handle(msg);
 			break;
 
 		case EVENT_CAM_UVC_OPEN_IND:

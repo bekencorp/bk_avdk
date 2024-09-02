@@ -6,6 +6,10 @@
 #include "lv_port_disp.h"
 #include "lv_port_indev.h"
 #include "lv_vendor.h"
+#include "driver/dma2d.h"
+#if CONFIG_FATFS
+#include "lv_fatfs.h"
+#endif
 
 
 static beken_thread_t g_disp_thread_handle;
@@ -13,6 +17,7 @@ static u32 g_init_stack_size = (1024 * 4);
 static beken_mutex_t g_disp_mutex;
 static beken_semaphore_t lvgl_sem;
 static u8 lvgl_task_state = STATE_INIT;
+static bool lv_vendor_initialized = false;
 lv_vnd_config_t vendor_config = {0};
 
 
@@ -38,10 +43,11 @@ void lv_vendor_init(lv_vnd_config_t *config)
 {
     bk_err_t ret;
 
-    if (lvgl_task_state != STATE_INIT) {
-        LOGE("%s already init\n", __func__);
+    if (lv_vendor_initialized) {
+        LOGI("%s already init\n", __func__);
         return;
     }
+
     os_memcpy(&vendor_config, config, sizeof(lv_vnd_config_t));
 
     lv_init();
@@ -54,6 +60,10 @@ void lv_vendor_init(lv_vnd_config_t *config)
 
     lv_port_indev_init();
 
+#if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
+    lv_fatfs_init();
+#endif
+
     rtos_init_mutex(&g_disp_mutex);
 
     ret = rtos_init_semaphore_ex(&lvgl_sem, 1, 0);
@@ -61,46 +71,58 @@ void lv_vendor_init(lv_vnd_config_t *config)
         LOGE("%s semaphore init failed\n", __func__);
         return;
     }
+
+    lv_vendor_initialized = true;
+
+    LOGI("%s complete\n", __func__);
 }
 
 void lv_vendor_deinit(void)
 {
-    if (lvgl_task_state != STATE_STOP) {
-        LOGE("%s already stop\n", __func__);
+    if (lv_vendor_initialized == false) {
+        LOGI("%s already deinit\n", __func__);
         return;
     }
-
-    os_memset(&vendor_config, 0x00, sizeof(lv_vnd_config_t));
 
     lv_port_disp_deinit();
 
     lv_port_indev_deinit();
 
+#if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
+    lv_fatfs_deinit();
+#endif
+
     rtos_deinit_mutex(&g_disp_mutex);
 
     rtos_deinit_semaphore(&lvgl_sem);
+
+    os_memset(&vendor_config, 0x00, sizeof(lv_vnd_config_t));
+
+    lv_vendor_initialized = false;
+
+    LOGI("%s complete\n", __func__);
 }
 
 static void lv_tast_entry(void *arg)
 {
     uint32_t sleep_time;
+
     lvgl_task_state = STATE_RUNNING;
-    
     rtos_set_semaphore(&lvgl_sem);
 
     while(lvgl_task_state == STATE_RUNNING) {
         lv_vendor_disp_lock();
         sleep_time = lv_task_handler();
         lv_vendor_disp_unlock();
-		#if CONFIG_LVGL_TASK_SLEEP_TIME_CUSTOMIZE
-		sleep_time = CONFIG_LVGL_TASK_SLEEP_TIME;
-		#else
+        #if CONFIG_LVGL_TASK_SLEEP_TIME_CUSTOMIZE
+        sleep_time = CONFIG_LVGL_TASK_SLEEP_TIME;
+        #else
         if (sleep_time > 500) {
             sleep_time = 500;
         } else if (sleep_time < 4) {
             sleep_time = 4;
         }
-		#endif
+        #endif
         rtos_delay_milliseconds(sleep_time);
     }
 
@@ -112,6 +134,11 @@ static void lv_tast_entry(void *arg)
 void lv_vendor_start(void)
 {
     bk_err_t ret;
+
+    if (lvgl_task_state == STATE_RUNNING) {
+        LOGI("%s already start\n", __func__);
+        return;
+    }
 
     ret = rtos_create_thread(&g_disp_thread_handle,
                              CONFIG_LVGL_TASK_PRIORITY,
@@ -128,19 +155,31 @@ void lv_vendor_start(void)
     if (BK_OK != ret) {
         LOGE("%s lvgl_sem get failed\n", __func__);
     }
+
+    LOGI("%s complete\n", __func__);
 }
 
 void lv_vendor_stop(void)
 {
     bk_err_t ret;
 
-    rtos_delay_milliseconds(150);
+    if (lvgl_task_state == STATE_STOP) {
+        LOGI("%s already stop\n", __func__);
+        return;
+    }
+
     lvgl_task_state = STATE_STOP;
 
     ret = rtos_get_semaphore(&lvgl_sem, BEKEN_NEVER_TIMEOUT);
     if (BK_OK != ret) {
         LOGE("%s lvgl_sem get failed\n", __func__);
     }
+
+    if (lv_vendor_display_frame_cnt() == 2 || lv_vendor_draw_buffer_cnt() == 2) {
+        while (bk_dma2d_is_transfer_busy()) {}
+    }
+
+    LOGI("%s complete\n", __func__);
 }
 
 int lv_vendor_display_frame_cnt(void)

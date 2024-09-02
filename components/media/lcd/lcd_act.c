@@ -1394,7 +1394,6 @@ void lcd_open_handle(param_pak_t *param)
 		goto out;
 	}
 
-	lcd_driver_backlight_open();
 	lcd_open_t *lcd_open = (lcd_open_t *)param->param;
 	os_memcpy(&lcd_config.lcd_open, lcd_open, sizeof(lcd_open_t));
 
@@ -1413,10 +1412,6 @@ void lcd_open_handle(param_pak_t *param)
 	}
 
 	LOGI("%s, lcd ppi: %dX%d %s\n", __func__, lcd_info.lcd_device->ppi >> 16, lcd_info.lcd_device->ppi & 0xFFFF, lcd_info.lcd_device->name);
-
-#if CONFIG_LCD_QSPI
-    bk_lcd_qspi_disp_task_start(lcd_info.lcd_device);
-#endif
 
 	lcd_info.lcd_width = ppi_to_pixel_x(lcd_info.lcd_device->ppi);
 	lcd_info.lcd_height = ppi_to_pixel_y(lcd_info.lcd_device->ppi);
@@ -1516,11 +1511,19 @@ void lcd_open_handle(param_pak_t *param)
 	}
 
 	camera_display_task_start(lcd_info.rotate);
+
+#if CONFIG_LCD_QSPI
+    bk_lcd_qspi_disp_task_start(lcd_info.lcd_device);
+#else
 #ifdef DISPLAY_PIPELINE_TASK
 	jpeg_display_task_start(lcd_info.rotate);
 #endif
+#endif
+
 	set_lcd_state(LCD_STATE_ENABLED);
 	lcd_info.enable = true;
+
+	lcd_driver_backlight_open();
 
 	LOGI("%s complete\n", __func__);
 
@@ -1559,12 +1562,12 @@ void lcd_close_handle(param_pak_t *param)
 
 	camera_display_task_stop();
 
+#if CONFIG_LCD_QSPI
+    bk_lcd_qspi_disp_task_stop();
+#else
 #ifdef DISPLAY_PIPELINE_TASK
 	jpeg_display_task_stop();
 #endif
-
-#if CONFIG_LCD_QSPI
-    bk_lcd_qspi_disp_task_stop();
 #endif
 
 	GLOBAL_INT_DECLARATION();

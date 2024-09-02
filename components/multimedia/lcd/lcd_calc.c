@@ -153,7 +153,7 @@ MINOOR_ITCM void lcd_jpeg_dec_sw(uint32_t param)
 	mb_chnl_cmd_t mb_cmd;
 	sw_jpeg_dec_res_t result;
 
-	ret = bk_jpeg_dec_sw_start(JPEGDEC_BY_FRAME, decoder_frame->frame, rotate_frame->frame, decoder_frame->length, 0, &result);
+	ret = bk_jpeg_dec_sw_start(JPEGDEC_BY_FRAME, decoder_frame->frame, rotate_frame->frame, decoder_frame->length, rotate_frame->size, &result);
 
 	if (ret != BK_OK)
 	{

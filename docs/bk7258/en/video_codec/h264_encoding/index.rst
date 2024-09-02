@@ -32,7 +32,7 @@ H264 Encoding
 
 	Structure parameter description: ``h264_qp_t``
 
-	- uint8_t init_qp;		The init qp value，range [0, 51];
+	- uint8_t init_qp;		The init qp value,range [0, 51];
 	- uint8_t i_min_qp;		The minimum qp of I frame encode, range [0, 51];
 	- uint8_t i_max_qp;		The maximum qp of I frame encode, range [0, 51];
 	- uint8_t p_min_qp;		The minimum qp of P frame encode, range [0, 51];

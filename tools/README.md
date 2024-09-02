@@ -15,18 +15,15 @@ crucial parts could be missing(like documentation, datasheet). Please use an bk_
 SoC is already supported.
 
 
-|Branch\Chip   |    [BK7235]           |       [BK7256]        |        [BK7236]        |      [BK7258]          |      Comment            |
-|:------------ |:--------------------: |:--------------------: |:---------------------: |:---------------------: |:----------------------: |
-|main          |                       |                       |                        |                        |                         |
-|release/v2.0.1|![alt text][supported] |![alt text][supported] |![alt text][developing] |![alt text][developing] |sdk 2.0 Develop Branch   |
+|Branch\Chip   |      [BK7258]          |      Comment            |
+|:------------ |:---------------------: |:----------------------: |
+|release/v2.0.1|![alt text][supported] |sdk 2.0 MP Branch   |
 
 
 [supported]: https://img.shields.io/badge/-supported-green "supported"
 [developing]: https://img.shields.io/badge/-developing-orange "developing"
 
 ==Tag version , please use the official release version for development.==
-
-main branch Tag is not official release, the format is vx.x.x.x, for example:v2.0.0.1 
 
 release Branch Tag is official release, the format is vx.x.x.x，for example: v2.0.1.1
 
@@ -40,9 +37,6 @@ denote developing status and support, respectively.
 |OS           |         main           |
 |:----------- |:---------------------: |
 |FreeRTOS     | ![alt text][supported] |
-|LiteOS       | ![alt text][supported]|
-|RT-Thread    | ![alt text][developing]|
-|AliOS        | ![alt text][developing]|
 
 [supported]: https://img.shields.io/badge/-supported-green "supported"
 [developing]: https://img.shields.io/badge/-developing-orange "developing"

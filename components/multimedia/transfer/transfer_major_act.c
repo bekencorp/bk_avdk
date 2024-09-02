@@ -156,9 +156,7 @@ static void transfer_major_task_transfer_data(uint32_t param)
 #endif
 
 		// send msg to cpu0
-		transfer_major_node->event = EVENT_MEDIA_DATA_NOTIFY;
-		transfer_major_node->param = (uint32_t)encode_frame;
-		msg_send_req_to_media_major_mailbox_sync(transfer_major_node, APP_MODULE);
+		msg_send_req_to_media_major_mailbox_sync(EVENT_MEDIA_DATA_NOTIFY, APP_MODULE, (uint32_t)encode_frame, NULL);
 		media_debug->wifi_kbps += encode_frame->length;
 
 		frame_buffer_fb_free(encode_frame, MODULE_WIFI);
@@ -222,12 +220,6 @@ exit:
 
 	if (transfer_major_node)
 	{
-		if(transfer_major_node->sem)
-		{
-			rtos_deinit_semaphore(&transfer_major_node->sem);
-			transfer_major_node->sem = NULL;
-		}
-
 		os_free(transfer_major_node);
 		transfer_major_node = NULL;
 	}
@@ -257,15 +249,10 @@ static bk_err_t transfer_major_task_init(void)
 	if (transfer_major_node == NULL)
 	{
 		transfer_major_node = (media_mailbox_msg_t *)os_malloc(sizeof(media_mailbox_msg_t));
-		if (transfer_major_node != NULL)
+		if (transfer_major_node == NULL)
 		{
-			ret = rtos_init_semaphore_ex(&transfer_major_node->sem, 1, 0);
-
-			if (ret != kNoErr)
-			{
-				LOGE("%s init semaphore failed\n", __func__);
-				goto error;
-			}
+			LOGE("%s transfer_major_node malloc failed\n", __func__);
+			goto error;
 		}
 	}
 
@@ -315,12 +302,6 @@ error:
 
 	if (transfer_major_node)
 	{
-		if(transfer_major_node->sem)
-		{
-			rtos_deinit_semaphore(&transfer_major_node->sem);
-			transfer_major_node->sem = NULL;
-		}
-
 		os_free(transfer_major_node);
 		transfer_major_node = NULL;
 	}

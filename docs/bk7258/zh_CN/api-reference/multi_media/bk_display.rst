@@ -40,7 +40,7 @@ LCD RGB Config
 
     Figure 2. rgb lcd config flow
 
-LCD parcical display 
+LCD parcical display
 ----------------------------------------
 
 .. figure:: ../../../_static/lcd_partical_display.png

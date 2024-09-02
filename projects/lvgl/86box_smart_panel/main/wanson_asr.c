@@ -1,5 +1,6 @@
 #include <common/bk_include.h>
 #include <os/os.h>
+#include <modules/pm.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "audio_pipeline.h"

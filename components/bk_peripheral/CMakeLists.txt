@@ -3,6 +3,7 @@ set(BK_PERIPHERAL_PATH $ENV{ARMINO_AVDK_DIR}/components/bk_peripheral)
 include(${BK_PERIPHERAL_PATH}/src/lcd/rgb/config.cmake)
 include(${BK_PERIPHERAL_PATH}/src/lcd/mcu/config.cmake)
 include(${BK_PERIPHERAL_PATH}/src/lcd/qspi/config.cmake)
+include(${BK_PERIPHERAL_PATH}/src/lcd/spi/config.cmake)
 include(${BK_PERIPHERAL_PATH}/src/dvp/config.cmake)
 include(${BK_PERIPHERAL_PATH}/src/tp/config.cmake)
 
@@ -22,6 +23,10 @@ list(APPEND srcs
 
 list(APPEND srcs
 	${QSPI_LCD_DEVICE_FILES}
+)
+
+list(APPEND srcs
+	${SPI_LCD_DEVICE_FILES}
 )
 
 list(APPEND srcs

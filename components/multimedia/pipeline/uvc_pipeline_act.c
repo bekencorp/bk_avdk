@@ -69,12 +69,12 @@ static bk_err_t h264_jdec_pipeline_open(media_mailbox_msg_t *msg)
 			LOGE("%s %d jpeg_decode_task_open fail\n", __func__, __LINE__);
 			goto error;
 		}
-		bk_jdec_buffer_request_register(PIPELINE_MOD_H264, bk_h264_encode_request);
+		bk_jdec_buffer_request_register(PIPELINE_MOD_H264, bk_h264_encode_request, bk_h264_reset_request);
 		LOGI("%s, jdec_h264_enc_en \n", __func__);
 	}
 	else
 	{
-		bk_jdec_buffer_request_register(PIPELINE_MOD_H264, bk_h264_encode_request);
+		bk_jdec_buffer_request_register(PIPELINE_MOD_H264, bk_h264_encode_request, bk_h264_reset_request);
 		LOGI("%s, jdec_h264_enc_en \n", __func__);
 	}
 	return ret;
@@ -129,20 +129,36 @@ static bk_err_t pipeline_set_rotate(media_mailbox_msg_t *msg)
 	return BK_OK;
 }
 
+static bk_err_t lcd_disp_pipeline_open(media_mailbox_msg_t *msg)
+{
+    int ret = BK_OK;
+
+    ret = lcd_display_open((lcd_open_t *)msg->param);
+    if (ret != BK_OK)
+    {
+        LOGE("%s %d lcd display open fail\r\n", __func__, __LINE__);
+    }
+
+    return ret;
+}
+
+static bk_err_t lcd_disp_pipeline_close(media_mailbox_msg_t *msg)
+{
+    int ret = BK_OK;
+
+    ret = lcd_display_close();
+
+    return ret;
+}
+
 static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 	rot_open_t rot_open = {0};
 
-	ret = lcd_display_open((lcd_open_t *)msg->param);
-	if (ret != BK_OK)
-	{
-		return ret;
-	}
-
 #if SUPPORTED_IMAGE_MAX_720P
-	ret = scale_task_open((lcd_scale_t *)msg->param);
-
+	lcd_scale_t local_lcd_scale = {PPI_1280X720, PPI_864X480};  // {PPI_864X480, PPI_480X480}, {PPI_1280X720, PPI_864X480}, {PPI_640X480, PPI_480X800};{PPI_480X320, PPI_480X864};
+	ret = scale_task_open(&local_lcd_scale);
 	if (ret != BK_OK)
 	{
 		goto error;
@@ -179,22 +195,19 @@ static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 			LOGE("%s, jpeg_decode_task_open fail\n", __func__);
 			return ret;
 		}
-
 #if SUPPORTED_IMAGE_MAX_720P
-		bk_jdec_buffer_request_register(PIPELINE_MOD_SCALE, bk_scale_encode_request);
+		bk_jdec_buffer_request_register(PIPELINE_MOD_SCALE, bk_scale_encode_request, bk_scale_reset_request);
 #else
-		bk_jdec_buffer_request_register(PIPELINE_MOD_ROTATE, bk_rotate_encode_request);
+		bk_jdec_buffer_request_register(PIPELINE_MOD_ROTATE, bk_rotate_encode_request, bk_rotate_reset_request);
 #endif
-		LOGI("%s, jdec_rotate_en \n", __func__);
 	}
 	else
 	{
 #if SUPPORTED_IMAGE_MAX_720P
-		bk_jdec_buffer_request_register(PIPELINE_MOD_SCALE, bk_scale_encode_request);
+        bk_jdec_buffer_request_register(PIPELINE_MOD_SCALE, bk_scale_encode_request, bk_scale_reset_request);
 #else
-		bk_jdec_buffer_request_register(PIPELINE_MOD_ROTATE, bk_rotate_encode_request);
+        bk_jdec_buffer_request_register(PIPELINE_MOD_ROTATE, bk_rotate_encode_request, bk_rotate_reset_request);
 #endif
-		LOGI("%s, jdec_rotate_en \n", __func__);
 	}
 	LOGI("%s %d\n", __func__, __LINE__);
 	return ret;
@@ -202,7 +215,7 @@ static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 error:
 	LOGI("%s fail\n", __func__, __LINE__);
 	rotate_task_close();
-	lcd_display_close();
+
 	return BK_FAIL;
 }
 
@@ -224,8 +237,6 @@ static bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg)
 		bk_jdec_buffer_request_deregister(PIPELINE_MOD_ROTATE);
 		rotate_task_close();
 #endif
-
-		lcd_display_close();
 	}
 	else
 	{
@@ -239,8 +250,6 @@ static bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg)
 		bk_jdec_buffer_request_deregister(PIPELINE_MOD_ROTATE);
 		rotate_task_close();
 #endif
-
-		lcd_display_close();
 
 		ret = jpeg_decode_task_close();
 		if (ret != BK_OK)
@@ -321,11 +330,19 @@ void uvc_pipeline_event_handle(media_mailbox_msg_t *msg)
 
 	switch (msg->event)
 	{
-		case EVENT_PIPELINE_LCD_OPEN_IND:
+		case EVENT_PIPELINE_LCD_DISP_OPEN_IND:
+			ret = lcd_disp_pipeline_open(msg);
+			break;
+
+		case EVENT_PIPELINE_LCD_DISP_CLOSE_IND:
+			ret = lcd_disp_pipeline_close(msg);
+			break;
+
+		case EVENT_PIPELINE_LCD_JDEC_OPEN_IND:
 			ret = lcd_jdec_pipeline_open(msg);
 			break;
 
-		case EVENT_PIPELINE_LCD_CLOSE_IND:
+		case EVENT_PIPELINE_LCD_JDEC_CLOSE_IND:
 			ret = lcd_jdec_pipeline_close(msg);
 			break;
 
@@ -400,6 +417,10 @@ bk_err_t uvc_pipeline_init(void)
 #endif
 
 	bk_rotate_pipeline_init();
+	bk_h264_pipeline_init();
 
 	return BK_OK;
 }
+
+
+

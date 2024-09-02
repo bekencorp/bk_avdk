@@ -20,4 +20,9 @@ API Reference
 
 .. include:: ../../_build/inc/aec.inc
 
+Reference link
+----------------------------------------
 
+    `API Reference : <../../api-reference/multi_media/bk_aec.html>`_ Introduced the AEC API interface
+
+    `User and Developer Guide : <../../audio_algorithms/aec/index.html>`_ Introduced common usage scenarios of AEC

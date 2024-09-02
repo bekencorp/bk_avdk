@@ -19,8 +19,9 @@ Most of JPEGDEC APIs can be categoried as:
 JPEGDEC APIs:
  - :cpp:func:`bk_jpeg_dec_sw_init` - init jpeg decode software module
  - :cpp:func:`bk_jpeg_dec_sw_deinit` - deinit jpeg decode software module
- - :cpp:func:`bk_jpeg_sw_decoder_fun` - excute jpeg decode
- - :cpp:func:`bk_jpeg_decode_sw_register_finish_callback` - register jpeg decode finish callback
+ - :cpp:func:`bk_jpeg_dec_sw_start` - excute jpeg decode
+ - :cpp:func:`bk_jpeg_dec_sw_register_finish_callback` - register jpeg decode finish callback
+ - :cpp:func:`bk_jpeg_dec_sw_start_one_time` - excute jpeg decode without relying on initalization
 
 API Reference
 ----------------------------------------

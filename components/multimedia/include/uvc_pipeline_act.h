@@ -26,7 +26,6 @@ extern "C" {
 void uvc_pipeline_event_handle(media_mailbox_msg_t *msg);
 bk_err_t uvc_pipeline_init(void);
 
-
 #ifdef __cplusplus
 }
 #endif

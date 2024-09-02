@@ -68,10 +68,6 @@ endif()
 
 set(priv_req bk_init bk_cli lvgl media_service audio_pipeline onboard_mic_stream raw_stream wanson)
 
-if ("${ARMINO_SOC}" STREQUAL "bk7256" OR "${ARMINO_SOC}" STREQUAL "bk7256_cp1")
-list(APPEND priv_req media)
-endif()
-
 if ("${ARMINO_SOC}" STREQUAL "bk7258" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp1")
 list(APPEND priv_req multimedia)
 endif()

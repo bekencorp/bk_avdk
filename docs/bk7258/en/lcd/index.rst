@@ -16,7 +16,7 @@ LCD physical structure
 LCD screen panels are mainly composed of glass substrates, polarizing plates, color filters, 
 liquid crystal materials, alignmentLayer, optical films, drive circuits and other components.
 
-1、glass substrates
+1.glass substrates
 A glass substrate is actually a thin piece of glass with a flat surface. 
 There is a transparent conductive layer of In2O3 or SnO2 evaporated on the surface, 
 which is the ITO film layer. After photolithography and processing, a transparent conductive pattern is made.
@@ -25,7 +25,7 @@ chromaticity and brightness of an image. Therefore, the outer leads must not be 
 Connections can only be made via conductive rubber strips or conductive tape, etc. 
 If it is scratched, cut or corroded, the device will be scrapped.
 
-2．color filters
+2.color filters
 The reason why the LCD panel can display colors is because the light passes through the color filter. 
 Then the liquid crystal panel is changed by the voltage of the driving chip, 
 so that the liquid crystal molecules stand in a row or appear in a twisted state.
@@ -34,7 +34,7 @@ and finally the picture is produced. But this is only a difference in the degree
 and the colors produced are only black and white. If you want to form a colorful picture,
 It needs to rely on a combination of three light sources: red, green, and blue.
 
-3．alignment film
+3.alignment film
 Alignment film is the most critical material to control the quality of LCD display. 
 In order to achieve a good rotation effect of the liquid crystal material, 
 it is necessary to apply an alignment film on the inside of the upper and lower electrode substrates of the LCD display screen.
@@ -44,7 +44,7 @@ The liquid crystal material on the alignment film will also reach the desired he
 A directional effect that produces alignment. In this way, we can control the predetermined direction 
 and predetermined tilt angle arrangement of the liquid crystal molecules, which is very conducive to the movement of the LCD display.
 
-4．liquid crystal material
+4.liquid crystal material
 Liquid crystal material is the main material of LCD display screen. 
 Most liquid crystal materials are mixed from several or even more than a dozen types of single liquid crystal materials. 
 Each liquid crystal material has its own fixed clearing point TL and crystallization point TS. 
@@ -52,10 +52,10 @@ Therefore, each type of LCD display must be used or stored within a certain temp
 If the temperature is too low, crystallization will destroy the orientation layer of the LCD display; and If the temperature is too high,
 The liquid crystal will lose its liquid crystal state, and then it will lose all the functions of the LCD display.
 
-5．polarizer
+5.polarizer
 The main purpose of polarizers is to polarize light that passes through the dichroic medium of the polarizing film.
 
-6．drive circuit
+6.drive circuit
 The biggest function of the drive circuit is to build on the drive circuit by adjusting a series of parameters such as voltage, phase, 
 peak value, frequency, timing, effective value, duty cycle, etc. applied to the pixel electrode.
 
@@ -154,6 +154,12 @@ The following is a timing diagram for writing commands and data:
 
     Figure 8. 8080 lcd hardware process
 
+Tearing Effect
+----------------------------
+
+The Tearing Effect output line supplies to the MPU a Panel synchronization signal.The signal can be used by the MPU to
+synchronize Frame Memory Writing when displaying video images.
+if the lcd not have TE single, the controller should select adapt clk to reduce tearing
 
 
 RGB LCD hardware interface
@@ -221,7 +227,7 @@ The RGB LCD protocol timing diagram is as follows:
     Figure 12. rgb lcd timing
 
 
-The RGB protocol data format is as follows：
+The RGB protocol data format is as follows:
 
 .. figure:: ../../_static/lcd_rgb_timing_2.png
     :align: center
@@ -231,7 +237,7 @@ The RGB protocol data format is as follows：
     Figure 13. rgb lcd protocol
 
 
-Hardware implementation of RGB LCD：
+Hardware implementation of RGB LCD:
 
 .. figure:: ../../_static/lcd_rgb_timing_3.png
     :align: center
@@ -295,7 +301,7 @@ The QSPI LCD protocol timing diagram is as follows:
 The qspi driver interface is similar to spi. The difference lies in the number of data pins. 
 qspi has two more data transmission pins and is faster than spi.
 
-Hardware implementation of QSPI LCD：
+Hardware implementation of QSPI LCD:
 
 .. figure:: ../../_static/lcd_rgb_timing_2.png
     :align: center
@@ -308,7 +314,7 @@ Hardware implementation of QSPI LCD：
 software design
 ----------------------------
 
-The design layering idea of the software code in the project is as follows：
+The design layering idea of the software code in the project is as follows:
 
 .. figure:: ../../_static/lcd_software.png
     :align: center
@@ -328,7 +334,7 @@ qspi_lcd to distinguish them, while the public API names are not distinguished.
 related data structures
 ----------------------------
 
-enumeration definition of image format：
+enumeration definition of image format:
 
 .. figure:: ../../_static/pixel_format.png
     :align: center
@@ -338,7 +344,7 @@ enumeration definition of image format：
     Figure 21. format enum
 
 
-enumeration definition of LCD screen device：
+enumeration definition of LCD screen device:
 
 .. figure:: ../../_static/lcd_device_id.png
     :align: center
@@ -349,7 +355,7 @@ enumeration definition of LCD screen device：
 
 
 
-enumeration definition of LCD pixels：
+enumeration definition of LCD pixels:
 
 .. figure:: ../../_static/media_ppi.png
     :align: center
@@ -359,7 +365,7 @@ enumeration definition of LCD pixels：
     Figure 23. pixel enum
 
 
-enumeration definition of FPS：
+enumeration definition of FPS:
 
 .. figure:: ../../_static/frame_fps.png
     :align: center
@@ -373,7 +379,7 @@ enumeration definition of FPS：
 code interface
 ----------------------------
 
-code API as follows：
+code API as follows:
 
 .. figure:: ../../_static/api_1.png
     :align: center
@@ -467,7 +473,7 @@ code API as follows：
 code configuration process
 ----------------------------
 
-LCD 8080 configuration flow chart is as follows：
+LCD 8080 configuration flow chart is as follows:
 
 .. figure:: ../../_static/lcd_8080_config.png
     :align: center
@@ -488,7 +494,7 @@ LCD RGB configuration flow chart is as follows:
     Figure 27. rgb configuration flow chart
 
 
-The flow chart for setting up special area display is as follows：
+The flow chart for setting up special area display is as follows:
 
 .. figure:: ../../_static/lcd_parcical_display.png
     :align: center
@@ -498,7 +504,7 @@ The flow chart for setting up special area display is as follows：
     Figure 28. special area configuration diagram
 
 
-partial display diagram：
+partial display diagram:
 
 .. figure:: ../../_static/lcd_area.png
     :align: center
@@ -508,51 +514,8 @@ partial display diagram：
     Figure 29. special area display map
 
 
-LCD_RGB DEMO PROJECT
-========================
+for the use of the RGB, please refer to the project   “https://docs.bekencorp.com/arminodoc/bk_avdk/bk7258/en/v2.0.1/projects_work/media/lcd_rgb/index.htmll” 
 
+for the use of the 8080, please refer to the project  “https://docs.bekencorp.com/arminodoc/bk_avdk/bk7258/en/v2.0.1/projects_work/media/lcd_8080/index.html”
 
-1 Function Overview
--------------------------------------
-This project mainly verifies the function of lcd_RGB driving st7701sn screen, which will generate random colors on the screen every second for display after power-on.
-
-2 Code Path
--------------------------------------
-demo path:./projects/media/lcd_rgb
-
-3 Introduction to cli commands
--------------------------------------
-This function mainly relies on APP to use the configuration, and does not require cli command auxiliary control for the time being
-
-4 Compile the command
--------------------------------------
-Compile command: 'make bk7258 PROJECT=media/lcd_rgb'
-
-5 Presentation
--------------------------------------
-When powered on, the display displays random colored rectangular squares
-
-
-LCD_8080 DEMO PROJECT
-========================
-
-
-1 Function Overview
--------------------------------------
-This project mainly verifies the function of lcd_8080 driving st7796 screen. After power-on, random color and random size area will be generated on the screen every second for display.
-
-2 Code Path
--------------------------------------
-demo path:./projects/media/lcd_8080
-
-3 Introduction to cli commands
--------------------------------------
-This function mainly relies on APP to use the configuration, and does not require cli command auxiliary control for the time being
-
-4 Compile the command
--------------------------------------
-Compile command: 'make bk7258 PROJECT=media/lcd_8080'
-
-5 Presentation
--------------------------------------
-After the device is powered on, the display displays rectangular squares of random size and color in random locations
+for the use of the QSPI, please refer to the project “https://docs.bekencorp.com/arminodoc/bk_avdk/bk7258/en/v2.0.1/projects_work/media/lcd_qspi/index.html”

@@ -57,7 +57,7 @@ DMA2D API Categories
 DMA2D Work Config
 ----------------------
 
-1、fill specific color
+1.fill specific color
 
 .. figure:: ../../../_static/dma2d_fill_color.png
     :align: center
@@ -67,7 +67,7 @@ DMA2D Work Config
     Figure 1. dma2d_fill_color
 
 
-2、mem to mem copy
+2.mem to mem copy
 
 .. figure:: ../../../_static/dma2d_mem_to_mem.png
     :align: center
@@ -77,13 +77,13 @@ DMA2D Work Config
     Figure 2. dma2d_mem_to_mem
 
 
-3、mem to mem with pixel conversion
+3.mem to mem with pixel conversion
 
     The Figure API is the same as dma2d_mem_to_mem
     please  reference the API Reference for the different config
 
 
-4、mem to mem with pixel conversion and blending
+4.mem to mem with pixel conversion and blending
 
 .. figure:: ../../../_static/dma2d_mem_to_mem_with_pixel_conv_blend.png
     :align: center

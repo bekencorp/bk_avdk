@@ -5,12 +5,12 @@ Support Peripherals
 
 This following are the peripherals supported by software platform adjustment verification:
 
-1、LCD
+1.LCD
 ------------------------
 
     Reference file path: ``.\components\bk_peripheral\src\lcd``
 
-1.1、RGB LCD
+1.1.RGB LCD
 ************************
 
     | Reference file path: ``.\components\bk_peripheral\src\lcd\rgb``
@@ -38,7 +38,7 @@ This following are the peripherals supported by software platform adjustment ver
     |NV3052CGRB     |720*1280                  |YES            |
     +---------------+--------------------------+---------------+
 
-1.2、Intel 8080[MCU] LCD
+1.2.Intel 8080[MCU] LCD
 ************************
 
     | Reference file path: ``.\components\bk_peripheral\src\lcd\mcu``
@@ -54,7 +54,7 @@ This following are the peripherals supported by software platform adjustment ver
     |ST7789V        |172*320                   |
     +---------------+--------------------------+
 
-1.3、QSPI LCD
+1.3.QSPI LCD
 ************************
 
     | Reference file path: ``.\components\bk_peripheral\src\lcd\qspi``
@@ -63,18 +63,18 @@ This following are the peripherals supported by software platform adjustment ver
     +------------------------------+--------------------------+---------------+
     |Models                        |Maximum Resolutions       |Has RAM        |
     +==============================+==========================+===============+
-    |SH8601A_FLSAMO139             |480*272                   |NO             |
+    |SH8601A_FLSAMO139             |454*454                   |YES            |
     +------------------------------+--------------------------+---------------+
-    |ST77903_WX20114               |480*480                   |YES            |
+    |ST77903_WX20114               |400*400                   |NO             |
     +------------------------------+--------------------------+---------------+
-    |ST77903_SAT61478M             |480*800                   |YES            |
+    |ST77903_SAT61478M             |360*800                   |NO             |
     +------------------------------+--------------------------+---------------+
-    |ST77903_H0165Y008T            |800*480                   |NO             |
+    |ST77903_H0165Y008T            |400*400                   |NO             |
     +------------------------------+--------------------------+---------------+
-    |SPD2010_H0146Y005T            |480*800                   |YES            |
+    |SPD2010_H0146Y005T            |412*412                   |YES            |
     +------------------------------+--------------------------+---------------+	
 
-2、DVP Camera
+2.DVP Camera
 ------------------------
 
     | Reference file path: ``.\components\bk_peripheral\src\dvp``
@@ -96,7 +96,7 @@ This following are the peripherals supported by software platform adjustment ver
     |SC101          |1280*720                  |
     +---------------+--------------------------+
 	
-3、UVC Camera
+3.UVC Camera
 ------------------------
 
     The supported UVC Camera models, resolutions and frame rates are as shown in the table below:
@@ -109,7 +109,7 @@ This following are the peripherals supported by software platform adjustment ver
     |                                     | | 640*480-15             |
     |                                     | | 480*320-15             |
     +-------------------------------------+--------------------------+
-    |USB\VID_13D3&PID_78AB&REV_0826       |640*480-15                |
+    |USB\VID_13D3&PID_78AB&REV_0826       | | 640*480-15             |
     +-------------------------------------+--------------------------+
     |USB\VID_13D3&PID_78AB&REV_0829       | | 1280*720-10            |
     |                                     | | 640*480-30             |
@@ -133,7 +133,7 @@ This following are the peripherals supported by software platform adjustment ver
     |                                     | | 480*320-15             |
     |                                     | | 352*288-15             |
     +-------------------------------------+--------------------------+
-    |USB\VID_13D3&PID_784B&REV_1001       |640*480-15                |
+    |USB\VID_13D3&PID_784B&REV_1001       | | 640*480-15             |
     +-------------------------------------+--------------------------+
     |USB\VID_05A3&PID_9230&REV_0909       | | 1280*720-25            |
     |                                     | | 640*480-15             |
@@ -185,7 +185,7 @@ This following are the peripherals supported by software platform adjustment ver
     |                                     | | 480*320-15             |
     +-------------------------------------+--------------------------+
 
-4、Touch Panel
+4.Touch Panel
 ------------------------
 
     | Reference file path: ``.\components\bk_peripheral\src\tp``
@@ -194,11 +194,11 @@ This following are the peripherals supported by software platform adjustment ver
     +-------------------------------------+---------------------+
     |Models                               |Resolutions          |
     +=====================================+=====================+
-    |FT6336                               |170*320              |
+    |FT6336                               |Customizable         |
     +-------------------------------------+---- ----------------+
-    |GT991                                |800*480              |
+    |GT991                                |Customizable         |
     +-------------------------------------+---------------------+
-    |GT1151                               |800*480              |
+    |GT1151                               |Customizable         |
     +-------------------------------------+---------------------+
-    |HY4633                               |480*854              |
+    |HY4633                               |Customizable         |
     +-------------------------------------+---------------------+

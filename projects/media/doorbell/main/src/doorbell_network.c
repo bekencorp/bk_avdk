@@ -86,7 +86,7 @@ int doorbell_wifi_sta_connect(char *ssid, char *key)
 {
 	int len;
 
-	bk_wlan_status_register_cb_internal(doorbell_wifi_event_cb);
+	bk_wlan_status_register_cb(doorbell_wifi_event_cb);
 
 	wifi_sta_config_t sta_config = {0};
 
@@ -140,7 +140,7 @@ int doorbell_wifi_soft_ap_start(char *ssid, char *key, uint16_t channel)
 
 	ap_config.channel = channel;
 
-	bk_wlan_status_register_cb_internal(doorbell_wifi_event_cb);
+	bk_wlan_status_register_cb(doorbell_wifi_event_cb);
 
 	BK_LOGI(TAG, "ssid:%s  key:%s\r\n", ap_config.ssid, ap_config.password);
 	BK_LOG_ON_ERR(bk_wifi_ap_set_config(&ap_config));

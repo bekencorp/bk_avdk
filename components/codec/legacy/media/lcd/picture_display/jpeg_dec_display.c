@@ -271,7 +271,7 @@ void jpeg_dec_display_demo(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
 
 			bk_jpeg_dec_driver_deinit();
 			bk_lcd_set_yuv_mode(PIXEL_FMT_YUYV);
-			ret = bk_jpeg_dec_sw_init();
+			ret = bk_jpeg_dec_sw_init(NULL, 0);
 			if (ret != kNoErr) {
 				os_printf("init jpeg_decoder failed\r\n");
 				return;

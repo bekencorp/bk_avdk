@@ -52,7 +52,6 @@ media_debug_t *media_debug_cached = NULL;
 static beken_thread_t media_ui_task = NULL;
 static beken_queue_t media_ui_msg_que = NULL;
 beken_timer_t media_debug_timer = {0};
-static media_mailbox_msg_t *media_ui_msg = NULL;
 
 media_share_ptr_t media_share = {0};
 
@@ -134,8 +133,7 @@ static void media_debug_dump(void)
 
 static void media_major_cpu1_free(void)
 {
-	media_ui_msg->event = EVENT_MEDIA_CPU1_POWEROFF_IND;
-	msg_send_req_to_media_major_mailbox_sync(media_ui_msg, APP_MODULE);
+	msg_send_req_to_media_major_mailbox_sync(EVENT_MEDIA_CPU1_POWEROFF_IND, APP_MODULE, 0, NULL);
 
 	bk_pm_module_vote_psram_ctrl(PM_POWER_PSRAM_MODULE_NAME_MEDIA, PM_POWER_MODULE_STATE_OFF);
 
@@ -168,13 +166,57 @@ static void media_ui_major_common_event_handle(uint32_t event)
 	}
 }
 
+static void media_ui_frame_buffer_event_handle(media_mailbox_msg_t *msg)
+{
+	int ret = BK_FAIL;
+	frame_buffer_t *new_frame = (frame_buffer_t *)msg->param;
+	frame_buffer_t **alloc_frame = (frame_buffer_t **)msg->param;
+	switch (msg->event)
+	{
+		case EVENT_FRAME_BUFFER_INIT_IND:
+			frame_buffer_fb_init((fb_type_t)msg->param);
+			ret = BK_OK;
+			break;
+
+		case EVENT_FRAME_BUFFER_JPEG_MALLOC_IND:
+			*alloc_frame = frame_buffer_fb_malloc(FB_INDEX_JPEG, CONFIG_JPEG_FRAME_SIZE);
+			if (*alloc_frame != NULL)
+			{
+				ret = BK_OK;
+			}
+			break;
+
+		case EVENT_FRAME_BUFFER_H264_MALLOC_IND:
+			*alloc_frame = frame_buffer_fb_malloc(FB_INDEX_H264, CONFIG_H264_FRAME_SIZE);
+			if (*alloc_frame != NULL)
+			{
+				ret = BK_OK;
+			}
+			break;
+
+		case EVENT_FRAME_BUFFER_PUSH_IND:
+			frame_buffer_fb_push(new_frame);
+			ret = BK_OK;
+			break;
+
+		case EVENT_FRAME_BUFFER_FREE_IND:
+			frame_buffer_fb_direct_free(new_frame);
+			ret = BK_OK;
+			break;
+
+		default:
+			break;
+	}
+
+	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+}
+
+
 static void media_ui_task_main(beken_thread_arg_t data)
 {
 	int ret = kNoErr;
 
-	media_ui_msg->event = EVENT_MEDIA_CPU1_POWERUP_IND;
-	media_ui_msg->param = (uint32_t)&media_share;
-	msg_send_req_to_media_major_mailbox_sync(media_ui_msg, APP_MODULE);
+	msg_send_req_to_media_major_mailbox_sync(EVENT_MEDIA_CPU1_POWERUP_IND, APP_MODULE, (uint32_t)&media_share, NULL);
 
 	rtos_init_timer(&media_debug_timer, DEBUG_INTERVAL * 1000, (timer_handler_t)media_ui_timer_debug_handle, NULL);
 	rtos_start_timer(&media_debug_timer);
@@ -267,6 +309,10 @@ static void media_ui_task_main(beken_thread_arg_t data)
 					media_ui_major_common_event_handle(msg.event);
 					break;
 
+				case FRAME_BUFFER_EVENT:
+					media_ui_frame_buffer_event_handle((media_mailbox_msg_t *)msg.param);
+					break;
+
 				case EXIT_EVENT:
 					goto exit;
 					break;
@@ -294,18 +340,6 @@ exit:
 		media_debug_cached = NULL;
 	}
 
-	if (media_ui_msg)
-	{
-		if (media_ui_msg->sem)
-		{
-			rtos_deinit_semaphore(&media_ui_msg->sem);
-			media_ui_msg->sem = NULL;
-		}
-
-		os_free(media_ui_msg);
-		media_ui_msg = NULL;
-	}
-
 	rtos_deinit_queue(&media_ui_msg_que);
 	media_ui_msg_que = NULL;
 
@@ -317,21 +351,6 @@ exit:
 bk_err_t media_ui_task_init(void)
 {
 	int ret = kNoErr;
-
-	if (media_ui_msg == NULL)
-	{
-		media_ui_msg = (media_mailbox_msg_t *)os_malloc(sizeof(media_mailbox_msg_t));
-		if (media_ui_msg != NULL)
-		{
-			ret = rtos_init_semaphore_ex(&media_ui_msg->sem, 1, 0);
-
-			if (ret != kNoErr)
-			{
-				LOGE("%s init semaphore failed\n", __func__);
-				goto error;
-			}
-		}
-	}
 
 	if ((!media_ui_task) && (!media_ui_msg_que))
 	{
@@ -350,7 +369,7 @@ bk_err_t media_ui_task_init(void)
 								BEKEN_DEFAULT_WORKER_PRIORITY,
 								"media_ui_task",
 								(beken_thread_function_t)media_ui_task_main,
-								2 * 1024,
+								CONFIG_MEDIA_UI_TASK_STACK_SIZE,
 								NULL);
 
 		if (kNoErr != ret)
@@ -367,18 +386,6 @@ error:
 
 	rtos_stop_timer(&media_debug_timer);
 	rtos_deinit_timer(&media_debug_timer);
-
-	if (media_ui_msg)
-	{
-		if (media_ui_msg->sem)
-		{
-			rtos_deinit_semaphore(&media_ui_msg->sem);
-			media_ui_msg->sem = NULL;
-		}
-
-		os_free(media_ui_msg);
-		media_ui_msg = NULL;
-	}
 
 	if (media_ui_msg_que)
 	{
@@ -469,6 +476,7 @@ void media_ui_deinit()
 	media_send_msg(&msg);
 
 	frame_buffer_deinit();
+
 	if (media_debug)
 	{
 		os_free(media_debug);

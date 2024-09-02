@@ -100,7 +100,7 @@ typedef struct head_param
 
 APP_DEMO_SOFTAP_PTR g_demo_softap = NULL;
 
-extern void bk_wlan_status_register_cb_internal(FUNC_1PARAM_PTR cb);
+extern void bk_wlan_status_register_cb(FUNC_1PARAM_PTR cb);
 static int app_demo_softap_get_general_paramters(general_param_t *general);
 static int app_demo_softap_get_ap_paramters(ap_param_t *ap);
 void app_demo_softap_send_msg(u32 new_msg, u32 new_data);
@@ -346,7 +346,7 @@ static int app_demo_softap_setup(void)
 
        bk_wifi_set_mac_address((char *)mac);
     }
-    bk_wlan_ap_set_default_channel_internal(ap_info.chann);
+    bk_wlan_ap_set_default_channel(ap_info.chann);
 
     len = os_strlen((const char *)ap_info.ssid.array);
     if (32 < len) // SSID_MAX_LEN 32
@@ -360,7 +360,7 @@ static int app_demo_softap_setup(void)
 
     APP_DEMO_SOFTAP_PRT("set ip info: %s,%s,%s\r\n", ip4_config.ip, ip4_config.mask, ip4_config.dns);
     APP_DEMO_SOFTAP_PRT("ssid:%s  key:%s\r\n", ap_config.ssid, ap_config.password);
-	bk_wifi_set_video_transfer_state_internal(1);
+	bk_wifi_set_video_transfer_state(1);
 	BK_LOG_ON_ERR(bk_netif_set_ip4_config(NETIF_IF_AP, &ip4_config));
 	BK_LOG_ON_ERR(bk_wifi_ap_set_config(&ap_config));
 	BK_LOG_ON_ERR(bk_wifi_ap_start());
@@ -380,7 +380,7 @@ static int app_softap_user_config_setup(void)
     os_strcpy(ip4_config.dns, APP_DEMO_SOFTAP_DEF_NET_GW);
 
 	//TODO
-    bk_wlan_ap_set_default_channel_internal(APP_DEMO_SOFTAP_DEF_CHANNEL);
+    bk_wlan_ap_set_default_channel(APP_DEMO_SOFTAP_DEF_CHANNEL);
 
     os_strcpy(ap_config.ssid, g_demo_softap->wifi_ssid);
     os_strcpy(ap_config.password, g_demo_softap->wifi_key);
@@ -392,7 +392,7 @@ static int app_softap_user_config_setup(void)
 
     APP_DEMO_SOFTAP_PRT("set ip info: %s,%s,%s\r\n", ip4_config.ip, ip4_config.mask, ip4_config.dns);
     APP_DEMO_SOFTAP_PRT("ssid:%s  key:%s\r\n", ap_config.ssid, ap_config.password);
-	bk_wifi_set_video_transfer_state_internal(1);
+	bk_wifi_set_video_transfer_state(1);
 	BK_LOG_ON_ERR(bk_netif_set_ip4_config(NETIF_IF_AP, &ip4_config));
 	BK_LOG_ON_ERR(bk_wifi_ap_set_config(&ap_config));
 	BK_LOG_ON_ERR(bk_wifi_ap_start());
@@ -405,7 +405,7 @@ static void app_demo_softap_main(beken_thread_arg_t data)
     bk_err_t err;
     u32 status;
 
-    bk_wlan_status_register_cb_internal(app_demo_softap_rw_event_func);
+    bk_wlan_status_register_cb(app_demo_softap_rw_event_func);
 
     if ((g_demo_softap->wifi_ssid == NULL) && (g_demo_softap->wifi_key == NULL))
     {
@@ -603,7 +603,7 @@ void app_demo_softap_exit(void)
 {
     APP_DEMO_SOFTAP_PRT("app_demo_sta_exit\r\n");
 
-    bk_wifi_set_video_transfer_state_internal(0);
+    bk_wifi_set_video_transfer_state(0);
     if (g_demo_softap)
     {
       app_demo_softap_send_msg(DAP_EXIT, 0);

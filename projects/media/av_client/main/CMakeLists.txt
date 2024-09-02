@@ -1,31 +1,33 @@
-set(incs .
-    include)
+set(incs . include)
+set(srcs av_client_main.c)
 
-set(srcs
-    av_client_main.c
-    )
-
+if (CONFIG_INTEGRATION_DOORBELL)
 if (CONFIG_SYS_CPU0)
+list(APPEND srcs
+	src/av_client_comm.c
+	src/av_client_transmission.c
+	src/av_client_udp_service.c
+	src/av_client_tcp_service.c
+	src/av_client_devices.c
 
-    list(APPEND srcs
-        src/av_audio_common.c
-    )
-
-if (CONFIG_AV_DEMO_MODE_TCP)
-    list(APPEND srcs
-        src/dual_device_transmission_tcp_client.c
-    )
-else()
-    list(APPEND srcs
-        src/dual_device_transmission_udp_client.c
-    )
+)
 endif()
-endif()#if (CONFIG_SYS_CPU0)
+endif()
+
+set(priv_req bk_init bt media_service lwip_intf_v2_1 wifi_transfer)
+
+if ("${ARMINO_SOC}" STREQUAL "bk7258")
+list(APPEND priv_req multimedia cs2p2p)
+endif()
 
 if (CONFIG_OVERRIDE_FLASH_PARTITION)
-    list(APPEND srcs
-        vendor_flash.c
-    )
+	list(APPEND srcs
+		vendor_flash.c
+	)
 endif()
 
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_init lwip_intf_v2_1 aud_intf media media_service wifi_transfer)
+armino_component_register(
+	SRCS "${srcs}"
+	INCLUDE_DIRS "${incs}"
+	PRIV_REQUIRES "${priv_req}"
+)

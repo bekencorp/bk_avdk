@@ -32,15 +32,7 @@ bk_err_t fatfs_init(int task_stack, int task_prio, void **coprocess_hdl, char *t
 #if CONFIG_SYS_CPU0
 		//not need
 #else
-	media_mailbox_msg_t fatfs_init_mb_msg;
 	bk_err_t ret = BK_OK;
-
-	ret = rtos_init_semaphore(&fatfs_init_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 
 	audio_element_mb_t mb_param = {0};
 	fatfs_init_param_t init_param = {0};
@@ -49,10 +41,7 @@ bk_err_t fatfs_init(int task_stack, int task_prio, void **coprocess_hdl, char *t
 	mb_param.coprocess_hdl = NULL;
 	mb_param.module = AUDIO_ELEMENT_FATFS;
 	mb_param.param = &init_param;
-	fatfs_init_mb_msg.event = EVENT_FATFS_INIT;
-	fatfs_init_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_init_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_init_mb_msg.sem);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_INIT, APP_MODULE, (uint32_t)&mb_param, NULL);
 
 	if (ret != BK_OK) {
 		BK_LOGE(TAG, "[%s] %s Failed to init fatfs coprocess task. ret: %d, line: %d \n", tag, __func__, ret, __LINE__);
@@ -68,24 +57,13 @@ bk_err_t fatfs_deinit(void *coprocess_hdl, char *tag)
 #if CONFIG_SYS_CPU0
 	//not need
 #else
-	media_mailbox_msg_t fatfs_deinit_mb_msg;
 	bk_err_t ret = BK_OK;
-
-	ret = rtos_init_semaphore(&fatfs_deinit_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 
 	audio_element_mb_t mb_param = {0};
 	mb_param.coprocess_hdl = coprocess_hdl;
 	mb_param.module = AUDIO_ELEMENT_FATFS;
 	mb_param.param = NULL;
-	fatfs_deinit_mb_msg.event = EVENT_FATFS_DEINIT;
-	fatfs_deinit_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_deinit_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_deinit_mb_msg.sem);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_DEINIT, APP_MODULE, (uint32_t)&mb_param, NULL);
 
 	if (ret != BK_OK) {
 		BK_LOGE(TAG, "[%s] %s Failed to deinit fatfs coprocess task. ret: %d, line: %d \n", tag, __func__, ret, __LINE__);
@@ -115,15 +93,7 @@ bk_err_t fatfs_open(void **fp, char* path, uint8_t mode, void *coprocess_hdl, ch
 		return BK_FAIL;
 	}
 #else
-	media_mailbox_msg_t fatfs_open_mb_msg;
 	bk_err_t ret = BK_OK;
-
-	ret = rtos_init_semaphore(&fatfs_open_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 
 	audio_element_mb_t mb_param = {0};
 	fatfs_open_param_t open_param = {0};
@@ -132,11 +102,8 @@ bk_err_t fatfs_open(void **fp, char* path, uint8_t mode, void *coprocess_hdl, ch
 	open_param.fp = NULL;
 	open_param.path = path;
 	open_param.mode = mode;
-	fatfs_open_mb_msg.event = EVENT_FATFS_OPEN;
 	mb_param.param = &open_param;
-	fatfs_open_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_open_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_open_mb_msg.sem);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_OPEN, APP_MODULE, (uint32_t)&mb_param, NULL);
 
 	if (ret != BK_OK) {
 		BK_LOGE(TAG, "[%s] %s Failed to fatfs open, ret:%d, line: %d \n", tag, __func__, ret, __LINE__);
@@ -153,33 +120,23 @@ bk_err_t fatfs_size(void *fp, void *coprocess_hdl, char *tag)
 #if CONFIG_SYS_CPU0
 	return f_size((FIL *)fp);
 #else
-	media_mailbox_msg_t fatfs_size_mb_msg;
 	bk_err_t ret = BK_OK;
-
-	ret = rtos_init_semaphore(&fatfs_size_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 
 	audio_element_mb_t mb_param = {0};
 	fatfs_fp_param_t size_param = {0};
 	size_param.fp = fp;
+	size_param.size = 0;
 	BK_LOGD(TAG, "%s size_param.fp: %p \n", __func__, size_param.fp);
 	mb_param.coprocess_hdl = coprocess_hdl;
 	mb_param.module = AUDIO_ELEMENT_FATFS;
 	mb_param.param = &size_param;
-	fatfs_size_mb_msg.event = EVENT_FATFS_SIZE;
-	fatfs_size_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_size_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_size_mb_msg.sem);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_SIZE, APP_MODULE, (uint32_t)&mb_param, NULL);
 
 	if (ret < 0) {
 		BK_LOGE(TAG, "[%s] %s Failed to fatfs size, ret: %d, line: %d \n", tag, __func__, ret, __LINE__);
 		return BK_FAIL;
 	}
-	return ret;
+	return size_param.size;
 #endif
 }
 
@@ -191,34 +148,23 @@ bk_err_t fatfs_lseek(void *fp, uint64_t ofs, void *coprocess_hdl, char *tag)
 		BK_LOGE(TAG, "%s fail seek file. Error: %s, line: %d \n", __func__, f_error((FIL *)fp), __LINE__);
 	return ret;
 #else
-	media_mailbox_msg_t fatfs_lseek_mb_msg;
 	bk_err_t ret = BK_OK;
-
-	ret = rtos_init_semaphore(&fatfs_lseek_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 
 	audio_element_mb_t mb_param = {0};
 	fatfs_lseek_param_t lseek_param = {0};
 	lseek_param.fp = fp;
 	lseek_param.ofs = ofs;
+	lseek_param.result = 0;
 	mb_param.coprocess_hdl = coprocess_hdl;
 	mb_param.module = AUDIO_ELEMENT_FATFS;
 	mb_param.param = &lseek_param;
-	fatfs_lseek_mb_msg.event = EVENT_FATFS_LSEEK;
-	fatfs_lseek_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_lseek_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_lseek_mb_msg.sem);
-
-	if (ret < 0) {
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_LSEEK, APP_MODULE, (uint32_t)&mb_param, NULL);
+	if (ret != BK_OK) {
 		BK_LOGE(TAG, "[%s] %s Failed to fatfs lseek, ret: %d. line: %d \n", tag, __func__, ret, __LINE__);
 		//return BK_FAIL;
 	}
 
-	return ret;
+	return lseek_param.result;
 #endif
 }
 
@@ -238,34 +184,25 @@ int fatfs_read(void *fp, void* buff, uint64_t len, void *coprocess_hdl, char *ta
 	}
 	return ret;
 #else
-	media_mailbox_msg_t fatfs_read_mb_msg;
 	bk_err_t ret = BK_OK;
 
-	ret = rtos_init_semaphore(&fatfs_read_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 	audio_element_mb_t mb_param = {0};
 	fatfs_rw_param_t read_param = {0};
 	read_param.fp = fp;
 	read_param.buff = buff;
 	read_param.len = len;
+	read_param.result = 0;
 	mb_param.coprocess_hdl = coprocess_hdl;
 	mb_param.module = AUDIO_ELEMENT_FATFS;
 	mb_param.param = &read_param;
-	fatfs_read_mb_msg.event = EVENT_FATFS_READ;
-	fatfs_read_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_read_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_read_mb_msg.sem);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_READ, APP_MODULE, (uint32_t)&mb_param, NULL);
 
-	if (ret < 0) {
+	if (ret != BK_OK) {
 		BK_LOGE(TAG, "[%s] %s Failed to fatfs read task, ret: %d. line: %d \n", tag, __func__, ret,__LINE__);
 		//return BK_FAIL;
 	}
 
-	return ret;
+	return read_param.result;
 #endif
 }
 
@@ -288,34 +225,25 @@ int fatfs_write(void *fp, void* buff, uint64_t len, void *coprocess_hdl, char *t
 	}
 	return ret;
 #else
-	media_mailbox_msg_t fatfs_write_mb_msg;
 	bk_err_t ret = BK_OK;
 
-	ret = rtos_init_semaphore(&fatfs_write_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 	audio_element_mb_t mb_param = {0};
 	fatfs_rw_param_t write_param = {0};
 	write_param.fp = fp;
 	write_param.buff = buff;
 	write_param.len = len;
+	write_param.result = 0;
 	mb_param.coprocess_hdl = coprocess_hdl;
 	mb_param.module = AUDIO_ELEMENT_FATFS;
 	mb_param.param = &write_param;
-	fatfs_write_mb_msg.event = EVENT_FATFS_WRITE;
-	fatfs_write_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_write_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_write_mb_msg.sem);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_WRITE, APP_MODULE, (uint32_t)&mb_param, NULL);
 
 	if (ret < 0) {
 		BK_LOGE(TAG, "[%s] %s Failed to fatfs write, ret: %d. line: %d \n", tag, __func__, ret, __LINE__);
 		//return BK_FAIL;
 	}
 
-	return ret;
+	return write_param.result;
 #endif
 }
 
@@ -333,15 +261,7 @@ bk_err_t fatfs_close(void *fp, void *coprocess_hdl, char *tag)
 		return BK_FAIL;
 	}
 #else
-	media_mailbox_msg_t fatfs_close_mb_msg;
 	bk_err_t ret = BK_OK;
-
-	ret = rtos_init_semaphore(&fatfs_close_mb_msg.sem, 1);
-	if (ret != BK_OK)
-	{
-		BK_LOGE(TAG, "%s init semaphore failed\n", __func__);
-		return BK_FAIL;
-	}
 
 	audio_element_mb_t mb_param = {0};
 	fatfs_fp_param_t close_param = {0};
@@ -349,10 +269,7 @@ bk_err_t fatfs_close(void *fp, void *coprocess_hdl, char *tag)
 	mb_param.coprocess_hdl = coprocess_hdl;
 	mb_param.module = AUDIO_ELEMENT_FATFS;
 	mb_param.param = &close_param;
-	fatfs_close_mb_msg.event = EVENT_FATFS_CLOSE;
-	fatfs_close_mb_msg.param = (uint32_t)&mb_param;
-	ret = msg_send_req_to_media_major_mailbox_sync(&fatfs_close_mb_msg, APP_MODULE);
-	rtos_deinit_semaphore(&fatfs_close_mb_msg.sem);
+	ret = msg_send_req_to_media_major_mailbox_sync(EVENT_FATFS_CLOSE, APP_MODULE, (uint32_t)&mb_param, NULL);
 
 	if (ret != BK_OK) {
 		BK_LOGE(TAG, "[%s] %s Failed to fatfs close. ret: %d, line: %d \n", tag, __func__, ret, __LINE__);

@@ -18,6 +18,9 @@
 #include <driver/media_types.h>
 #include <driver/psram_types.h>
 #include <bk_list.h>
+#include "FreeRTOS.h"
+#include "event_groups.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,7 +76,7 @@ typedef struct
 	uint8_t plugin : 1;
 	fb_type_t type;
 	beken_mutex_t lock;
-	beken_semaphore_t sem;
+	EventGroupHandle_t handle;
 } fb_mod_t;
 
 
@@ -101,6 +104,7 @@ int frame_buffer_fb_init(fb_type_t type);
 int frame_buffer_fb_deinit(fb_type_t type);
 void frame_buffer_fb_clear(fb_type_t type);
 frame_buffer_t *frame_buffer_fb_malloc(fb_type_t type, uint32_t size);
+frame_buffer_t *frame_buffer_fb_dual_malloc(fb_type_t type, uint32_t size);
 frame_buffer_t *frame_buffer_fb_display_malloc_wait(uint32_t size);
 void frame_buffer_fb_push(frame_buffer_t *frame);
 frame_buffer_t *frame_buffer_fb_display_pop_wait(void);

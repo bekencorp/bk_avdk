@@ -16,7 +16,7 @@ SoC is already supported.
 
 
 |Branch\Chip   |      [BK7258]          |      Comment            |
-|:------------ |:-----------------:     |:----------------------: |
+|main          |                        |                         |
 |release/v2.0.1|![alt text][supported]  |sdk 2.0 MP Branch        |
 
 
@@ -25,6 +25,7 @@ SoC is already supported.
 
 ==Tag version , please use the official release version for development.==
 
+main branch Tag is not official release, the format is vx.x.x.x, for example:v2.0.0.19
 
 release Branch Tag is official release, the format is vx.x.x.x，for example: v2.0.1.19
 
@@ -35,9 +36,12 @@ Beken SoCs released before 2022, such as BK7231N, BK7231U, BK7251 etc, are not s
 The following table shows Armino support of Popular IoT OS where ![alt text][developing] and ![alt text][supported]
 denote developing status and support, respectively.
 
-|OS           |         release        |
+|OS           |         main           |
 |:----------- |:---------------------: |
 |FreeRTOS     | ![alt text][supported] |
+|LiteOS       | ![alt text][supported]|
+|RT-Thread    | ![alt text][developing]|
+|AliOS        | ![alt text][developing]|
 
 [supported]: https://img.shields.io/badge/-supported-green "supported"
 [developing]: https://img.shields.io/badge/-developing-orange "developing"
@@ -51,4 +55,5 @@ git clone --recurse-submodules https://github.com/bekencorp/bk_avdk.git -b tagna
 build:
 
 make bk7258 PROJECT=lvgl/86box
+
 
