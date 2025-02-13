@@ -1,0 +1,4 @@
+[submodule "bk_idk"]
+	path = bk_idk
+	url = git@gitlab.bekencorp.com:armino/bk_idk.git
+	branch = release/v2.0.2
