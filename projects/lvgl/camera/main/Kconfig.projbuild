@@ -1,0 +1,14 @@
+menu "LVGL Meter Configuration"
+
+    config INTEGRATION_DOORBELL
+        bool "Doorbell integration"
+        default n
+
+    config INTEGRATION_DOORBELL_CS2
+        bool "Doorbell integration CS2"
+        default n
+
+    config LV_USE_DEMO_METER
+        bool "LVGL Meter"
+        default n
+endmenu

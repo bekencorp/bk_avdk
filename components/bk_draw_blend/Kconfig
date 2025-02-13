@@ -1,0 +1,7 @@
+menu "Draw Blend"
+
+	config BLEND
+		depends on SYS_CPU1
+		bool "Enable Draw Blend"
+		default y
+endmenu
