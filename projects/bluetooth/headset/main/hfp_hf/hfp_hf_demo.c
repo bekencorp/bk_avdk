@@ -82,6 +82,7 @@ enum
     HFP_STATUS_WAIT_QUERY_CALL,
     HFP_STATUS_WAIT_VGS,
     HFP_STATUS_WAIT_VGM,
+
     HFP_STATUS_WAIT_CUSTOM,
     HFP_STATUS_WAIT_QUERY_CURRENT_OP,
     HFP_STATUS_WAIT_RETRIEVE_SUB_INFO,
@@ -1051,26 +1052,32 @@ static void speaker_task(void *arg)
 #else
 
         int size = 0;
+
         while(ring_buffer_particle_len(&s_hfp_sco_spk_data_rb) >= 100)
         {
+            uint32_t write_len = 0;
             already_len = 0;
             ring_buffer_particle_read(&s_hfp_sco_spk_data_rb, tmp_recv + tmp_recv_index, sizeof(tmp_recv) - tmp_recv_index, &already_len);
             tmp_recv_index += already_len;
-            size = audio_play_write_data(s_audio_play_obj, (char *)tmp_recv, tmp_recv_index - (tmp_recv_index % 2));
-            tmp_recv_index %= 2;
+            write_len = tmp_recv_index - (tmp_recv_index % 2);
+
+            size = audio_play_write_data(s_audio_play_obj, (char *)tmp_recv, write_len);
+
+            if (size <= 0)
+            {
+                LOGE("audio_play_write_data size err: %d %d!!!\n", size, write_len);
+                break;
+            }
+            else
+            {
+                //LOGI("audio_play_write_data size: %d \n", size);
+            }
+
+            os_memmove(tmp_recv, tmp_recv + write_len, tmp_recv_index - write_len);
+            tmp_recv_index -= write_len;
         }
 
 #endif
-
-        if (size <= 0)
-        {
-            LOGE("raw_stream_write size: %d \n", size);
-            break;
-        }
-        else
-        {
-            //LOGI("raw_stream_write size: %d \n", size);
-        }
     }
 end:;
     LOGI("%s hfp exit start!! \r\n", __func__);
