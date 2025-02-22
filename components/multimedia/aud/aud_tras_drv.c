@@ -568,7 +568,7 @@ static void usb_hub_voc_uac_mic_port_dev_complete_callback(void *pCompleteParam,
 		urb->transfer_buffer_length = aud_tras_drv_info.voc_info.uac_urb_mic_buff.buff_size;
 		urb->actual_length = 0;
 	} else {
-		LOGE("%s, %d, aud_tras_drv_info.voc_info.status:%d not need read uac mic data \n", __func__, __LINE__, aud_tras_drv_info.voc_info.status);
+		LOGW("%s, status:%d not need read uac mic data\n", __func__, aud_tras_drv_info.voc_info.status);
 		return;
 	}
 
@@ -1286,7 +1286,7 @@ static bk_err_t aud_tras_dec(void)
 			aud_aec_set_mic_delay(aud_tras_drv_info.voc_info.aec_info->aec, 0);
 		} else {
 			//aec_ctrl(aud_tras_drv_info.voc_info.aec_info->aec, AEC_CTRL_CMD_SET_MIC_DELAY, (mic_fill_size + speaker_fill_size - ref_fill_size)/2 + CONFIG_AUD_TRAS_AEC_MIC_DELAY_POINTS);
-            //aud_aec_set_mic_delay(aud_tras_drv_info.voc_info.aec_info->aec, (mic_fill_size + speaker_fill_size - ref_fill_size)/2 + CONFIG_AUD_TRAS_AEC_MIC_DELAY_POINTS);
+			//aud_aec_set_mic_delay(aud_tras_drv_info.voc_info.aec_info->aec, (mic_fill_size + speaker_fill_size - ref_fill_size)/2 + CONFIG_AUD_TRAS_AEC_MIC_DELAY_POINTS);
 		}
 
 		if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.aec_info->ref_rb)) > aud_tras_drv_info.voc_info.aec_info->samp_rate_points*2) {
@@ -1296,8 +1296,6 @@ static bk_err_t aud_tras_dec(void)
 				goto decoder_exit;
 			}
 		}
-
-
 	}
 
 #if CONFIG_AUD_TRAS_DAC_DEBUG
@@ -1361,16 +1359,16 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 //	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_NULL)
 //		return BK_ERR_AUD_INTF_OK;
 
-    /* debug */
-    if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_UAC) {
-        AUD_MIC_COUNT_CLOSE();
-        UAC_MIC_DATA_DUMP_CLOSE();
-    }
+	/* debug */
+	if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_UAC) {
+		AUD_MIC_COUNT_CLOSE();
+		UAC_MIC_DATA_DUMP_CLOSE();
+	}
 
-    if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_UAC) {
-        AUD_SPK_COUNT_CLOSE();
-        UAC_SPK_DATA_DUMP_CLOSE();
-    }
+	if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_UAC) {
+		AUD_SPK_COUNT_CLOSE();
+		UAC_SPK_DATA_DUMP_CLOSE();
+	}
 
 	/* disable mic */
 	if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_BOARD) {
@@ -1481,6 +1479,7 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 
 	/* disable AEC */
 	aud_aec_deinit(aud_tras_drv_info.voc_info.aec_info);
+	aud_tras_drv_info.voc_info.aec_enable = false;
 
 	if (aud_tras_drv_info.voc_info.uac_config) {
 		audio_tras_drv_free(aud_tras_drv_info.voc_info.uac_config);
@@ -1569,6 +1568,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 	bk_err_t err = BK_ERR_AUD_INTF_FAIL;
 	bk_usb_hub_port_info *port_dev_info = NULL;
 	uint8_t count = 6;
+	LOGI("%s, %d, aec_state:%d\n", __func__, __LINE__, voc_cfg->aec_enable);
 
 	/* callback config */
 //	aud_tras_drv_info.voc_info.aud_tras_drv_voc_event_cb = voc_cfg->aud_tras_drv_voc_event_cb;
@@ -1627,7 +1627,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 
 	aud_tras_drv_info.voc_info.aud_tx_rb = voc_cfg->aud_tx_rb;
 	aud_tras_drv_info.voc_info.data_type = voc_cfg->data_type;
-	LOGI("%s, %d, aud_tras_drv_info.voc_info.data_type:%d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.data_type);
+	LOGD("%s, %d, aud_tras_drv_info.voc_info.data_type:%d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.data_type);
 	aud_tras_drv_info.voc_info.mic_en = voc_cfg->mic_en;
 	aud_tras_drv_info.voc_info.spk_en = voc_cfg->spk_en;
 	aud_tras_drv_info.voc_info.mic_type = voc_cfg->mic_type;
@@ -1776,7 +1776,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 	} else if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_UAC) {
 		/* init mic_ring_buff */
 		ring_buffer_init(&(aud_tras_drv_info.voc_info.mic_rb), (uint8_t*)aud_tras_drv_info.voc_info.mic_ring_buff, aud_tras_drv_info.voc_info.mic_samp_rate_points*2*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
-		LOGI("%s, %d, uac mic_ring_buff:%p, size:%d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.mic_ring_buff, aud_tras_drv_info.voc_info.mic_samp_rate_points*2*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+		LOGD("%s, %d, uac mic_ring_buff:%p, size:%d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.mic_ring_buff, aud_tras_drv_info.voc_info.mic_samp_rate_points*2*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
 
 		/* debug */
 		UAC_MIC_DATA_DUMP_OPEN();
@@ -1805,13 +1805,13 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 			memset(s_usbh_uac_mic_urb, 0, sizeof(struct usbh_urb) + sizeof(struct usbh_iso_frame_packet));
 		}
 
-		LOGI("%s, %d, power on uac mic port \n", __func__, __LINE__);
-        ret = bk_aud_uac_power_on(USB_HOST_MODE, aud_tras_drv_info.voc_info.mic_port_index, USB_UAC_MIC_DEVICE);
-        if (ret != BK_OK) {
-            LOGE("%s, %d, power on uac mic port fail \n", __func__, __LINE__);
-            err = BK_ERR_AUD_INTF_UAC_DRV;
-            goto aud_tras_drv_voc_init_exit;
-        }
+		LOGD("%s, %d, power on uac mic port \n", __func__, __LINE__);
+		ret = bk_aud_uac_power_on(USB_HOST_MODE, aud_tras_drv_info.voc_info.mic_port_index, USB_UAC_MIC_DEVICE);
+		if (ret != BK_OK) {
+			LOGE("%s, %d, power on uac mic port fail \n", __func__, __LINE__);
+			err = BK_ERR_AUD_INTF_UAC_DRV;
+			goto aud_tras_drv_voc_init_exit;
+		}
 		/* check whether device power on */
 		port_dev_info = NULL;
 		ret = bk_aud_uac_hub_port_check_device(aud_tras_drv_info.voc_info.mic_port_index, USB_UAC_MIC_DEVICE, &port_dev_info);
@@ -1929,7 +1929,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 			memset(s_usbh_uac_spk_urb, 0, sizeof(struct usbh_urb) + sizeof(struct usbh_iso_frame_packet));
 		}
 
-		LOGI("%s, %d, power on uac spk port \n", __func__, __LINE__);
+		LOGD("%s, %d, power on uac spk port \n", __func__, __LINE__);
 		ret = bk_aud_uac_power_on(USB_HOST_MODE, aud_tras_drv_info.voc_info.spk_port_index, USB_UAC_SPEAKER_DEVICE);
 		if (ret != BK_OK) {
 			LOGE("%s, %d, power on uac mic port fail \n", __func__, __LINE__);
@@ -2072,7 +2072,7 @@ static bk_err_t aud_tras_drv_voc_start(void)
 			/* wait receive data and then open adc */
 			bk_aud_adc_start();
 		} else {
-			LOGI("%s, %d, start uac mic \n", __func__, __LINE__);
+			LOGD("%s, %d, start uac mic \n", __func__, __LINE__);
 
 			/* check uac connect status */
 			if (aud_tras_drv_info.uac_mic_status == AUD_INTF_UAC_MIC_CONNECTED) {
@@ -2128,7 +2128,7 @@ static bk_err_t aud_tras_drv_voc_start(void)
 			}
 #endif
 
-			LOGI("%s, %d, start uac spk \n", __func__, __LINE__);
+			LOGD("%s, %d, start uac spk \n", __func__, __LINE__);
 			/* check uac connect status */
 			if (aud_tras_drv_info.uac_spk_status == AUD_INTF_UAC_SPK_CONNECTED) {
 				usb_hub_voc_uac_spk_port_device_urb_fill(aud_tras_drv_info.voc_info.spk_port_info[aud_tras_drv_info.voc_info.spk_port_index - 1], s_usbh_uac_spk_urb);
@@ -2200,7 +2200,7 @@ static bk_err_t aud_tras_drv_voc_stop(void)
 			return BK_ERR_AUD_INTF_DMA;
 		}
 	} else {
-		LOGI("%s, %d, stop uac mic \n", __func__, __LINE__);
+		LOGD("%s, %d, stop uac mic \n", __func__, __LINE__);
 		aud_tras_drv_info.uac_mic_open_status = false;
 		aud_tras_drv_info.uac_mic_open_current = false;
 	}
@@ -2212,7 +2212,7 @@ static bk_err_t aud_tras_drv_voc_stop(void)
 			return BK_ERR_AUD_INTF_DMA;
 		}
 	} else {
-		LOGI("%s, %d, stop uac spk \n", __func__, __LINE__);
+		LOGD("%s, %d, stop uac spk \n", __func__, __LINE__);
 		aud_tras_drv_info.uac_spk_open_status = false;
 		aud_tras_drv_info.uac_spk_open_current = false;
 	}

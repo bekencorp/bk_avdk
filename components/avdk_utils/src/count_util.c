@@ -74,7 +74,7 @@ bk_err_t count_util_destroy(count_util_t *count_util)
     count_util->data_size = 0;
     count_util->timer_interval = 0;
     os_memset(count_util->tag, '\0', 20);
-    LOGI("%s, %d, destroy count util timer complete \n", __func__, __LINE__);
+    LOGD("%s, %d, destroy count util timer complete \n", __func__, __LINE__);
 
     return ret;
 }
@@ -126,7 +126,7 @@ bk_err_t count_util_create(count_util_t *count_util, uint32_t interval, char *ta
         LOGE("%s, %d, start %s count util timer fail \n", __func__, __LINE__, count_util->tag);
         goto exit;
     }
-    LOGI("%s, %d, create %s count util timer complete \n", __func__, __LINE__, count_util->tag);
+    LOGD("%s, %d, create %s count util timer complete \n", __func__, __LINE__, count_util->tag);
 
     return BK_OK;
 exit:
