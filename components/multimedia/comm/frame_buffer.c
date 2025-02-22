@@ -789,6 +789,8 @@ bk_err_t frame_buffer_fb_register(frame_list_node_t *node, frame_module_t module
 
 bk_err_t frame_buffer_fb_deregister(frame_list_node_t *node, frame_module_t module)
 {
+    LIST_HEADER_T *pos, *n;
+    frame_node_t *tmp = NULL;
     if (node == NULL)
     {
         LOGW("%s, %d node/frame NULL\n", __func__, __LINE__);
@@ -805,6 +807,25 @@ bk_err_t frame_buffer_fb_deregister(frame_list_node_t *node, frame_module_t modu
     {
         node->register_mask &= INDEX_UNMASK(module);
         rtos_set_semaphore(&node->read_sem);
+    }
+
+    if (node->register_mask == 0 && !list_empty(&node->ready))
+    {
+        list_for_each_safe(pos, n, &node->ready)
+        {
+            tmp = list_entry(pos, frame_node_t, list);
+            if (tmp != NULL)
+            {
+                if (tmp->frame)
+                {
+                    frame_buffer_encode_free(tmp->frame);
+                    tmp->frame = NULL;
+                }
+                list_del(pos);
+                os_free(tmp);
+                tmp = NULL;
+            }
+        }
     }
     LOGI("%s, %p, %d, %d\n", __func__, node, node->register_mask, module);
 
