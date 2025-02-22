@@ -36,6 +36,43 @@
 #define DRAW_END()
 #endif
 
+#if (CONFIG_BLEND_UI)
+extern const uint32_t blend_assets_size;
+extern const blend_info_t blend_assets[];
+#else
+const uint32_t blend_assets_size = 0;
+const blend_info_t blend_assets[0];
+#endif
+
+dynamic_array_t g_dyn_array;
+
+typedef enum
+{
+    BLEND_ADD = 0,
+    BLEND_EXTI,
+}blend_event_t;
+
+typedef struct
+{
+    uint32_t event;
+    uint32_t param;
+} blend_msg_t;
+
+typedef struct{
+    beken_thread_t blend_task;
+    beken_semaphore_t task_sem;
+    beken_queue_t queue;
+    bool task_running;
+    uint8_t enable;
+}blend_t;
+
+static blend_t *blend = NULL;
+#define BLEND_RETURN_NOT_INIT() do {\
+	if (!blend->enable) {\
+		return NULL;\
+	}\
+} while(0)
+
 
 /**
  * @brief  blend font by cpu
@@ -146,20 +183,34 @@ bk_err_t bk_display_blend_img_handle(frame_buffer_t *frame, uint16_t lcd_width, 
 }
 
 
-bk_err_t bk_display_blend_handle(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd_height, const blend_info_t *array, uint8_t array_size)
+bk_err_t bk_display_blend_handle_by_array(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd_height, const blend_info_t *array, uint8_t array_size)
 {
 #if (CONFIG_BLEND)
     for (int i = 0; i < array_size; i++)
     {
-        if ((array[i].addr != NULL) && array[i].addr->enable)
+        if (array[i].addr != NULL)
         {
             if (array[i].addr->blend_type == BLEND_TYPE_FONT)
                 bk_display_blend_font_handle(frame, lcd_width, lcd_height, &array[i]);
             else if (array[i].addr->blend_type == BLEND_TYPE_IMAGE)
                 bk_display_blend_img_handle(frame, lcd_width, lcd_height, array[i].addr);
         }
+        #if 0
         else if (array[i].find_addr != NULL)
         {
+        /*
+            GUI_CONST_STORAGE bk_blend_t *img_logo[8] =
+            {
+                &img_wifi_rssi0,
+                &img_wifi_rssi1,
+                &img_wifi_rssi2,
+                &img_wifi_rssi3,
+                &img_wifi_rssi4,
+                &img_battery_1,
+                &img_cloudy_to_sunny,
+                NULL,           //must in the end, and can't delete
+            };
+        */
             int j = 0;
             const bk_blend_t *(*temp_1)[0] = (array[i].find_addr);
              while ((*temp_1)[j] != NULL) 
@@ -179,11 +230,428 @@ bk_err_t bk_display_blend_handle(frame_buffer_t *frame, uint16_t lcd_width, uint
                 LOGI("%s %d, i=%d, j=%d not find img %s \n", __func__, __LINE__, i,j, array[i].content);
             }
         }
+        #endif
         else
         {
         }
     }
 #endif
+    return BK_OK;
+}
+
+
+/**
+ * @brief  blend array include image and font
+ * @param  blend background layer frame
+ * @param  blend panel lcd width, to calculate postion in panel by (x, y) pos
+ * @param  blend panel lcd heighe, to calculate postion in panel by (x, y) pos
+ * @param  array ptr, the arrays end must be NULL
+ * @return 
+ *     - BK_OK: no error
+ *     - BK_FAIL:not find blend image
+ */
+bk_err_t bk_display_blend_handle(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd_height, const blend_info_t *array_ptr)
+{
+#if (CONFIG_BLEND)
+    uint8_t i = 0;
+    while (array_ptr[i].addr != NULL)
+    {
+        if (array_ptr[i].content[0] != '\0')
+        {
+            if (array_ptr[i].addr->blend_type == BLEND_TYPE_FONT)
+            {
+                bk_display_blend_font_handle(frame, lcd_width, lcd_height, &array_ptr[i]);
+            }
+            else if (array_ptr[i].addr->blend_type == BLEND_TYPE_IMAGE)
+            {
+                bk_display_blend_img_handle(frame, lcd_width, lcd_height, array_ptr[i].addr);
+            }
+        }
+    i++;
+    }
+#endif
+    return BK_OK;
+}
+
+
+bk_err_t blend_task_send_msg(uint8_t type, uint32_t param)
+{
+    int ret = BK_FAIL;
+    blend_msg_t msg;
+
+    if (blend && blend->task_running)
+    {
+        msg.event = type;
+        msg.param = param;
+        ret = rtos_push_to_queue(&blend->queue, &msg, BEKEN_WAIT_FOREVER);
+
+        if (ret != BK_OK)
+        {
+            LOGE("%s push failed\n", __func__);
+        }
+    }
+    return ret;
+}
+
+bk_err_t dynamic_array_init(dynamic_array_t * dyn_array, size_t initial_capacity)
+{
+    dyn_array->entry = os_malloc(initial_capacity * sizeof(blend_info_t));
+    if (dyn_array->entry == NULL)
+    {
+        return BK_FAIL;
+    }
+
+    for(int i = 0; i < initial_capacity; i++)
+    {
+        dyn_array->entry[i].name[0] = '\0';
+        dyn_array->entry[i].addr = NULL;
+    }
+    dyn_array->size = 0;
+    dyn_array->capacity = initial_capacity;
+    return BK_OK;
+}
+
+
+const blend_info_t *find_blend_info_in_assets_by_name(const char *name)
+{
+    BLEND_RETURN_NOT_INIT();
+    if (name == NULL)
+    {
+        return NULL;
+    }
+
+    for(int i = 0; i < blend_assets_size; i++)
+    {
+        if (strcmp((char *)blend_assets[i].name, name) == 0)
+        {
+            if (blend_assets[i].addr != NULL)
+            {
+                return &blend_assets[i];
+            }
+        }
+    }
+    return NULL;
+}
+
+const blend_info_t *find_blend_info_in_assets_by_content(const char *content)
+{
+    BLEND_RETURN_NOT_INIT();
+    if (content == NULL && content[0] == '\0')
+    {
+        return NULL;
+    }
+    for(int i = 0; i < blend_assets_size; i++)
+    {
+        if (strcmp((char *)blend_assets[i].content, content) == 0)
+        {
+            if (blend_assets[i].addr != NULL)
+            {
+                return &blend_assets[i];
+            }
+        }
+    }
+    return NULL;
+}
+
+blend_info_t *find_blend_info_in_dynamic_array(dynamic_array_t * dyn_array, const char *name)
+{
+    BLEND_RETURN_NOT_INIT();
+    if (name == NULL  && name[0] == '\0')
+    {
+        return NULL;
+    }
+
+    for(int i = 0; i < dyn_array->size; i++)
+    {
+        if (strcmp(dyn_array->entry[i].name, name) == 0)
+        {
+            return &dyn_array->entry[i];
+        }
+    }
+    return NULL;
+}
+
+void add_or_update_blend_info_to_dynamic_array(dynamic_array_t * dyn_array, const char *name, const char* content)
+{
+    blend_info_t * exiting_info = find_blend_info_in_dynamic_array(dyn_array, name);
+    if (exiting_info != NULL) 
+    {
+        os_strncpy(exiting_info->name, name, sizeof(exiting_info->name) - 1);
+        exiting_info->name[sizeof(exiting_info->name) - 1] = '\0';
+        if (content != NULL)
+        {
+            os_strncpy(exiting_info->content, content, sizeof(exiting_info->content) - 1);
+            exiting_info->content[sizeof(exiting_info->content) - 1] = '\0';
+            if (content[0] != '\0')
+            {
+                if (exiting_info->addr->blend_type == BLEND_TYPE_IMAGE)
+                {
+                    const blend_info_t *update_img = find_blend_info_in_assets_by_content(content);
+                    if (update_img != NULL)
+                    {
+                        exiting_info->addr = update_img->addr;
+                    }
+                    else
+                    {
+                        LOGW("warring!!!, not find img %s,'%s' in assets\n", exiting_info->name, content);
+                        exiting_info->content[0] = '\0';
+                    }
+                }
+            }
+            else
+            {
+                LOGW("warring!!!, input no content \n");
+            }
+        }
+        return;
+    }
+
+    const blend_info_t * assets_info = find_blend_info_in_assets_by_name(name);
+    if (assets_info == NULL)
+    {
+        LOGW("%s, not fint assets %s\n", __func__, name);
+        return;
+    }
+    if (dyn_array->size >= dyn_array->capacity)
+    {
+        dyn_array->capacity *= 2;
+        dyn_array->entry = os_realloc(dyn_array->entry, dyn_array->capacity * sizeof(dynamic_array_t));
+        if (dyn_array->entry == NULL)
+        {
+            LOGI("%s realloc fail \n", __func__);
+            return;
+        }
+        for(int i = dyn_array->size; i < dyn_array->capacity; i++)
+        {
+            dyn_array->entry[i].name[0] = '\0';
+            dyn_array->entry[i].addr = NULL;
+        }
+        LOGI("%s extend dyn_array capacity * 2\n", __func__);
+    }
+    dyn_array->entry[dyn_array->size] = *assets_info;
+
+    strncpy(dyn_array->entry[dyn_array->size].name, name, sizeof(dyn_array->entry[dyn_array->size].name) - 1);
+    dyn_array->entry[dyn_array->size].name[sizeof(dyn_array->entry[dyn_array->size].name) - 1] = '\0';
+    if (content != NULL)
+    {
+        strncpy(dyn_array->entry[dyn_array->size].content, content, sizeof(dyn_array->entry[dyn_array->size].content) - 1);
+        dyn_array->entry[dyn_array->size].content[sizeof(dyn_array->entry[dyn_array->size].content) - 1] = '\0';
+        if (content[0] != '\0')
+        {
+            if (dyn_array->entry[dyn_array->size].addr->blend_type == BLEND_TYPE_IMAGE)
+            {
+                const blend_info_t *update_img = find_blend_info_in_assets_by_content(content);
+                if (update_img != NULL)
+                {
+                    dyn_array->entry[dyn_array->size].addr = update_img->addr;
+                }
+                else
+                {
+                    LOGW("warring!!!, not find img %s,'%s' in assets\n", assets_info->name, content);
+                    dyn_array->entry[dyn_array->size].content[0] = '\0';
+                }
+            }
+        }
+        else
+        {
+            LOGW("warring!!!, input no content \n");
+        }
+    }
+
+    LOGD("%s,%d, %s %p %s\n", __func__,__LINE__, dyn_array->entry[dyn_array->size].name,  dyn_array->entry[dyn_array->size].addr,  dyn_array->entry[dyn_array->size].content);
+    dyn_array->size++;
+    dyn_array->entry[dyn_array->size].addr = NULL;
+}
+
+bk_err_t bk_draw_blend_update(blend_info_t *blend)
+{
+    return blend_task_send_msg(BLEND_ADD, (uint32_t)blend);
+}
+
+
+static void blend_task_entry(beken_thread_arg_t data)
+{
+    blend->task_running = true;
+    rtos_set_semaphore(&blend->task_sem);
+
+    while (blend->task_running)
+    {
+        blend_msg_t msg;
+        int ret = rtos_pop_from_queue(&blend->queue, &msg, BEKEN_WAIT_FOREVER);
+        if (ret == BK_OK)
+        {
+            switch (msg.event)
+            {
+                case BLEND_ADD:
+                {
+                    blend_info_t *info = (blend_info_t *)msg.param;
+                    add_or_update_blend_info_to_dynamic_array(&g_dyn_array, info->name, info->content);
+                }
+                break;
+
+                case BLEND_EXTI:
+                {
+                    blend->task_running = false;
+                    blend->blend_task = NULL;
+                    rtos_set_semaphore(&blend->task_sem);
+                    rtos_delete_thread(NULL);
+                }
+                break;
+            }
+        }
+    }
+}
+
+static bk_err_t blend_task_start(void)
+{
+    int ret = BK_OK;
+
+    ret = rtos_init_queue(&blend->queue,
+                          "blend_queue",
+                          sizeof(blend_msg_t),
+                          15);
+    if (ret != BK_OK)
+    {
+        LOGE("%s, init blend_queue failed\r\n", __func__);
+         return ret;;
+    }
+    
+    ret = rtos_create_thread(&blend->blend_task,
+                             BEKEN_DEFAULT_WORKER_PRIORITY,
+                             "blend_thread",
+                             (beken_thread_function_t)blend_task_entry,
+                             1024,
+                             (beken_thread_arg_t)NULL);
+    
+    if (BK_OK != ret)
+    {
+        LOGE("%s blend_thread init failed\n", __func__);
+        return ret;
+    }
+    ret = rtos_get_semaphore(&blend->task_sem, BEKEN_NEVER_TIMEOUT);
+    
+    if (BK_OK != ret)
+    {
+        LOGE("%s decoder_sem get failed\n", __func__);
+        return ret;
+    }
+    
+    return ret;
+}
+
+static bk_err_t blend_task_stop(void)
+{
+    bk_err_t ret = BK_OK;
+    if (!blend || blend->task_running == false)
+    {
+        LOGI("%s already stop\n", __func__);
+        return ret;
+    }
+
+    blend_task_send_msg(BLEND_EXTI, 0);
+
+    ret = rtos_get_semaphore(&blend->task_sem, BEKEN_NEVER_TIMEOUT);
+    if (BK_OK != ret)
+    {
+        LOGE("%s get sem failed\n", __func__);
+    }
+
+    if (blend->queue)
+    {
+        rtos_deinit_queue(&blend->queue);
+        blend->queue = NULL;
+    }
+
+    LOGI("%s complete\n", __func__);
+
+    return ret;
+}
+bk_err_t bk_draw_blend_init(void)
+{
+    bk_err_t ret = BK_OK;
+    if (NULL != blend && blend->task_running)
+    {
+        LOGI("%s already init\n", __func__);
+        return ret;
+    }
+     blend = (blend_t *)os_malloc(sizeof(blend_t));
+    if (blend == NULL)
+    {
+        LOGE("%s, malloc blend fail!\r\n", __func__);
+        return BK_FAIL;
+    }
+    os_memset(blend, 0, sizeof(blend_t));
+    
+    ret = rtos_init_semaphore(&blend->task_sem, 1);
+    if (ret != BK_OK)
+    {
+        LOGE("%s task_sem init failed: %d\n", __func__, ret);
+        goto error;
+    }
+
+    ret = blend_task_start();
+    if (ret != BK_OK)
+    {
+        LOGE("%s blend_task creat failed: %d\n", __func__, ret);
+        goto error;
+    }
+
+    ret = dynamic_array_init(&g_dyn_array, blend_assets_size);
+    if(ret != BK_OK)
+    {
+        return ret;
+    }
+    blend->enable = true;
+
+    LOGI("%s complete\n", __func__);
+    return BK_OK;
+
+error:
+    if (blend)
+    {
+        if (blend->task_sem)
+        {
+            rtos_deinit_semaphore(&blend->task_sem);
+            blend->task_sem = NULL;
+        }
+        if (g_dyn_array.entry)
+        {
+            os_free(g_dyn_array.entry);
+        }
+        if (blend)
+        {
+            os_free(blend);
+            blend = NULL;
+        }
+    }
+    return ret;
+}
+
+bk_err_t bk_draw_blend_deinit(void)
+{
+    if (blend == NULL)
+    {
+        LOGE("%s, already deinit!\r\n", __func__);
+        return BK_OK;
+    }
+    if (blend->task_sem)
+    {
+        rtos_deinit_semaphore(&blend->task_sem);
+        blend->task_sem = NULL;
+    }
+    if (g_dyn_array.entry)
+    {
+        os_free(g_dyn_array.entry);
+    }
+    g_dyn_array.size = 0;
+   blend->enable = false;
+
+   if (blend)
+   {
+       os_free(blend);
+       blend = NULL;
+   }
+    LOGI("%s complete\n", __func__);
     return BK_OK;
 }
 

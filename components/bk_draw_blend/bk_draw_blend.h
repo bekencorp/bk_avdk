@@ -117,7 +117,6 @@ typedef struct {
 typedef struct 
 {
     uint8_t version;
-    uint8_t enable;                /*< 1:open by default*/
     blend_type_t blend_type;       /**< 0: image, 1:font */
     const char name[MAX_BLEND_NAME_LEN];        /**< image name like "wifi3","wifi4", font name like "clock", "weather" */
     uint32 width;         /**< image width   */
@@ -134,10 +133,19 @@ typedef struct
 
 typedef struct 
 {
-    const bk_blend_t *(*find_addr)[];  //the pointer, pointer to the struct pointer array
+    char name[20];
+    //const bk_blend_t *(*find_addr)[];  //the pointer, pointer to the struct pointer array
     const bk_blend_t *addr;            //the pointer, pointer to the struct
     char content[20];
 }blend_info_t;
+
+typedef struct{
+    blend_info_t *entry;
+    size_t size;
+    size_t capacity;
+}dynamic_array_t;
+
+extern dynamic_array_t g_dyn_array;
 
 /**
  * @brief  blend icon of ARGB888 image by cpu or hardware dma2d
@@ -192,7 +200,26 @@ bk_err_t bk_display_blend_font_handle(frame_buffer_t *frame, uint16_t lcd_width,
  *     - BK_OK: no error
  *     - BK_FAIL:not find blend image
  */
-bk_err_t bk_display_blend_handle(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd_height, const blend_info_t *array, uint8_t array_size);
+bk_err_t bk_display_blend_handle_by_array(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd_height, const blend_info_t *array, uint8_t array_size);
+
+/**
+ * @brief  blend array include image and font
+ * @param  blend background layer frame
+ * @param  blend panel lcd width, to calculate postion in panel by (x, y) pos
+ * @param  blend panel lcd heighe, to calculate postion in panel by (x, y) pos
+ * @param  array ptr, the arrays end must be NULL
+ * @return 
+ *     - BK_OK: no error
+ *     - BK_FAIL:not find blend image
+ */
+bk_err_t bk_display_blend_handle(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd_height, const blend_info_t *array_ptr);
+
+
+bk_err_t bk_draw_blend_init(void);
+
+bk_err_t bk_draw_blend_deinit(void);
+
+bk_err_t bk_draw_blend_update(blend_info_t *blend);
 
 #ifdef __cplusplus
 }

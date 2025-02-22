@@ -14,7 +14,7 @@
 #include "lv_vendor.h"
 #include <modules/image_scale.h>
 #include "frame_buffer.h"
-#include "yuv_encode.h"
+#include "lcd_display_service.h"
 #include "driver/media_types.h"
 #include "driver/dma2d.h"
 #if CONFIG_LCD_QSPI

@@ -32,6 +32,10 @@
 #include <bk_scale.h>
 #include "yuv_encode.h"
 #include "sw_decode.h"
+#include "uvc_pipeline_act.h"
+#include "lcd_display_service.h"
+#include "bk_draw_blend.h"
+
 #if CONFIG_CACHE_ENABLE
 #include "cache.h"
 #endif
@@ -895,10 +899,6 @@ void img_event_handle(media_mailbox_msg_t *msg)
             ret = image_rotate_set(msg);
         }
         break;
-        case EVENT_IMG_BLEND_IND:
-        {
-        }
-        break;
         case EVENT_LCD_GET_DEVICES_NUM_IND:
         {
             uint32_t device_num = get_lcd_devices_num();
@@ -936,10 +936,76 @@ void img_event_handle(media_mailbox_msg_t *msg)
             break;
         }
 
+        case EVENT_LCD_DISP_OPEN_IND:
+            ret = lcd_display_open((lcd_open_t *)msg->param);
+        break;
+
+        case EVENT_IMG_BLEND_IND:
+        {
+            blend_info_t *blend = (blend_info_t *)msg->param;
+            if (!strcmp(blend->name, "close"))
+            {
+                LOGI(" EVENT_IMG_BLEND_IND CLOSE close\n");
+                bk_draw_blend_deinit();
+                break;
+            }
+            bk_draw_blend_init();
+            ret = bk_draw_blend_update(blend);
+        }
+        break;
+
+        case EVENT_PIPELINE_LCD_DISP_CLOSE_IND:
+            ret = lcd_display_close();
+            break;
+
+#if (CONFIG_MEDIA_PIPELINE)
+        case EVENT_PIPELINE_LCD_JDEC_OPEN_IND:
+            ret = lcd_jdec_pipeline_open(msg);
+            break;
+
+        case EVENT_PIPELINE_LCD_JDEC_CLOSE_IND:
+            ret = lcd_jdec_pipeline_close(msg);
+            break;
+
+        case EVENT_PIPELINE_SET_ROTATE_IND:
+            ret = pipeline_set_rotate(msg);
+            break;
+
+        case EVENT_PIPELINE_H264_OPEN_IND:
+            ret = h264_jdec_pipeline_open(msg);
+            break;
+
+        case EVENT_PIPELINE_H264_CLOSE_IND:
+            ret = h264_jdec_pipeline_close(msg);
+            break;
+
+        case EVENT_PIPELINE_H264_RESET_IND:
+            ret = h264_encode_regenerate_idr_frame();
+            break;
+
+        case EVENT_LCD_SET_FMT_IND:
+            ret = lcd_set_fmt(msg);
+            break;
+
+        case EVENT_PIPELINE_DUMP_IND:
+            decoder_mux_dump();
+            BK_ASSERT_EX(0, "dump for debug\n");
+            ret = 0;
+            break;
+
+        case EVENT_PIPELINE_MEM_SHOW_IND:
+            pipeline_mem_show();
+            break;
+
+        case EVENT_PIPELINE_MEM_LEAK_IND:
+            pipeline_mem_leak();
+            break;
+#endif
         default:
             break;
     }
-
     msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
 }
+
+
 

@@ -127,7 +127,7 @@ static bk_err_t camera_close_handle(media_mailbox_msg_t *msg)
 	}
 	else
 	{
-		LOGW("%s, not support\n", __func__);
+		LOGW("%s, not support %x %x\n", __func__, config->id, config->type);
 	}
 
 	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
@@ -211,6 +211,7 @@ static bk_err_t camera_get_h264_encode_param_handle(media_mailbox_msg_t *msg)
 
 	os_memcpy((h264_base_config_t *)msg->param, &base_config, sizeof(h264_base_config_t));
 #endif
+
 	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
 
 	return ret;
@@ -232,6 +233,27 @@ static bk_err_t camera_switch_main_stream_handle(media_mailbox_msg_t *msg)
 
 	return ret;
 }
+
+static bk_err_t camera_get_main_stream_handle(media_mailbox_msg_t *msg)
+{
+	int ret = BK_FAIL;
+
+#if (defined(CONFIG_DVP_CAMERA) || defined(CONFIG_USB_CAMERA))
+
+	frame_list_node_t *node = NULL;
+
+	node = frame_buffer_list_get_main_stream();
+	if (node != NULL)
+	{
+		os_memcpy((h264_base_config_t *)msg->param, node, sizeof(frame_list_node_t));
+		ret = BK_OK;
+	}
+#endif
+	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+
+	return ret;
+}
+
 
 bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 {
@@ -268,6 +290,10 @@ bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 
 		case EVENT_CAM_SWITCH_MAIN_IND:
 			camera_switch_main_stream_handle(msg);
+			break;
+
+		case EVENT_CAM_GET_MAIN_STREAM_IND:
+			camera_get_main_stream_handle(msg);
 			break;
 
 		default:

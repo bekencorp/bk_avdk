@@ -7,7 +7,7 @@ menu "INTEGRATION_DOORBELL"
         bool "Doorbell integration CS2"
         default n
 
-	config BLEND_DEMO
+	config BLEND_UI
 		depends on BLEND
 		bool "Enable Demo Blend"
 		default n

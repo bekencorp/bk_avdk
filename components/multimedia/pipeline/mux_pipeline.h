@@ -177,7 +177,6 @@ typedef struct {
 
 extern mux_sram_buffer_t *mux_sram_buffer;
 
-void decoder_mux_dump(void);
 
 bk_err_t bk_h264_encode_request(pipeline_encode_request_t *request, mux_callback_t cb);
 bk_err_t bk_rotate_encode_request(pipeline_encode_request_t *request, mux_callback_t cb);
@@ -192,8 +191,6 @@ bk_err_t bk_h264_pipeline_init(void);
 bk_err_t bk_h264_reset_request(mux_callback_t cb);
 bk_err_t bk_scale_reset_request(mux_callback_t cb);
 bk_err_t bk_rotate_reset_request(mux_callback_t cb);
-
-void decoder_mux_dump(void);
 
 #ifdef __cplusplus
 }

@@ -2559,9 +2559,8 @@ GUI_CONST_STORAGE unsigned char cloudy_to_sunny_argb8888[4096] = {
 GUI_CONST_STORAGE bk_blend_t img_wifi_rssi0 =
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_IMAGE,
-    .name = "wifi0",
+    .name = "wifi",
     .width = WIFI_WIDTH,
     .height = WIFI_HEIGHT,
     .xpos = WIFI_XPOS,
@@ -2576,9 +2575,8 @@ GUI_CONST_STORAGE bk_blend_t img_wifi_rssi0 =
 GUI_CONST_STORAGE bk_blend_t img_wifi_rssi1 =
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_IMAGE,
-    .name = "wifi1",
+    .name = "wifi",
     .width = WIFI_WIDTH,
     .height = WIFI_HEIGHT,
     .xpos = WIFI_XPOS,
@@ -2593,9 +2591,8 @@ GUI_CONST_STORAGE bk_blend_t img_wifi_rssi1 =
 GUI_CONST_STORAGE bk_blend_t img_wifi_rssi2 =
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_IMAGE,
-    .name = "wifi2",
+    .name = "wifi",
     .width = WIFI_WIDTH,
     .height = WIFI_HEIGHT,
     .xpos = WIFI_XPOS,
@@ -2610,9 +2607,8 @@ GUI_CONST_STORAGE bk_blend_t img_wifi_rssi2 =
 GUI_CONST_STORAGE bk_blend_t img_wifi_rssi3 =
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_IMAGE,
-    .name = "wifi3",
+    .name = "wifi",
     .width = WIFI_WIDTH,
     .height = WIFI_HEIGHT,
     .xpos = WIFI_XPOS,
@@ -2627,9 +2623,8 @@ GUI_CONST_STORAGE bk_blend_t img_wifi_rssi3 =
 GUI_CONST_STORAGE bk_blend_t img_wifi_rssi4 =
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_IMAGE,
-    .name = "wifi4",
+    .name = "wifi",
     .width = WIFI_WIDTH,
     .height = WIFI_HEIGHT,
     .xpos = WIFI_XPOS,
@@ -2643,12 +2638,11 @@ GUI_CONST_STORAGE bk_blend_t img_wifi_rssi4 =
 };
 
 
-GUI_CONST_STORAGE bk_blend_t img_battery_1 =
+GUI_CONST_STORAGE bk_blend_t img_battery1 =
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_IMAGE,
-    .name = "battery_1",
+    .name = "battery",
     .width = BATTERY_WIDTH,
     .height = BATTERY_HEIGHT,
     .xpos = BATTERY_XPOS,
@@ -2664,9 +2658,8 @@ GUI_CONST_STORAGE bk_blend_t img_battery_1 =
 GUI_CONST_STORAGE bk_blend_t img_cloudy_to_sunny =
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_IMAGE,
-    .name = "cloudy_to_sunny",
+    .name = "weather",
     .width = WEATHER_WIDTH,
     .height = WEATHER_HEIGHT,
     .xpos = WEATHER_XPOS,

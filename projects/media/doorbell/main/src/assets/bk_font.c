@@ -1759,7 +1759,6 @@ const gui_font_digit_struct *const font_digit_black24 = GUI_Fontblack24_anti_Cha
 GUI_CONST_STORAGE bk_blend_t font_clock = 
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_FONT,
     .name = "clock",
     .width = CLOCK_LOGO_W,
@@ -1775,9 +1774,8 @@ GUI_CONST_STORAGE bk_blend_t font_clock =
 GUI_CONST_STORAGE bk_blend_t font_dates = 
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_FONT,
-    .name = "dates",
+    .name = "date",
     .width = DATA_LOGO_W,
     .height = DATA_LOGO_H,
     .xpos = DATA_POSTION_X,
@@ -1792,7 +1790,6 @@ GUI_CONST_STORAGE bk_blend_t font_dates =
 GUI_CONST_STORAGE bk_blend_t font_week = 
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_FONT,
     .name = "week",
     .width = DATA_LOGO_W,
@@ -1808,7 +1805,6 @@ GUI_CONST_STORAGE bk_blend_t font_week =
 GUI_CONST_STORAGE bk_blend_t font_weather = 
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_FONT,
     .name = "weather",
     .width = DATA_LOGO_W,
@@ -1825,7 +1821,6 @@ GUI_CONST_STORAGE bk_blend_t font_weather =
 GUI_CONST_STORAGE bk_blend_t font_ver = 
 {
     .version = 0,
-    .enable = 1,
     .blend_type = BLEND_TYPE_FONT,
     .name = "ver",
     .width = VERSION_LOGO_W,

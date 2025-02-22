@@ -16,3 +16,12 @@
 
 bk_err_t lcd_display_service_init(void);
 
+bk_err_t lcd_display_open(lcd_open_t *config);
+
+bk_err_t lcd_display_close(void);
+
+bool check_lcd_task_is_open(void);
+
+bk_err_t lcd_display_frame_request(frame_buffer_t *frame);
+
+

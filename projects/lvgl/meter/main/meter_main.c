@@ -46,7 +46,7 @@ int cli_meter_init(void)
 
 
 #if (CONFIG_SYS_CPU1)
-#include "yuv_encode.h"
+#include "lcd_display_service.h"
 
 void lvgl_event_handle(media_mailbox_msg_t *msg)
 {

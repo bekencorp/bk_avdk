@@ -32,6 +32,7 @@
 #if (CONFIG_CPU_CNT > 2)
 #include "components/system.h"
 #endif
+#include "lcd_display_service.h"
 
 #define TAG "jdec_pip"
 
@@ -405,7 +406,7 @@ static void jpeg_decode_line_complete_handler(jpeg_dec_res_t *result)
 		}
 		else
 		{
-			LOGI("%s, %d\n", __func__, jdec_config->jdec_line_count);
+			LOGD("%s, %d\n", __func__, jdec_config->jdec_line_count);
 			jpeg_decode_task_send_msg(JPEGDEC_RESET, 0);
 		}
 	}

@@ -19,6 +19,7 @@
 #include <components/video_types.h>
 #include <components/usb_types.h>
 #include <driver/h264_types.h>
+#include "frame_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +43,7 @@ typedef struct {
 bk_err_t media_app_camera_open(camera_handle_t *handle, media_camera_device_t *device);
 bk_err_t media_app_camera_close(camera_handle_t *handle);
 bk_err_t media_app_switch_main_camera(uint16_t id, camera_type_t type, image_format_t format);
+bk_err_t media_app_get_main_camera_stream(frame_list_node_t *node);
 bk_err_t media_app_get_h264_encode_config(h264_base_config_t *config);
 bk_err_t media_app_set_compression_ratio(compress_ratio_t * ratio);
 bk_err_t media_app_uvc_register_info_notify_cb(camera_state_cb_t cb);
@@ -119,6 +121,9 @@ bk_err_t media_app_set_rotate(media_rotate_t rotate);
  */
 bk_err_t media_app_lcd_fmt(pixel_format_t fmt);
 bk_err_t media_app_lcd_set_backlight(uint8_t level);
+
+bk_err_t media_app_lcd_blend(void *param);
+
 
 /******************************h264 API******************************************************/
 bk_err_t media_app_pipeline_h264_open(void);

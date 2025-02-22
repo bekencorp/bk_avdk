@@ -52,7 +52,7 @@ static void lcd_qspi_disp_task_entry(beken_thread_arg_t arg)
     }
 
     lcd_qspi_disp_thread_hdl = NULL;
-    rtos_set_semaphore(g_lcd_qspi_task_sem);
+    rtos_set_semaphore(&g_lcd_qspi_task_sem);
     rtos_delete_thread(NULL);
 }
 

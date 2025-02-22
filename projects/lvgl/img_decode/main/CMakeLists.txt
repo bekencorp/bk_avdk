@@ -17,5 +17,5 @@ endif()
 armino_component_register(
 	SRCS "${srcs}"
 	INCLUDE_DIRS "${incs}" 
-	PRIV_REQUIRES bk_init bk_cli multimedia lvgl media_service bk_vfs
+	PRIV_REQUIRES bk_init bk_cli multimedia lvgl media_service bk_vfs display_service
 )

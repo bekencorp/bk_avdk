@@ -24,7 +24,7 @@ const lcd_open_t lcd_open =
 
 #if (CONFIG_SYS_CPU1)
 #include <frame_buffer.h>
-#include "yuv_encode.h"
+#include "lcd_display_service.h"
 
 
 static frame_buffer_t *disp_frame = NULL;

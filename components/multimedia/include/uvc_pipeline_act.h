@@ -23,8 +23,22 @@
 extern "C" {
 #endif
 
-void uvc_pipeline_event_handle(media_mailbox_msg_t *msg);
+
 bk_err_t uvc_pipeline_init(void);
+
+bk_err_t h264_jdec_pipeline_open(media_mailbox_msg_t *msg);
+bk_err_t h264_jdec_pipeline_close(media_mailbox_msg_t *msg);
+
+bk_err_t lcd_set_fmt(media_mailbox_msg_t *msg);
+bk_err_t pipeline_set_rotate(media_mailbox_msg_t *msg);
+
+bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg);
+bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg);
+
+void pipeline_mem_show(void);
+void pipeline_mem_leak(void);
+
+uint8_t *get_mux_sram_buffer(void);
 
 #ifdef __cplusplus
 }

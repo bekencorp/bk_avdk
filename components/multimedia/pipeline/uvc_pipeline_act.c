@@ -21,6 +21,7 @@
 #include "media_mailbox_list_util.h"
 #include "media_evt.h"
 
+#include "lcd_display_service.h"
 #include "yuv_encode.h"
 #include "uvc_pipeline_act.h"
 
@@ -35,12 +36,11 @@
 
 static pixel_format_t lcd_fmt = PIXEL_FMT_UNKNOW;
 static media_rotate_t pipeline_rotate = ROTATE_90;
-static uint8_t lcd_scale = 0;
 
 extern uint8_t *media_bt_share_buffer;
 mux_sram_buffer_t *mux_sram_buffer = NULL;
 
-static bk_err_t h264_jdec_pipeline_open(media_mailbox_msg_t *msg)
+bk_err_t h264_jdec_pipeline_open(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 
@@ -77,11 +77,14 @@ static bk_err_t h264_jdec_pipeline_open(media_mailbox_msg_t *msg)
 error:
 	bk_jdec_buffer_request_deregister(PIPELINE_MOD_H264);
 	h264_encode_task_close();
-	jpeg_decode_task_close();
+    if (check_rotate_task_is_open() == false)
+    {
+        jpeg_decode_task_close();
+    }
 	return BK_FAIL;
 }
 
-static bk_err_t h264_jdec_pipeline_close(media_mailbox_msg_t *msg)
+bk_err_t h264_jdec_pipeline_close(media_mailbox_msg_t *msg)
 {
 	LOGD("%s %d\n", __func__, __LINE__);
 
@@ -104,7 +107,7 @@ static bk_err_t h264_jdec_pipeline_close(media_mailbox_msg_t *msg)
 	return BK_OK;
 }
 
-static bk_err_t lcd_set_fmt(media_mailbox_msg_t *msg)
+bk_err_t lcd_set_fmt(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 
@@ -115,7 +118,7 @@ static bk_err_t lcd_set_fmt(media_mailbox_msg_t *msg)
 	return ret;
 }
 
-static bk_err_t pipeline_set_rotate(media_mailbox_msg_t *msg)
+bk_err_t pipeline_set_rotate(media_mailbox_msg_t *msg)
 {
 	pipeline_rotate = (uint32_t)msg->param;
 	LOGI("%s, rotate angle = %d (0:0, 1:90,2:180,3:270)\r\n", __func__, pipeline_rotate);
@@ -123,20 +126,8 @@ static bk_err_t pipeline_set_rotate(media_mailbox_msg_t *msg)
 	return BK_OK;
 }
 
-static bk_err_t lcd_disp_pipeline_open(media_mailbox_msg_t *msg)
-{
-    int ret = BK_OK;
 
-    ret = lcd_display_open((lcd_open_t *)msg->param);
-    if (ret != BK_OK)
-    {
-        LOGE("%s %d lcd display open fail\r\n", __func__, __LINE__);
-    }
-
-    return ret;
-}
-
-static bk_err_t lcd_disp_pipeline_close(media_mailbox_msg_t *msg)
+bk_err_t lcd_disp_pipeline_close(media_mailbox_msg_t *msg)
 {
     int ret = BK_OK;
 
@@ -145,7 +136,7 @@ static bk_err_t lcd_disp_pipeline_close(media_mailbox_msg_t *msg)
     return ret;
 }
 
-static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
+bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 	rot_open_t rot_open = {0};
@@ -209,11 +200,14 @@ static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 error:
 	LOGI("%s fail\n", __func__, __LINE__);
 	rotate_task_close();
-
+	if (check_h264_task_is_open() == false)
+    {
+        jpeg_decode_task_close();
+    }
 	return BK_FAIL;
 }
 
-static bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg)
+bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 
@@ -258,13 +252,6 @@ static bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg)
 	return BK_OK;
 }
 
-static bk_err_t lcd_scale_pipline_close(media_mailbox_msg_t *msg)
-{
-	LOGI("%s %d\n", __func__, __LINE__);
-    scale_task_close();
-    lcd_scale = 0;
-	return BK_OK;
-}
 
 void pipeline_mem_show(void)
 {
@@ -297,68 +284,6 @@ void pipeline_mem_leak(void)
 #endif
 }
 
-void uvc_pipeline_event_handle(media_mailbox_msg_t *msg)
-{
-	bk_err_t ret = BK_OK;
-
-	switch (msg->event)
-	{
-		case EVENT_PIPELINE_LCD_DISP_OPEN_IND:
-			ret = lcd_disp_pipeline_open(msg);
-			break;
-
-		case EVENT_PIPELINE_LCD_DISP_CLOSE_IND:
-			ret = lcd_disp_pipeline_close(msg);
-			break;
-
-		case EVENT_PIPELINE_LCD_JDEC_OPEN_IND:
-			ret = lcd_jdec_pipeline_open(msg);
-			break;
-
-		case EVENT_PIPELINE_LCD_JDEC_CLOSE_IND:
-			ret = lcd_jdec_pipeline_close(msg);
-			break;
-
-		case EVENT_PIPELINE_SET_ROTATE_IND:
-			ret = pipeline_set_rotate(msg);
-			break;
-
-		case EVENT_PIPELINE_H264_OPEN_IND:
-			ret = h264_jdec_pipeline_open(msg);
-			break;
-
-		case EVENT_PIPELINE_H264_CLOSE_IND:
-			ret = h264_jdec_pipeline_close(msg);
-			break;
-
-		case EVENT_PIPELINE_H264_RESET_IND:
-			ret = h264_encode_regenerate_idr_frame();
-			break;
-
-		case EVENT_LCD_SET_FMT_IND:
-			ret = lcd_set_fmt(msg);
-			break;
-
-		case EVENT_PIPELINE_DUMP_IND:
-			decoder_mux_dump();
-			BK_ASSERT_EX(0, "dump for debug\n");
-			ret = 0;
-			break;
-
-		case EVENT_PIPELINE_MEM_SHOW_IND:
-			pipeline_mem_show();
-			break;
-
-		case EVENT_PIPELINE_MEM_LEAK_IND:
-			pipeline_mem_leak();
-			break;
-
-		default:
-			break;
-	}
-
-	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
-}
 
 bk_err_t uvc_pipeline_init(void)
 {

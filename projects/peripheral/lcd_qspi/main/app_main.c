@@ -41,7 +41,7 @@ int cli_qspi_lcd_init(void)
 #if (CONFIG_SYS_CPU1)
 #include <frame_buffer.h>
 #include <lcd_qspi_display_service.h>
-#include "yuv_encode.h"
+#include "lcd_display_service.h"
 
 static frame_buffer_t *disp_frame = NULL;
 

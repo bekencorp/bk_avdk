@@ -21,7 +21,7 @@ list(APPEND srcs
 )
 endif()
 
-if (CONFIG_BLEND_DEMO)
+if (CONFIG_BLEND_UI)
 list(APPEND srcs
 	src/assets/bk_font.c
 	src/assets/bk_img.c
@@ -29,7 +29,7 @@ list(APPEND srcs
 )
 endif()
 
-set(priv_req bk_init bt media_service lwip_intf_v2_1 wifi_transfer avdk_utils bk_draw_blend multimedia)
+set(priv_req bk_init bt media_service lwip_intf_v2_1 wifi_transfer avdk_utils bk_draw_blend multimedia )
 
 if ("${ARMINO_SOC}" STREQUAL "bk7258")
 list(APPEND priv_req cs2p2p)

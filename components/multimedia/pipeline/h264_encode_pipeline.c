@@ -28,6 +28,7 @@
 #include "media_evt.h"
 #include "frame_buffer.h"
 #include "yuv_encode.h"
+#include "uvc_pipeline_act.h"
 
 #include "mux_pipeline.h"
 #include "avdk_crc.h"

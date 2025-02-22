@@ -29,6 +29,7 @@
 #include <driver/uvc_camera.h>
 #include <driver/h264_types.h>
 #include "media_evt.h"
+#include "bk_draw_blend.h"
 
 #include "media_utils.h"
 
@@ -160,9 +161,28 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     media_ppi_t ppi;
     camera_handle_t handle = NULL;
 
+	
+    frame_list_node_t node;
+    ret = media_app_get_main_camera_stream(&node);
+    if (ret == BK_OK)
+    {
+        if(node.camera_id == 8)
+        {
+            node.camera_id = 0;
+        }
+        LOGI("%s opened:%x,  switch:%x\n", __func__, node.camera_id, camera_port);
+        if(node.camera_id == camera_port)
+        {
+            LOGI("%s open repetition, opened:%x,  switch:%x\n", __func__, node.camera_id, camera_port);
+            return BK_OK;
+        }
+    }
+
     handle = bk_camera_handle_node_get_by_id_and_fomat(1, IMAGE_MJPEG);
+
     if (handle != NULL)
     {
+        LOGI("%s media_app_get_camera_handle_by_id 1\n", __func__);
         ret = media_app_camera_close(&handle);
     }
 
@@ -170,6 +190,7 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     handle = bk_camera_handle_node_get_by_id_and_fomat(2, IMAGE_MJPEG);
     if (handle != NULL)
     {
+        LOGI("%s media_app_get_camera_handle_by_id 2\n", __func__);
         ret = media_app_camera_close(&handle);
     }
 
@@ -181,6 +202,7 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_YUV | IMAGE_MJPEG);
     if (handle != NULL)
     {
+        LOGI("%s media_app_get_camera_handle_by_id 0\n", __func__);
         ret = media_app_camera_close(&handle);
     }
     else
@@ -288,7 +310,7 @@ void media_cli_threecam_auto_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, 
             media_debug->fps_lcd = 0;
             order = (uint32_t)rand();   //((order&0xf0) >> 4)&0x3
             order = ((order & 0xf) & 0x3);
-            if (old_order == order)
+            if (old_order == order || (order == 3))
             {
                 rtos_delay_milliseconds(100);
                 continue;
@@ -644,8 +666,7 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 			{
 				if (os_strcmp(argv[3], "open") == 0)
 				{
-					lcd_open_t lcd_open;
-					ret = media_app_frame_jdec_open(&lcd_open);
+					ret = media_app_frame_jdec_open(NULL);
 				}
 				else if (os_strcmp(argv[3], "close") == 0)
 				{
@@ -654,6 +675,7 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 			}
 			else if (os_strcmp(argv[2], "line") == 0)
 			{
+    			ret = media_app_set_rotate(ROTATE_90);
 				if (os_strcmp(argv[3], "open") == 0)
 				{
 					ret = media_app_pipeline_jdec_open();
@@ -961,6 +983,53 @@ output:
 	os_memcpy(pcWriteBuffer, msg, os_strlen(msg));
 }
 
+/*blend clock 12:30 | blend wifi wifi0*/
+void media_cli_blend_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+    int ret = UNKNOW_ERROR;
+    char *msg = NULL;
+
+    if (argc < 1)
+    {
+        goto output;
+    }
+
+    blend_info_t blend = {0};
+    if (argv[1] != NULL)
+        os_strcpy((char *)blend.name, argv[1]);
+    if (argv[2] != NULL)
+        os_strcpy((char *)blend.content, argv[2]);
+    ret = media_app_lcd_blend(&blend);
+output:
+
+    if (ret == UNKNOW_ERROR)
+    {
+        LOGE("%s unknow cmd\n", __func__);
+    }
+
+    if (ret == PARAMS_ERROR)
+    {
+        LOGE("%s param error cmd\n", __func__);
+    }
+
+    if (ret != BK_OK)
+    {
+        msg = CLI_CMD_RSP_ERROR;
+    }
+    else
+    {
+        msg = CLI_CMD_RSP_SUCCEED;
+    }
+
+    LOGI("%s ---complete\n", __func__);
+
+    os_memcpy(pcWriteBuffer, msg, os_strlen(msg));
+
+}
+
+
+
+
 void media_cli_switch_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
 	int ret = UNKNOW_ERROR;
@@ -1059,10 +1128,10 @@ static const struct cli_command s_media_commands[] =
 {
 	{"media", "media...", media_cli_test_cmd},
 	{"three_camera", "auto test", media_cli_threecam_auto_test_cmd},
-	{"three_camera", "switch", media_cli_threecam_auto_test_cmd},
 	{"storage", "open|close|capture|save|save_stop...", media_cli_storage_cmd},
 	{"transfer", "open fmt|close...", media_cli_transfer_cmd},
 	{"test", "open|close|switch fmt", media_cli_switch_cmd},
+	{"blend", "wifi0|clock 12:30|bat", media_cli_blend_cmd},
 #if (CONFIG_USB_CDC_ACM_DEMO)
 	{"cdc_test", "open|out|close|...", media_cli_for_usb_cdc_cmd},
 #endif

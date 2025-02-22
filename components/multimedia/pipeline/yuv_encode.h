@@ -74,6 +74,8 @@ typedef enum {
 	SCALE_RESET,
 } scale_msg_type_t;
 
+void decoder_mux_dump(void);
+
 bk_err_t h264_encode_task_send_msg(uint8_t type, uint32_t param);
 
 bk_err_t h264_encode_task_open(media_camera_device_t *device);
@@ -94,11 +96,6 @@ bk_err_t jpeg_decode_task_close();
 
 bool check_jpeg_decode_task_is_open(void);
 
-bk_err_t lcd_display_open(lcd_open_t *config);
-
-bk_err_t lcd_display_close(void);
-
-bool check_lcd_task_is_open(void);
 
 bk_err_t rotate_task_open(rot_open_t *rot_open);
 
@@ -115,7 +112,6 @@ bk_err_t scale_task_open(lcd_scale_t *lcd_scale);
 bk_err_t scale_task_close(void);
 bk_err_t scale_task_send_msg(uint8_t type, uint32_t param);
 
-bk_err_t lcd_display_frame_request(frame_buffer_t *frame);
 bk_err_t jpeg_decode_list_push(frame_buffer_t *frame, LIST_HEADER_T *list);
 frame_buffer_t *jpeg_decode_list_pop(LIST_HEADER_T *list);
 uint8_t jpeg_decode_list_del_node(frame_buffer_t *frame, LIST_HEADER_T *list);
@@ -137,12 +133,10 @@ bk_err_t jpeg_decode_single_frame(frame_buffer_t *in_frame,
 void jpeg_decode_set_rotate_angle(media_rotate_t rotate_angle);
 
 
-bool check_uvc_status(void);
 
 void rotate_set_dma2d_cb(void);
-void sw_dec_set_dma2d_cb(void);
 
-uint8_t *get_mux_sram_buffer(void);
+
 
 #ifdef __cplusplus
 }

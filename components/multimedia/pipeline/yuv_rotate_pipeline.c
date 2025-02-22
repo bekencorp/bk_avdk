@@ -38,6 +38,7 @@
 #include "dma2d_ll_macro_def.h"
 
 #include "bk_list.h"
+#include "lcd_display_service.h"
 
 #include "mux_pipeline.h"
 
@@ -525,7 +526,7 @@ error:
 bk_err_t rotate_clear_status(void)
 {
 	bk_err_t ret= BK_FAIL;
-	LOGI("%s, set reset\n", __func__);
+	LOGD("%s, set reset\n", __func__);
 	rotate_config->reset_status = true;
     if(rotate_config->reset_cb)
         rotate_config->reset_cb(NULL);

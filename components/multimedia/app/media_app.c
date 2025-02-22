@@ -38,6 +38,7 @@
 #include "components/bluetooth/bk_dm_ble.h"
 #include "components/bluetooth/bk_dm_bluetooth.h"
 #endif
+#include "frame_buffer.h"
 
 #define TAG "media_app"
 
@@ -212,6 +213,25 @@ bk_err_t media_app_switch_main_camera(uint16_t id, camera_type_t type, image_for
 
     return ret;
 }
+
+
+bk_err_t media_app_get_main_camera_stream(frame_list_node_t *node)
+{
+    int ret = BK_FAIL;
+
+    if (list_empty(&media_modules_state->cam_list))
+    {
+        LOGI("%s camera not open!\n", __func__);
+        return ret;
+    }
+    ret = media_send_msg_sync(EVENT_CAM_GET_MAIN_STREAM_IND, (uint32_t)node);
+
+    LOGI("%s complete\n", __func__);
+
+    return ret;
+}
+
+
 
 bk_err_t media_app_get_h264_encode_config(h264_base_config_t *config)
 {
@@ -404,7 +424,7 @@ bk_err_t media_app_lcd_disp_open(void *config)
 
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_ON);
 
-	ret = media_send_msg_sync(EVENT_PIPELINE_LCD_DISP_OPEN_IND, (uint32_t)config);
+	ret = media_send_msg_sync(EVENT_LCD_DISP_OPEN_IND, (uint32_t)config);
 
 	LOGI("%s complete %x\n", __func__, ret);
 
@@ -423,6 +443,21 @@ bk_err_t media_app_lcd_disp_close(void)
 
 	return ret;
 }
+
+bk_err_t media_app_lcd_blend(void *param)
+{
+    bk_err_t ret = BK_OK;
+    ret = media_send_msg_sync(EVENT_IMG_BLEND_IND, (uint32_t)param);
+
+    if (ret != BK_OK)
+    {
+        LOGE("%s fail\n", __func__);
+        return ret;
+    }
+
+    return ret;
+}
+
 
 bk_err_t media_app_pipeline_jdec_open(void)
 {
@@ -635,7 +670,7 @@ bk_err_t media_app_get_lcd_status(void)
 	uint32_t lcd_status = 0;
 	bk_err_t ret;
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_GET_MEDIA_MSG, PM_POWER_MODULE_STATE_ON);
-	ret = media_send_msg_sync_return_param(EVENT_LCD_GET_STATUS_IND, 0, &lcd_status);
+    ret = media_send_msg_sync_return_param(EVENT_LCD_GET_STATUS_IND, 0, &lcd_status);
 	if (ret != BK_OK)
 	{
 		LOGE("%s error\n", __func__);

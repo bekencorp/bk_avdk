@@ -64,7 +64,7 @@ if (CONFIG_WANSON_ASR)
 	)
 endif()
 
-set(priv_req bk_init bk_cli lvgl media_service audio_record wanson)
+set(priv_req bk_init bk_cli lvgl media_service audio_record wanson display_service)
 
 if ("${ARMINO_SOC}" STREQUAL "bk7258" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp1")
 list(APPEND priv_req multimedia)

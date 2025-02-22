@@ -34,6 +34,7 @@
 #include "bk_list_edge.h"
 
 #include "mux_pipeline.h"
+#include "lcd_display_service.h"
 
 #define TAG "scale_pipline"
 
@@ -566,6 +567,11 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
 			}
 
 			scale_config->decoder_buffer = (complex_buffer_t*)os_malloc(sizeof(complex_buffer_t));
+			if (scale_config->decoder_buffer == NULL)
+			{
+				LOGE("%s os_malloc fail\n", __func__);
+				break;
+			}
 			os_memcpy(scale_config->decoder_buffer, scale_request->buffer, sizeof(complex_buffer_t));
 
 			scale_config->state = SCALE_STATE_SCALING;
@@ -613,6 +619,11 @@ bk_err_t lcd_scale_line_state_machine(scale_state_t state, void *args)
             HW_SCALE_SRC_START();
 
 			scale_config->decoder_buffer = (complex_buffer_t*)os_malloc(sizeof(complex_buffer_t));
+            if (scale_config->decoder_buffer == NULL)
+            {
+				LOGI("%s os_malloc fail\n", __func__);
+                break;
+            }
 			os_memcpy(scale_config->decoder_buffer, scale_request->buffer, sizeof(complex_buffer_t));
 
 			scale_block_t scale_block;
@@ -1153,6 +1164,11 @@ bk_err_t scale_task_close(void)
 		if (scale_request != NULL)
 		{
 			complex_buffer_t *decoder_buffer = (complex_buffer_t*)os_malloc(sizeof(complex_buffer_t));
+            if (decoder_buffer == NULL)
+            {
+				LOGI("%s os_malloc fail\n", __func__);
+                break;
+            }
 			os_memcpy(decoder_buffer, scale_request->buffer, sizeof(complex_buffer_t));
 
 			LOGI("%s free pending list\n", __func__);

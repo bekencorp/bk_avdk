@@ -18,7 +18,7 @@
 #include <components/log.h>
 #include <driver/lcd.h>
 #include <driver/flash.h>
-#include "display_service.h"
+#include "lcd_display_service.h"
 #include "frame_buffer.h"
 #include "yuv_encode.h"
 #if CONFIG_LCD_QSPI
@@ -26,16 +26,14 @@
 #endif
 #include "mux_pipeline.h"
 
-#if CONFIG_BLEND
 #include "bk_draw_blend.h"
-#endif
 
 #if CONFIG_LCD_SPI_DISPLAY
 #include <lcd_spi_display_service.h>
 #endif
 
 
-#define TAG "lcd_pip"
+#define TAG "lcd_disp"
 
 #define LOGI(...) BK_LOGI(TAG, ##__VA_ARGS__)
 #define LOGW(...) BK_LOGW(TAG, ##__VA_ARGS__)
@@ -54,8 +52,8 @@
 #define DISPLAY_ISR_END()
 #endif
 
-#if (CONFIG_BLEND_DEMO)
-extern const blend_info_t blend_info[8];
+#if (CONFIG_BLEND_UI)
+extern const blend_info_t blend_info[];
 #endif
 extern media_debug_t *media_debug;
 extern uint32_t  platform_is_in_interrupt_context(void);
@@ -316,9 +314,18 @@ static void lcd_display_task_entry(beken_thread_arg_t data)
             switch (msg.event)
             {
                 case DISPLAY_FRAME_REQUEST:
-#if (CONFIG_BLEND_DEMO)
-                    bk_display_blend_handle((frame_buffer_t *)msg.param, lcd_disp_config->lcd_width, lcd_disp_config->lcd_height,
-                                            blend_info, sizeof(blend_info)/sizeof(blend_info[0]));
+#if (CONFIG_BLEND_UI)
+                    if (g_dyn_array.size > 0)
+                    {
+                        blend_info_t *info = &g_dyn_array.entry[0];
+                        bk_display_blend_handle((frame_buffer_t *)msg.param, lcd_disp_config->lcd_width,
+                                                lcd_disp_config->lcd_height, info);
+                    }
+                    else
+                    {
+                        bk_display_blend_handle((frame_buffer_t *)msg.param, lcd_disp_config->lcd_width,
+                                                lcd_disp_config->lcd_height, blend_info);
+                    }
 #endif
                     lcd_display_frame((frame_buffer_t *)msg.param);
                     break;
@@ -329,6 +336,7 @@ static void lcd_display_task_entry(beken_thread_arg_t data)
 					jpeg_decode_get_next_frame();
 #endif
                     break;
+
                 case DISPLAY_FRAME_EXTI:
                 {
                     rtos_lock_mutex(&service_info->lock);
@@ -627,10 +635,6 @@ bk_err_t lcd_display_close(void)
 #endif
 
     lcd_display_config_free();
-
-#if (CONFIG_BLEND_DEMO)
-     bk_blend_deinit();
-#endif
 
     LOGI("%s complete, %d\n", __func__, __LINE__);
 

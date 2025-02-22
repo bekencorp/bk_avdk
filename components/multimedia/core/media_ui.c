@@ -31,7 +31,7 @@
 #include <driver/pwr_clk.h>
 #include "yuv_encode.h"
 
-#include "display_service.h"
+#include "lcd_display_service.h"
 
 #if (CONFIG_CACHE_ENABLE)
 #include "cache.h"
@@ -240,12 +240,7 @@ static void media_ui_task_main(beken_thread_arg_t data)
 				case LCD_EVENT:
 					mb_msg = (media_mailbox_msg_t *)msg.param;
 					img_event_handle(mb_msg);
-					break;
-#endif
-#ifdef CONFIG_MEDIA_PIPELINE
-				case UVC_PIPELINE_EVENT:
-					mb_msg = (media_mailbox_msg_t *)msg.param;
-					uvc_pipeline_event_handle(mb_msg);
+
 					break;
 #endif
 #ifdef CONFIG_LVGL

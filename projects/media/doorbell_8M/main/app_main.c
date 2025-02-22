@@ -211,7 +211,7 @@ int cli_lvcamera_init(void)
 
 #if (CONFIG_SYS_CPU1)
 #include "frame_buffer.h"
-#include "yuv_encode.h"
+#include "lcd_display_service.h"
 #include "lv_vendor.h"
 #include "driver/media_types.h"
 #include "media_evt.h"
