@@ -69,5 +69,10 @@ int media_service_init(void)
 #endif
 
 #endif
+
+#if (CONFIG_USB_CDC)
+	extern bk_err_t bk_cdc_acm_demo(void);
+	bk_cdc_acm_demo();
+#endif
 	return 0;
 }

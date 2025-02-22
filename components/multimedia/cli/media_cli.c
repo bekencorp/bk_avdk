@@ -1029,7 +1029,29 @@ output:
 
 	os_memcpy(pcWriteBuffer, msg, os_strlen(msg));
 }
+#if (CONFIG_USB_CDC_ACM_DEMO)
+extern void ex_cdc_send_msg(uint8_t type, uint32_t param);
+extern void demo_bulk_out(uint32_t port);
+extern void bk_usb_cdc_demo(void);
 
+void media_cli_for_usb_cdc_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+	if (argc > 2) {
+		uint8_t port = os_strtoul(argv[2], NULL, 10) & 0xFF;
+		if (os_strcmp(argv[1], "open") == 0) {
+			bk_usb_cdc_demo();
+			rtos_delay_milliseconds(500);///wait the cp1 starting up
+			ex_cdc_send_msg(0, port);///CDC_STATUS_IDLE 
+		}
+		else if (os_strcmp(argv[1], "out") == 0) {
+			demo_bulk_out(port);
+		}
+	}
+	else if (os_strcmp(argv[1], "close") == 0) {
+		ex_cdc_send_msg(6, 0);///CDC_STATUS_CLOSE 
+	}
+}
+#endif
 
 #define MEDIA_CMD_CNT   (sizeof(s_media_commands) / sizeof(struct cli_command))
 
@@ -1041,6 +1063,9 @@ static const struct cli_command s_media_commands[] =
 	{"storage", "open|close|capture|save|save_stop...", media_cli_storage_cmd},
 	{"transfer", "open fmt|close...", media_cli_transfer_cmd},
 	{"test", "open|close|switch fmt", media_cli_switch_cmd},
+#if (CONFIG_USB_CDC_ACM_DEMO)
+	{"cdc_test", "open|out|close|...", media_cli_for_usb_cdc_cmd},
+#endif
 };
 
 int media_cli_init(void)
