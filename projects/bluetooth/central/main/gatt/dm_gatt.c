@@ -30,6 +30,8 @@ static uint8_t s_dm_gatt_is_inited;
 static uint8_t s_dm_gatt_privacy_enable = 0;
 static bk_ble_local_keys_t s_dm_gap_local_key;
 
+static beken_semaphore_t s_ble_er_ir_sema = NULL;
+
 #if 1
     static uint8_t s_dm_gatt_iocap = BK_IO_CAP_NONE;
     static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_BOND;
@@ -703,6 +705,11 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
         bluetooth_storage_save_local_key(&s_dm_gap_local_key);
         bluetooth_storage_sync_to_flash();
 #endif
+
+        if (s_ble_er_ir_sema)
+        {
+            rtos_set_semaphore(&s_ble_er_ir_sema);
+        }
     }
     break;
 
@@ -725,6 +732,11 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
         bluetooth_storage_save_local_key(&s_dm_gap_local_key);
         bluetooth_storage_sync_to_flash();
 #endif
+
+        if (s_ble_er_ir_sema)
+        {
+            rtos_set_semaphore(&s_ble_er_ir_sema);
+        }
     }
     break;
 
@@ -1574,6 +1586,14 @@ int dm_gatt_main(cli_gatt_param_t *param)
         return -1;
     }
 
+    ret = rtos_init_semaphore(&s_ble_er_ir_sema, 1);
+
+    if (ret != 0)
+    {
+        gatt_loge("rtos_init_semaphore s_ble_er_ir_sema err %d", ret);
+        return -1;
+    }
+
     bk_ble_gap_register_callback(dm_ble_gap_private_cb);
     dm_gatt_add_gap_callback(dm_ble_gap_common_cb);
 
@@ -1597,6 +1617,8 @@ int dm_gatt_main(cli_gatt_param_t *param)
         }
     }
 
+    gatt_logw("set BK_BLE_SM_SET_ER start");
+
     ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_ER, (void *)s_dm_gap_local_key.er, sizeof(s_dm_gap_local_key.er));
 
     if (ret)
@@ -1613,6 +1635,14 @@ int dm_gatt_main(cli_gatt_param_t *param)
         return -1;
     }
 
+    ret = rtos_get_semaphore(&s_ble_er_ir_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait er report err %d", ret);
+        return -1;
+    }
+
     if (!dm_gap_is_data_valid(s_dm_gap_local_key.ir, sizeof(s_dm_gap_local_key.ir)))
     {
         for (int i = 0; i < sizeof(s_dm_gap_local_key.ir); ++i)
@@ -1620,6 +1650,8 @@ int dm_gatt_main(cli_gatt_param_t *param)
             s_dm_gap_local_key.ir[i] = rand();
         }
     }
+
+    gatt_logw("set BK_BLE_SM_SET_IR start");
 
     ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_IR, (void *)s_dm_gap_local_key.ir, sizeof(s_dm_gap_local_key.ir));
 
@@ -1636,6 +1668,15 @@ int dm_gatt_main(cli_gatt_param_t *param)
         gatt_loge("wait set ir err %d", ret);
         return -1;
     }
+
+    ret = rtos_get_semaphore(&s_ble_er_ir_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait ir report err %d", ret);
+        return -1;
+    }
+
 
     if (g_dm_gap_use_rpa)
     {
@@ -1733,6 +1774,19 @@ int dm_gatt_main(cli_gatt_param_t *param)
     //set mtu
     bk_ble_gatt_set_local_mtu(517);
 
+    if (s_ble_er_ir_sema)
+    {
+        ret = rtos_deinit_semaphore(&s_ble_er_ir_sema);
+
+        if (ret != 0)
+        {
+            gatt_loge("rtos_deinit_semaphore s_ble_er_ir_sema err %d", ret);
+            return -1;
+        }
+
+        s_ble_er_ir_sema = NULL;
+    }
+
     if (s_ble_sema)
     {
         ret = rtos_deinit_semaphore(&s_ble_sema);
@@ -1745,7 +1799,6 @@ int dm_gatt_main(cli_gatt_param_t *param)
     }
 
     s_ble_sema = NULL;
-
     s_dm_gatt_is_inited = 1;
 
     return 0;
