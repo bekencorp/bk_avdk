@@ -190,7 +190,6 @@ static media_transfer_cb_t doorbell_udp_img_channel =
 	.prepare = doorbell_udp_img_send_prepare,
 	.get_tx_buf = doorbell_udp_img_get_tx_buf,
 	.get_tx_size = doorbell_udp_img_get_tx_size,
-	.fmt = PIXEL_FMT_JPEG
 };
 
 static const media_transfer_cb_t doorbell_udp_aud_channel =
@@ -199,7 +198,6 @@ static const media_transfer_cb_t doorbell_udp_aud_channel =
 	.prepare = doorbell_udp_aud_send_prepare,
 	.get_tx_buf = doorbell_udp_aud_get_tx_buf,
 	.get_tx_size = doorbell_udp_aud_get_tx_size,
-	.fmt = PIXEL_FMT_UNKNOW
 };
 
 static inline void doorbell_udp_voice_receiver(db_channel_t *channel, uint16_t sequence, uint16_t flags, uint32_t timestamp, uint8_t sequences, uint8_t *data, uint16_t length)

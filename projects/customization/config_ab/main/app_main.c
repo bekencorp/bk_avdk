@@ -24,11 +24,10 @@ extern db_device_info_t *db_device_info;
 
 media_camera_device_t camera_device = {
     .type = DVP_CAMERA,
-    .mode = JPEG_YUV_MODE,
-    .fmt = PIXEL_FMT_JPEG,
-    .info.fps = FPS30,
-    .info.resolution.width = 864,
-    .info.resolution.height = 480,
+    .format = IMAGE_MJPEG,
+    .width = 864,
+    .height = 480,
+    .fps = FPS30,
     .port = 0,
 };
 
@@ -126,16 +125,13 @@ void cli_lvcamera_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char *
 
         if ((device_id == 1) || (device_id == 2)) {
             camera_device.type = UVC_CAMERA;
-            camera_device.mode = JPEG_MODE;
-            camera_device.fmt = PIXEL_FMT_JPEG;
+            camera_device.format = IMAGE_MJPEG;
         } else if (device_id == 0) {
             camera_device.type = DVP_CAMERA;
             if (db_device_info->h264_transfer) {
-                camera_device.mode = H264_YUV_MODE;
-                camera_device.fmt = PIXEL_FMT_H264;
+                camera_device.format = IMAGE_YUV | IMAGE_H264;
             } else {
-                camera_device.mode = JPEG_YUV_MODE;
-                camera_device.fmt = PIXEL_FMT_JPEG;
+                camera_device.format = IMAGE_YUV | IMAGE_MJPEG;
             }
         } else {
             os_printf("Unsupported device ID! The range of device id is from 0 to 2!\r\n");

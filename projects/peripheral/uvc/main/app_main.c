@@ -30,11 +30,11 @@ sw_jpeg_dec_res_t result;
 #if (CONFIG_SYS_CPU0)
 media_camera_device_t camera_device = {
 	.type = UVC_CAMERA,
-	.mode = JPEG_MODE,
-	.fmt = PIXEL_FMT_JPEG,
-	.info.fps = FPS25,
-	.info.resolution.width = 800,
-	.info.resolution.height = 480,
+	.format = IMAGE_MJPEG,
+	.fps = FPS30,
+	.width = 800,
+	.height = 480,
+	.port = 1,
 };
 
 static void media_checkout_uvc_device_info(bk_usb_hub_port_info *info, uint32_t state)

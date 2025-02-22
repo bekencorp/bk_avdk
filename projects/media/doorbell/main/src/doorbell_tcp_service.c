@@ -171,7 +171,6 @@ static media_transfer_cb_t doorbell_tcp_img_channel =
 	.prepare = doorbell_tcp_img_send_prepare,
 	.get_tx_buf = doorbell_tcp_img_get_tx_buf,
 	.get_tx_size = doorbell_tcp_img_get_tx_size,
-	.fmt = PIXEL_FMT_UNKNOW,
 };
 
 static const media_transfer_cb_t doorbell_tcp_aud_channel =
@@ -180,7 +179,6 @@ static const media_transfer_cb_t doorbell_tcp_aud_channel =
 	.prepare = doorbell_tcp_aud_send_prepare,
 	.get_tx_buf = doorbell_tcp_aud_get_tx_buf,
 	.get_tx_size = doorbell_tcp_aud_get_tx_size,
-	.fmt = PIXEL_FMT_UNKNOW,
 };
 
 static void doorbell_image_server_thread(beken_thread_arg_t data)

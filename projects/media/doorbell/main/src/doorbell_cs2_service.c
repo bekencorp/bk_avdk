@@ -590,7 +590,6 @@ static media_transfer_cb_t doorbell_cs2_img_channel =
 	.prepare = doorbell_cs2_img_send_prepare,
 	.get_tx_buf = doorbell_cs2_img_get_tx_buf,
 	.get_tx_size = doorbell_cs2_img_get_tx_size,
-	.fmt = PIXEL_FMT_UNKNOW,
 #if CONFIG_MEDIA_DROP_STRATEGY_ENABLE
 	.drop_check = doorbell_cs2_img_drop_check,
 #else
@@ -605,7 +604,6 @@ static const media_transfer_cb_t doorbell_cs2_aud_channel =
 	.prepare = doorbell_cs2_aud_send_prepare,
 	.get_tx_buf = doorbell_cs2_aud_get_tx_buf,
 	.get_tx_size = doorbell_cs2_aud_get_tx_size,
-	.fmt = PIXEL_FMT_UNKNOW,
 };
 
 static void doorbell_cs2_get_time(time_info_t *pt)

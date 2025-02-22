@@ -324,6 +324,14 @@ void doorbell_transmission_cmd_recive_callback(db_channel_t *channel, uint16_t s
 				parameters.rotate = -1;
 			}
 
+#ifdef CONFIG_STANDARD_DUALSTREAM
+			if (cmd.length > 5 * sizeof(uint16_t))
+			{
+				STREAM_TO_UINT16(parameters.dualstream, p);
+				STREAM_TO_UINT16(parameters.d_width, p);
+				STREAM_TO_UINT16(parameters.d_height, p);
+			}
+#endif
 			int ret = doorbell_camera_turn_on(&parameters);
 			doorbell_video_transfer_turn_on();
 

@@ -20,6 +20,12 @@ typedef struct
 	uint16_t format;
 	uint16_t protocol;
 	uint16_t rotate;
+
+#ifdef CONFIG_STANDARD_DUALSTREAM
+	uint16_t dualstream;
+	uint16_t d_width;
+	uint16_t d_height;
+#endif
 } camera_parameters_t;
 
 typedef struct
@@ -52,7 +58,7 @@ typedef struct
 	uint16_t lcd_id;
 	uint16_t camera_id;
 	void *video_handle;
-	media_transfer_cb_t *camera_transfer_cb;
+	const media_transfer_cb_t *camera_transfer_cb;
 	const media_transfer_cb_t *audio_transfer_cb;
 } db_device_info_t;
 

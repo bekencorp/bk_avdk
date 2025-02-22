@@ -36,11 +36,11 @@ const lcd_open_t lcd_open =
 
 media_camera_device_t camera_device = {
     .type = UVC_CAMERA,
-    .mode = JPEG_MODE,
-    .fmt = PIXEL_FMT_JPEG,
-    .info.fps = FPS25,
-    .info.resolution.width = 864,
-    .info.resolution.height = 480,
+    .format = IMAGE_MJPEG,
+    .width = 864,
+    .height = 480,
+    .fps = FPS30,
+    .port = 1,
 };
 
 void lvcamera_open(void)

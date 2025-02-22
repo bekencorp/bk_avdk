@@ -24,6 +24,7 @@
 
 #include "wifi_transfer.h"
 #include "media_app.h"
+#include "camera_handle_list.h"
 #include "img_service.h"
 
 #include "driver/dvp_camera.h"
@@ -369,55 +370,33 @@ int doorbell_camera_turn_on(camera_parameters_t *parameters)
 
 	if (parameters->format == 0) // wifi transfer format 0/1:mjpeg/h264
 	{
-		device.fmt = PIXEL_FMT_JPEG;
+		device.format = IMAGE_MJPEG;
 		if (device.type == DVP_CAMERA)
 		{
-			device.mode = JPEG_YUV_MODE;
+			device.format = IMAGE_YUV | IMAGE_MJPEG;
 		}
-		else
-		{
-			device.mode = JPEG_MODE;
-		}
+
 		db_device_info->h264_transfer = false;
 	}
 	else
 	{
 		if (device.type == DVP_CAMERA)
 		{
-			device.fmt = PIXEL_FMT_H264;
-			device.mode = H264_YUV_MODE;
+			device.format = IMAGE_YUV | IMAGE_H264;
 			db_device_info->pipeline_enable = false;
 		}
 		else
 		{
-			device.fmt = PIXEL_FMT_JPEG;
-			device.mode = JPEG_MODE; // uvc output mjpeg(not h264 stream)
+			device.format = IMAGE_MJPEG;// uvc output mjpeg(not h264 stream)
 			db_device_info->pipeline_enable = true;
 		}
 		db_device_info->h264_transfer = true;
 	}
 
-	if (db_device_info->pipeline_enable)
-	{
-		db_device_info->camera_transfer_cb->fmt = PIXEL_FMT_H264;
-	}
-	else
-	{
-		if (device.mode == H264_YUV_MODE || device.mode == H264_MODE)
-		{
-			db_device_info->camera_transfer_cb->fmt = PIXEL_FMT_H264;
-		}
-		else
-		{
-			db_device_info->camera_transfer_cb->fmt = PIXEL_FMT_JPEG;
-		}
-	}
-
-	LOGI("%s, device(mode:%d, fmt:%d), transfer(fmt:%d)\n", __func__, device.mode, device.fmt,
-			 db_device_info->camera_transfer_cb->fmt);
-	device.info.resolution.width = parameters->width;
-	device.info.resolution.height = parameters->height;
-	device.info.fps = FPS30;
+	LOGI("%s, device:fmt:%d, transfer:%s\n", __func__, device.format, db_device_info->h264_transfer ? "h264" : "mjpeg");
+	device.width = parameters->width;
+	device.height = parameters->height;
+	device.fps = FPS30;
 
 	ret = media_app_camera_open(&db_device_info->video_handle, &device);
 
@@ -472,7 +451,6 @@ int doorbell_camera_turn_on(camera_parameters_t *parameters)
 
 int doorbell_camera_turn_off(void)
 {
-
 	if (db_device_info->video_handle == NULL)
 	{
 		LOGI("%s, %d already close\n", __func__);
@@ -487,14 +465,20 @@ int doorbell_camera_turn_off(void)
 
 	media_app_pipeline_jdec_close();
 	media_app_frame_jdec_close();
-	for (uint8_t id = 0; id < CAMERA_MAX_NUM; id++)
-	{
-		db_device_info->video_handle = media_app_get_camera_handle_by_id(id);
-		if (db_device_info->video_handle != NULL)
+
+	do {
+		db_device_info->video_handle = bk_camera_handle_node_pop();
+		if (db_device_info->video_handle)
 		{
+			LOGI("%s, %d, %p\n", __func__, __LINE__, db_device_info->video_handle);
 			media_app_camera_close(&db_device_info->video_handle);
 		}
-	}
+		else
+		{
+			break;
+		}
+	} while (1);
+
 	db_device_info->video_handle = NULL;
 	db_device_info->camera_id = CAMERA_MAX_NUM;
 
@@ -517,7 +501,14 @@ int doorbell_video_transfer_turn_on(void)
 
 	if (db_device_info->camera_transfer_cb)
 	{
-		ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb);
+		if (db_device_info->h264_transfer)
+		{
+			ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb, IMAGE_H264);
+		}
+		else
+		{
+			ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb, IMAGE_MJPEG);
+		}
 	}
 	else
 	{

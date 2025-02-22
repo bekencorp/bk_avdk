@@ -24,6 +24,7 @@
 
 #include "wifi_transfer.h"
 #include "media_app.h"
+#include "camera_handle_list.h"
 #include "img_service.h"
 
 #include "driver/dvp_camera.h"
@@ -345,22 +346,11 @@ int doorbell_camera_turn_on(camera_parameters_t *parameters)
 {
 	bk_err_t ret = BK_FAIL;
 	media_camera_device_t device = {0};
+	media_camera_device_t device1 = {0};
 
 	LOGI("%s, id: 0x%x, %d X %d, format: %d, Protocol: %d\n", __func__, 
 		parameters->id, parameters->width, parameters->height,
 		parameters->format, parameters->protocol);
-
-	if (parameters->dualstream)
-	{
-		device.dualstream  = 1;
-		device.num_uvc_dev = 2;
-		LOGI("DualStream : %d X %d\n", parameters->d_width, parameters->d_height);
-	}
-	else
-	{
-		device.dualstream  = 0;
-		device.num_uvc_dev = 1;
-	}
 
 	if (db_device_info->video_handle)
 	{
@@ -371,114 +361,112 @@ int doorbell_camera_turn_on(camera_parameters_t *parameters)
 	if (parameters->id == UVC_DEVICE_ID)
 	{
 		device.type = UVC_CAMERA;
+		if (parameters->dualstream)
+		{
+			device.format = IMAGE_MJPEG;
+		}
+		else
+		{
+			if (parameters->format == 0)
+			{
+				device.format = IMAGE_MJPEG;
+			}
+			else
+			{
+				device.format = IMAGE_H264;
+			}
+		}
 	}
 	else
 	{
 		device.type = DVP_CAMERA;
+		if (parameters->format == 0)
+		{
+			device.format = IMAGE_YUV | IMAGE_MJPEG;
+		}
+		else
+		{
+			device.format = IMAGE_YUV | IMAGE_H264;
+		}
 	}
 
 	if (parameters->format == 0)
 	{
-		device.fmt = PIXEL_FMT_JPEG;
-		if (device.type == DVP_CAMERA)
-			device.mode = JPEG_YUV_MODE;
-		else
-			device.mode = JPEG_MODE;
+		db_device_info->h264_transfer = false;
 	}
-	else if (parameters->format == 1 && parameters->dualstream == 0)
+	else
 	{
-		device.fmt = PIXEL_FMT_H264;
-		if (device.type == DVP_CAMERA)
-			device.mode = H264_YUV_MODE;
-		else
-			device.mode = H264_MODE;
+		db_device_info->h264_transfer = true;
 	}
-	else if (parameters->format == 1 && parameters->dualstream != 0)
+
+	device.width  = parameters->width;
+	device.height = parameters->height;
+	device.fps = FPS30;
+	device.port = 1;
+	if (parameters->dualstream)
 	{
-		device.fmt = PIXEL_FMT_JPEG;
-		if (device.type == DVP_CAMERA)
-			device.mode = JPEG_YUV_MODE;
-		else
-			device.mode = JPEG_MODE;
-
-		device.d_fmt  = PIXEL_FMT_H264;   // PIXEL_FMT_H265
-		if (device.type == DVP_CAMERA)
-			device.d_mode = H264_YUV_MODE;
-		else
-			device.d_mode = H264_MODE;    // H265_MODE
-
-		device.d_info.resolution.width  = parameters->d_width;
-		device.d_info.resolution.height = parameters->d_height;
-		device.d_info.fps = FPS30;
-	}
-	else if (parameters->format == 2 && parameters->dualstream != 0)
-	{
-		device.fmt = PIXEL_FMT_JPEG;
-		if (device.type == DVP_CAMERA)
-			device.mode = JPEG_YUV_MODE;
-		else
-			device.mode = JPEG_MODE;
-
-		device.d_fmt  = PIXEL_FMT_H265;   // PIXEL_FMT_H265
-		device.d_mode = H265_MODE;    // H265_MODE
-
-		device.d_info.resolution.width  = parameters->d_width;
-		device.d_info.resolution.height = parameters->d_height;
-		device.d_info.fps = FPS30;
+		device1.type = UVC_CAMERA;
+		device1.format = IMAGE_H264;
+		device1.width  = parameters->d_width;
+		device1.height = parameters->d_height;
+		device1.fps = FPS30;
+		device1.port = 1;
 	}
 
-	if (device.type == UVC_CAMERA && device.mode == H264_MODE && device.num_uvc_dev == 1)
-	{
-#if !CONFIG_SOC_BK7256XX
-		device.mode = JPEG_MODE;
-		device.fmt  = PIXEL_FMT_JPEG;
-		db_device_info->pipeline_enable = true;
-#endif
-	}
-	if (device.num_uvc_dev == 1) {
-		db_device_info->camera_transfer_cb->fmt = device.fmt;
-	}
-	else if (device.num_uvc_dev == 2) {
-		db_device_info->camera_transfer_cb->fmt = device.d_fmt;
-	}
+	db_device_info->pipeline_enable = false;
 
-	if (db_device_info->pipeline_enable)
-		db_device_info->camera_transfer_cb->fmt = PIXEL_FMT_H264;
-
-	device.info.resolution.width  = parameters->width;
-	device.info.resolution.height = parameters->height;
-	device.info.fps = FPS30;
-
+	/*dvp (mjpeg + yuv)|(h264 + yuv)/ uvc (mjpeg + h264)|(mjpeg + h265)*/
 	ret = media_app_camera_open(&db_device_info->video_handle, &device);
-
 	if (ret != BK_OK)
 	{
-		LOGE("%s failed\n", __func__);
+		LOGE("%s %d failed\n", __func__, __LINE__);
 		return ret;
 	}
 
-	uint8_t rot_angle = 0;
-	if (db_device_info->pipeline_enable)
+	if (parameters->dualstream)
 	{
-		switch (parameters->rotate)
+		void *video_handle1 = NULL;
+		ret = media_app_camera_open(&video_handle1, &device1);
+		if (ret != BK_OK)
 		{
-			case 90:
-				rot_angle = ROTATE_90;
-				break;
-			case 180:
-				rot_angle = ROTATE_180;
-				break;
-			case 270:
-				rot_angle = ROTATE_270;
-				break;
-			case 0:
-				rot_angle = ROTATE_NONE;
-				break;
-			default:
-				rot_angle = ROTATE_90;
-				break;
+			LOGE("%s %d failed\n", __func__, __LINE__);
+			return ret;
 		}
-		media_app_set_rotate(rot_angle);
+	}
+
+	uint8_t rot_angle = 0;
+
+	switch (parameters->rotate)
+	{
+		case 90:
+			rot_angle = ROTATE_90;
+			break;
+		case 180:
+			rot_angle = ROTATE_180;
+			break;
+		case 270:
+			rot_angle = ROTATE_270;
+			break;
+		case 0:
+			rot_angle = ROTATE_NONE;
+			break;
+		default:
+			rot_angle = ROTATE_90;
+			break;
+	}
+	media_app_set_rotate(rot_angle);
+
+	if (device.type == UVC_CAMERA)
+	{
+		if (device.format == IMAGE_MJPEG)
+		{
+			media_app_pipeline_jdec_open();
+		}
+
+	}
+	else if (device.type == DVP_CAMERA)
+	{
+		media_app_frame_jdec_open(NULL);
 	}
 
 	return ret;
@@ -486,31 +474,35 @@ int doorbell_camera_turn_on(camera_parameters_t *parameters)
 
 int doorbell_camera_turn_off(void)
 {
-	camera_handle_t handle = NULL;
 	LOGI("%s\n", __func__);
 
-	if (media_app_check_all_camera_close())
+	if (db_device_info->video_handle == NULL)
 	{
-		LOGI("%s, %d all camera already close\n", __func__);
+		LOGI("%s, %d already close\n", __func__);
 		return EVT_STATUS_ALREADY;
 	}
 
-	if (db_device_info->pipeline_enable)
-	{
-		media_app_pipeline_h264_close();
-		LOGI("%s h264_pipeline close\n", __func__);
-	}
+	media_app_pipeline_jdec_close();
+	media_app_frame_jdec_close();
 
-	for (uint8_t id = 0; id < CAMERA_MAX_NUM; id++)
-	{
-		handle = media_app_get_camera_handle_by_id(id);
-		if (handle != NULL)
+	do {
+		db_device_info->video_handle = bk_camera_handle_node_pop();
+		if (db_device_info->video_handle)
 		{
-			media_app_camera_close(&handle);
+			media_app_camera_close(&db_device_info->video_handle);
 		}
-	}
+		else
+		{
+			break;
+		}
+	} while (1);
 
 	db_device_info->video_handle = NULL;
+	db_device_info->camera_id = CAMERA_MAX_NUM;
+
+	db_device_info->pipeline_enable = false;
+
+	db_device_info->h264_transfer = false;
 
 	return 0;
 }
@@ -527,7 +519,14 @@ int doorbell_video_transfer_turn_on(void)
 
 	if (db_device_info->camera_transfer_cb)
 	{
-		ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb);
+		if (db_device_info->h264_transfer)
+		{
+			ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb, IMAGE_H264);
+		}
+		else
+		{
+			ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb, IMAGE_MJPEG);
+		}
 	}
 	else
 	{
@@ -606,7 +605,7 @@ int doorbell_display_turn_on(uint16_t id, uint16_t rotate, uint16_t fmt)
 	}
 
 	media_app_set_rotate(rot_angle);
-	media_app_lcd_disp_open(&lcd_open)
+	media_app_lcd_disp_open(&lcd_open);
 
 	return 0;
 }

@@ -44,46 +44,19 @@ static char agora_appid[50] = {0};
 static bool audio_en = false;
 static bool video_en = false;
 static media_camera_device_t camera_device = {
-#if defined(CONFIG_ENABLE_DUAL_STREAM)
-	/* dual stream */
-	.num_uvc_dev = 2,
-	.dualstream  = 1,
-#if defined(CONFIG_ENABLE_VIDEO_H265)
-	/* h265 video */
-	.d_mode = H265_MODE,
-	.d_fmt  = PIXEL_FMT_H265,
-#else
-	/* h264 video */
-	.d_mode = H264_MODE,
-	.d_fmt  = PIXEL_FMT_H264,
-#endif //#if defined(CONFIG_ENABLE_VIDEO_H265)
-	.d_info.resolution.width  = 1920,
-	.d_info.resolution.height = 1080,
-	.d_info.fps = FPS25,
-#else
-	/* single stream */
-	.num_uvc_dev = 1,
-	.dualstream  = 0,
-#endif //#if defined(CONFIG_ENABLE_DUAL_STREAM)
-
 #if defined(CONFIG_UVC_CAMERA)
 	.type = UVC_CAMERA,
-	.mode = JPEG_MODE,
-	.fmt  = PIXEL_FMT_JPEG,
-	/* expect the width and length */
-	.info.resolution.width  = 640,//640,//864,
-	.info.resolution.height = 480,
-	.info.fps = FPS25,
+	.port  = 1,
 #elif defined(CONFIG_DVP_CAMERA)
 	/* DVP Camera */
 	.type = DVP_CAMERA,
-	.mode = H264_MODE,
-	.fmt  = PIXEL_FMT_H264,
-	/* expect the width and length */
-	.info.resolution.width  = 640,//1280,
-	.info.resolution.height = 480,//720,
-	.info.fps = FPS20,
+	.port  = 0,
 #endif
+	/* expect the width and length */
+	.format = IMAGE_MJPEG,
+	.width  = 640,//640,//864,
+	.height = 480,
+	.fps = FPS25,
 };
 
 static uint8_t audio_type = 0;
@@ -582,10 +555,7 @@ void agora_main(void)
 		rwnxl_set_video_transfer_flag(true);
 
 #if defined(CONFIG_UVC_CAMERA)
-	#if defined(CONFIG_ENABLE_DUAL_STREAM)
-	#else
 		media_app_uvc_register_info_notify_cb(media_checkout_uvc_device_info);
-	#endif
 #endif
 
 	#if defined (CONFIG_ENABLE_APP_DATA_BACK) /* receive app video and send back app video to app */
@@ -620,7 +590,7 @@ void agora_main(void)
 			return;
 		}
 
-		ret = media_app_register_read_frame_callback(PIXEL_FMT_H264, app_media_read_frame_callback);
+		ret = media_app_register_read_frame_callback(IMAGE_H264, app_media_read_frame_callback);
 		if (ret != BK_OK) {
 			LOGE("%s register read_frame_cb failed\n", __func__);
 			return;
@@ -628,7 +598,7 @@ void agora_main(void)
 
 	#endif
 #elif defined(CONFIG_DVP_CAMERA)
-		ret = media_app_register_read_frame_callback(camera_device.fmt, app_media_read_frame_callback);
+		ret = media_app_register_read_frame_callback(camera_device.format, app_media_read_frame_callback);
 		if (ret != BK_OK) {
 			LOGE("%s register read_frame_cb failed\n", __func__);
 			return;
@@ -787,24 +757,19 @@ void cli_agora_rtc_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, 
 
 			if (os_strcmp(argv[4], "DVP_JPEG") == 0) {
 				camera_device.type = DVP_CAMERA;
-				camera_device.mode = JPEG_MODE;
-				camera_device.fmt  = PIXEL_FMT_JPEG;
+				camera_device.format = IMAGE_MJPEG;
 			} else if (os_strcmp(argv[4], "DVP_YUV") == 0) {
 				camera_device.type = DVP_CAMERA;
-				camera_device.mode = YUV_MODE;
-				camera_device.fmt  = PIXEL_FMT_YUYV;
+				camera_device.format = IMAGE_YUV;
 			} else if (os_strcmp(argv[4], "DVP_H264") == 0) {
 				camera_device.type = DVP_CAMERA;
-				camera_device.mode = H264_MODE;
-				camera_device.fmt  = PIXEL_FMT_H264;
+				camera_device.format = IMAGE_H264;
 			} else if (os_strcmp(argv[4], "UVC_MJPEG") == 0) {
 				camera_device.type = UVC_CAMERA;
-				camera_device.mode = JPEG_MODE;
-				camera_device.fmt  = PIXEL_FMT_JPEG;
+				camera_device.format = IMAGE_MJPEG;
 			} else if (os_strcmp(argv[4], "UVC_H264") == 0) {
 				camera_device.type = UVC_CAMERA;
-				camera_device.mode = JPEG_MODE;
-				camera_device.fmt  = PIXEL_FMT_JPEG;
+				camera_device.format = IMAGE_H264;
 			} else {
 				LOGW("the type is not support \n");
 				goto cmd_fail;
@@ -827,26 +792,21 @@ void cli_agora_rtc_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, 
 
 			if (os_strcmp(argv[6], "DVP_JPEG") == 0) {
 				camera_device.type = DVP_CAMERA;
-				camera_device.mode = JPEG_MODE;
-				camera_device.fmt  = PIXEL_FMT_JPEG;
+				camera_device.format = IMAGE_MJPEG;
 			} else if (os_strcmp(argv[6], "DVP_YUV") == 0) {
 				camera_device.type = DVP_CAMERA;
-				camera_device.mode = YUV_MODE;
-				camera_device.fmt  = PIXEL_FMT_YUYV;
+				camera_device.format = IMAGE_YUV;
 			} else if (os_strcmp(argv[6], "DVP_H264") == 0) {
 				camera_device.type = DVP_CAMERA;
-				camera_device.mode = H264_YUV_MODE;
-				camera_device.fmt  = PIXEL_FMT_H264;
+				camera_device.format = IMAGE_H264;
 			} else if (os_strcmp(argv[6], "UVC_MJPEG") == 0) {
 				camera_device.type = UVC_CAMERA;
-				camera_device.mode = JPEG_MODE;
-				camera_device.fmt  = PIXEL_FMT_JPEG;
+				camera_device.format = IMAGE_MJPEG;
 			} else if (os_strcmp(argv[6], "UVC_H264") == 0) {
 				camera_device.type = UVC_CAMERA;
-				camera_device.mode = JPEG_MODE;
-				camera_device.fmt  = PIXEL_FMT_JPEG;
+				camera_device.format = IMAGE_H264;
 			} else {
-				LOGW("the type is not support. \n");
+				LOGW("the type is not support \n");
 				goto cmd_fail;
 			}
 

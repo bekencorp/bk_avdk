@@ -19,11 +19,11 @@ sw_jpeg_dec_res_t result;
 
 media_camera_device_t camera_device = {
 	.type = DVP_CAMERA,
-	.mode = JPEG_MODE,
-	.fmt = PIXEL_FMT_JPEG,
-	.info.fps = FPS25,
-	.info.resolution.width = 640,
-	.info.resolution.height = 480,
+	.format = IMAGE_MJPEG,
+	.fps = FPS25,
+	.width = 640,
+	.height = 480,
+	.port = 0,
 };
 
 static void media_read_frame_info_callback(frame_buffer_t *frame)
