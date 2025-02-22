@@ -63,7 +63,7 @@ void lvgl_event_handle(media_mailbox_msg_t *msg)
 
     lv_vnd_config.draw_pixel_size = ppi_to_pixel_x(lcd_open->device_ppi) * ppi_to_pixel_y(lcd_open->device_ppi);
     lv_vnd_config.draw_buf_2_1 = (lv_color_t *)PSRAM_DRAW_BUFFER;
-    lv_vnd_config.draw_buf_2_2 = (lv_color_t *)(PSRAM_DRAW_BUFFER + lv_vnd_config->draw_pixel_size * sizeof(lv_color_t));
+    lv_vnd_config.draw_buf_2_2 = (lv_color_t *)(PSRAM_DRAW_BUFFER + lv_vnd_config.draw_pixel_size * sizeof(lv_color_t));
 #else
 #define PSRAM_FRAME_BUFFER ((0x60000000UL) + 5 * 1024 * 1024)
     lv_vnd_config.draw_pixel_size = (45 * 1024) / sizeof(lv_color_t);
