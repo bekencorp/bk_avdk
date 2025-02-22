@@ -165,8 +165,11 @@ static bk_err_t camera_set_uvc_param_handle(media_mailbox_msg_t *msg)
 {
    int ret = BK_FAIL;
 
+    media_device_t *device = (media_device_t*)msg->param;
+    camera_handle_t *handle = (camera_handle_t *)device->param1;
+    uvc_config_t *config = (uvc_config_t *)device->param2;
 #ifdef CONFIG_USB_CAMERA
-   ret = bk_uvc_set_param((uvc_config_t *)msg->param);
+   ret = bk_uvc_set_start(handle, config);
 #endif
 
    msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);

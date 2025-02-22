@@ -120,41 +120,16 @@ bk_dvp_callback_t dvp_frame_cb = {
 
 bk_err_t bk_dvp_camera_open(camera_handle_t *handle, media_camera_device_t *device)
 {
-    int ret = BK_FAIL;
     dvp_config_t config = {0};
 
-    config.width = device->info.resolution.width;
-    config.height = device->info.resolution.height;
-    config.fps = device->info.fps;
+    config.width = device->width;
+    config.height = device->height;
+    config.fps = device->fps;
     config.rotate = device->rotate;
-    switch (device->mode)
-    {
-        case YUV_MODE:
-            config.img_format = IMAGE_YUV;
-            break;
+    config.img_format = device->format;
+    config.drop_num = 0;
 
-        case JPEG_MODE:
-            config.img_format = IMAGE_MJPEG;
-            break;
-
-        case H264_MODE:
-            config.img_format = H264_MODE;
-            break;
-
-        case JPEG_YUV_MODE:
-            config.img_format = IMAGE_MJPEG | IMAGE_YUV;
-            break;
-
-        case H264_YUV_MODE:
-            config.img_format = IMAGE_H264 | IMAGE_YUV;
-            break;
-
-        default:
-            LOGE("%s, mode:%d not support\n", __func__, device->mode);
-            return ret;
-    }
-
-	return bk_dvp_init(handle, &config, &dvp_frame_cb);
+    return bk_dvp_init(handle, &config, &dvp_frame_cb);
 }
 
 bk_err_t bk_dvp_camera_close(camera_handle_t *handle)

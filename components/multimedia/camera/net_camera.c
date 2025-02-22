@@ -257,32 +257,32 @@ static void net_camera_process_packet(uint8_t *data, uint32_t length)
 static void net_camera_task_entry(beken_thread_arg_t data)
 {
 	net_camera_elem_t *elem = NULL;
-    bk_err_t err = 0;
+	bk_err_t err = 0;
 
 	net_camera_buf->start_buf = BUF_STA_INIT;
 	net_camera_task_running = true;
 
 	while (net_camera_task_running)
 	{
-	    err = rtos_get_semaphore(&s_recv_video_data_sem, 1000);
+		err = rtos_get_semaphore(&s_recv_video_data_sem, 1000);
 
-	    if(!net_camera_task_running)
-	    {
-	        break;
-	    }
+		if(!net_camera_task_running)
+		{
+			break;
+		}
 
-	    if(err != 0)
-	    {
-	        LOGD("%s get sem timeout\n", __func__);
-	        continue;
-	    }
+		if(err != 0)
+		{
+			LOGD("%s get sem timeout\n", __func__);
+			continue;
+		}
 
 		while((elem = (net_camera_elem_t *)co_list_pick(&net_camera_pool.ready)) != NULL)
 		{
-            net_camera_process_packet(elem->buf_start, elem->buf_len);
+			net_camera_process_packet(elem->buf_start, elem->buf_len);
 
-            co_list_pop_front(&net_camera_pool.ready);
-            co_list_push_back(&net_camera_pool.free, (struct co_list_hdr *)&elem->hdr);
+			co_list_pop_front(&net_camera_pool.ready);
+			co_list_push_back(&net_camera_pool.free, (struct co_list_hdr *)&elem->hdr);
 		}
 	};
 
@@ -345,12 +345,12 @@ bk_err_t bk_net_camera_open(media_camera_device_t *device)
 
 	net_camera_buf->buf_ptr = net_camera_buf->frame->frame;
 	net_camera_buf->frame_pkt_cnt = 0;
-	net_camera_buf->frame->width = device->info.resolution.width;
-	net_camera_buf->frame->height = device->info.resolution.height;
+	net_camera_buf->frame->width = device->width;
+	net_camera_buf->frame->height = device->height;
 	net_camera_buf->frame->sequence = 0;
 	net_camera_buf->start_buf = BUF_STA_INIT;
 
-	net_camera_param.ppi = (device->info.resolution.width << 16) | device->info.resolution.height;
+	net_camera_param.ppi = (device->width << 16) | device->height;
 	net_camera_param.fmt = net_camera_buf->frame->fmt;
 	net_camera_param.send_type = TVIDEO_SND_TCP;
 

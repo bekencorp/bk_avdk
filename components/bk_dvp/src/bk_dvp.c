@@ -1542,12 +1542,12 @@ bk_err_t bk_dvp_init(camera_handle_t *handle, dvp_config_t *cfg, bk_dvp_callback
     // step 2: init stream list
     if (cfg->img_format & IMAGE_MJPEG)
     {
-        s_dvp_camera_handle->enc_stream = (void *)cb->frame_init(s_dvp_camera_handle->sensor->id, DVP_CAMERA, IMAGE_MJPEG);
+        s_dvp_camera_handle->enc_stream = (void *)cb->frame_init(cfg->id, DVP_CAMERA, IMAGE_MJPEG);
     }
 
     if (cfg->img_format & IMAGE_H264)
     {
-        s_dvp_camera_handle->enc_stream = (void *)cb->frame_init(s_dvp_camera_handle->sensor->id, DVP_CAMERA, IMAGE_H264);
+        s_dvp_camera_handle->enc_stream = (void *)cb->frame_init(cfg->id, DVP_CAMERA, IMAGE_H264);
     }
 
     if ((cfg->img_format & (IMAGE_MJPEG | IMAGE_H264))

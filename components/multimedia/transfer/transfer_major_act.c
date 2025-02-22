@@ -125,6 +125,7 @@ static void transfer_major_task_transfer_data(uint32_t param)
 {
 	frame_buffer_t *encode_frame = NULL;
 	frame_list_node_t *stream = NULL;
+	uint8_t log_enable = 0;
 
 	transfer_major_task_running = true;
 
@@ -170,11 +171,20 @@ static void transfer_major_task_transfer_data(uint32_t param)
 		encode_frame = frame_buffer_fb_read(transfer_info.stream, MODULE_WIFI, 100);
 		if (encode_frame == NULL)
 		{
-			LOGE("read frame NULL %p, %d\n", transfer_info.stream, transfer_info.stream == NULL ? 0 : transfer_info.stream->invalid);
+			if (log_enable >= 5)
+			{
+				LOGE("read frame NULL %p, %d\n", transfer_info.stream, transfer_info.stream == NULL ? 0 : transfer_info.stream->invalid);
+				log_enable = 0;
+			}
+			else
+			{
+				log_enable++;
+			}
 			continue;
 		}
 
 		media_debug->fps_wifi++;
+		log_enable = 0;
 
 		// send msg to cpu0
 		msg_send_req_to_media_major_mailbox_sync(EVENT_MEDIA_DATA_NOTIFY, APP_MODULE, (uint32_t)encode_frame, NULL);

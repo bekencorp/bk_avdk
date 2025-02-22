@@ -56,20 +56,6 @@ void uvc_camera_urb_free(struct usbh_urb *urb);
 void uvc_camera_urb_push(struct usbh_urb *urb);
 struct usbh_urb *uvc_camera_urb_pop(void);
 
-
-#if (CONFIG_STANDARD_DUALSTREAM)
-
-bk_err_t uvc_camera_h26x_urb_list_init(void);
-bk_err_t uvc_camera_h26x_urb_list_deinit(void);
-void uvc_camera_h26x_urb_list_clear(void);
-
-struct usbh_urb *uvc_camera_h26x_urb_malloc(void);
-void uvc_camera_h26x_urb_free(struct usbh_urb *urb);
-void uvc_camera_h26x_urb_push(struct usbh_urb *urb);
-struct usbh_urb *uvc_camera_h26x_urb_pop(void);
-
-#endif
-
 #ifdef __cplusplus
 }
 #endif

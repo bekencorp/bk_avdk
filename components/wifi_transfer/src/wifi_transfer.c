@@ -222,10 +222,9 @@ static void wifi_transfer_buffer_deinit(void)
 #endif
 }
 
-bk_err_t bk_wifi_transfer_frame_open(const media_transfer_cb_t *cb)
+bk_err_t bk_wifi_transfer_frame_open(const media_transfer_cb_t *cb, uint16_t img_format)
 {
 	int ret = BK_FAIL;
-	uint16_t img_format = IMAGE_UNKNOW;
 
 	if (transfer_enable)
 	{
@@ -240,34 +239,6 @@ bk_err_t bk_wifi_transfer_frame_open(const media_transfer_cb_t *cb)
 	ret = wifi_transfer_buffer_init(cb);
 	if (ret != BK_OK)
 	{
-		return ret;
-	}
-
-	switch (cb->fmt)
-	{
-		case PIXEL_FMT_JPEG:
-			img_format = IMAGE_MJPEG;
-			break;
-
-		case PIXEL_FMT_H264:
-			img_format = IMAGE_H264;
-			break;
-
-		case PIXEL_FMT_H265:
-			img_format = IMAGE_H265;
-			break;
-
-		default:
-			LOGE("%s, transfer not support this fmt:%d\n", __func__, cb->fmt);
-			ret = BK_FAIL;
-	}
-
-	if (ret != BK_OK)
-	{
-		wifi_transfer_buffer_deinit();
-		bk_wifi_set_wifi_media_mode(false);
-
-		bk_wifi_set_video_quality(WIFI_VIDEO_QUALITY_HD);
 		return ret;
 	}
 
@@ -562,16 +533,16 @@ bk_err_t wifi_transfer_net_camera_open(media_camera_device_t *device)
 		goto error;
 	}
 
-	wifi_transfer_net_camera_buf->frame->fmt = device->fmt;
+	wifi_transfer_net_camera_buf->frame->fmt = device->format;
 
 	wifi_transfer_net_camera_buf->buf_ptr = wifi_transfer_net_camera_buf->frame->frame;
 	wifi_transfer_net_camera_buf->frame_pkt_cnt = 0;
-	wifi_transfer_net_camera_buf->frame->width = device->info.resolution.width;
-	wifi_transfer_net_camera_buf->frame->height = device->info.resolution.height;
+	wifi_transfer_net_camera_buf->frame->width = device->width;
+	wifi_transfer_net_camera_buf->frame->height = device->height;
 	wifi_transfer_net_camera_buf->frame->sequence = 0;
 	wifi_transfer_net_camera_buf->start_buf = BUF_STA_INIT;
 
-	wifi_transfer_net_camera_param.ppi = (device->info.resolution.width << 16) | device->info.resolution.height;
+	wifi_transfer_net_camera_param.ppi = (device->width << 16) | device->height;
 	wifi_transfer_net_camera_param.fmt = wifi_transfer_net_camera_buf->frame->fmt;
 	wifi_transfer_net_camera_param.send_type = TVIDEO_SND_TCP;
 

@@ -19,7 +19,7 @@
 
 #include "media_cli_comm.h"
 #include "media_app.h"
-
+#include "camera_handle_list.h"
 #include <driver/dvp_camera.h>
 #include <driver/jpeg_enc.h>
 #include "img_service.h"
@@ -160,14 +160,14 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     media_ppi_t ppi;
     camera_handle_t handle = NULL;
 
-    handle = media_app_get_camera_handle_by_id(1);
+    handle = bk_camera_handle_node_get_by_id_and_fomat(1, IMAGE_MJPEG);
     if (handle != NULL)
     {
         ret = media_app_camera_close(&handle);
     }
 
     handle = NULL;
-    handle = media_app_get_camera_handle_by_id(2);
+    handle = bk_camera_handle_node_get_by_id_and_fomat(2, IMAGE_MJPEG);
     if (handle != NULL)
     {
         ret = media_app_camera_close(&handle);
@@ -178,10 +178,18 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     ret = media_app_frame_jdec_close();
 
     handle = NULL;
-    handle = media_app_get_camera_handle_by_id(0);
+    handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_YUV | IMAGE_MJPEG);
     if (handle != NULL)
     {
         ret = media_app_camera_close(&handle);
+    }
+    else
+    {
+        handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_YUV | IMAGE_H264);
+        if (handle != NULL)
+        {
+            ret = media_app_camera_close(&handle);
+        }
     }
 
     os_memset(&device, 0, sizeof(media_camera_device_t));
@@ -190,18 +198,17 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     {
         ppi = PPI_864X480;
         device.type = UVC_CAMERA;
-        device.info.resolution.width = ppi >> 16;
-        device.info.resolution.height = ppi & 0xFFFF;
-        device.info.fps = FPS25;
-        device.mode = JPEG_MODE;
-        device.fmt = PIXEL_FMT_JPEG;
+        device.width = ppi >> 16;
+        device.height = ppi & 0xFFFF;
+        device.fps = FPS25;
+        device.format = IMAGE_MJPEG;
         device.port = camera_port;
         handle = NULL;
         ret = media_app_camera_open(&handle, &device);
 
         ret = media_app_set_rotate(ROTATE_90);
 
-		if (fmt == IMAGE_H264)
+        if (fmt == IMAGE_H264)
         {
             ret = media_app_pipeline_h264_open();
         }
@@ -211,20 +218,18 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     {
         ppi = PPI_864X480;
         device.type = DVP_CAMERA;
-        device.info.resolution.width = ppi >> 16;
-        device.info.resolution.height = ppi & 0xFFFF;
-        device.info.fps = FPS25;
+        device.width = ppi >> 16;
+        device.height = ppi & 0xFFFF;
+        device.fps = FPS25;
         if (fmt == IMAGE_H264)
-		{
-			device.mode = H264_YUV_MODE;
-			device.fmt = PIXEL_FMT_H264;
-		}
-		else
-		{
-			device.mode = JPEG_YUV_MODE;
-			device.fmt = PIXEL_FMT_JPEG;
-		}
-		device.port = 0;
+        {
+            device.format = IMAGE_YUV | IMAGE_H264;
+        }
+        else
+        {
+            device.format = IMAGE_YUV | IMAGE_MJPEG;
+        }
+        device.port = 0;
         handle = NULL;
         ret = media_app_camera_open(&handle, &device);
         ret = media_app_set_rotate(ROTATE_90);
@@ -232,7 +237,7 @@ int open_camera_display(int camera_port, image_format_t fmt)  // uvc 1/ uvc 2/ d
     }
     else
     {
-     	LOGI("%s not support camera id %d\n", __func__, camera_port);
+        LOGI("%s not support camera id %d\n", __func__, camera_port);
     }
     return ret;
 }
@@ -242,7 +247,7 @@ extern media_share_ptr_t *media_share_ptr;
 void media_cli_threecam_auto_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
     LOGI("%s +++ cmd:'three_camera test 3000 rgb565/rgb888] +++\n", __func__);
-	image_format_t fmt = IMAGE_MJPEG;
+    image_format_t fmt = IMAGE_MJPEG;
     static uint32_t cnt = 0;
     if (os_strcmp(argv[1], "test") == 0)
     {
@@ -341,46 +346,32 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 		if (os_strcmp(argv[1], "dvp") == 0)
 		{
 			media_ppi_t ppi = GET_PPI(PPI_640X480);
-			media_camera_device_t device = {0};
-			device.type = DVP_CAMERA;
-			device.mode = JPEG_MODE;
-			device.fmt = PIXEL_FMT_H264;
-			device.info.resolution.width = ppi >> 16;
-			device.info.resolution.height = ppi & 0xFFFF;
-			device.info.fps = FPS25;
+			media_camera_device_t device = DEFAULT_CAMERA_CONFIG();
+			device.width = ppi >> 16;
+			device.height = ppi & 0xFFFF;
+			device.fps = FPS25;
 
 			if (CMD_CONTAIN("yuv"))
 			{
-				device.mode = YUV_MODE;
-				device.fmt = PIXEL_FMT_YUYV;
+				device.format = IMAGE_YUV;
 			}
 
 			if (CMD_CONTAIN("jpeg"))
 			{
+				device.format = IMAGE_MJPEG;
 				if (CMD_CONTAIN("enc_yuv"))
 				{
-					device.mode = JPEG_YUV_MODE;
+					device.format |= IMAGE_YUV;
 				}
-				else
-				{
-					device.mode = JPEG_MODE;
-				}
-
-				device.fmt = PIXEL_FMT_JPEG;
 			}
 
 			if (CMD_CONTAIN("h264"))
 			{
+				device.format = IMAGE_H264;
 				if (CMD_CONTAIN("enc_yuv"))
 				{
-					device.mode = H264_YUV_MODE;
+					device.format |= IMAGE_YUV;
 				}
-				else
-				{
-					device.mode = H264_MODE;
-				}
-
-				device.fmt = PIXEL_FMT_H264;
 			}
 
 			if (os_strcmp(argv[2], "open") == 0)
@@ -390,7 +381,34 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 
 			if (os_strcmp(argv[2], "close") == 0)
 			{
-				handle = media_app_get_camera_handle_by_id(0);
+				do {
+					handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_YUV);
+					if (handle)
+					{
+						break;
+					}
+
+					handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_MJPEG);
+					if (handle)
+					{
+						break;
+					}
+
+					handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_H264);
+					if (handle)
+					{
+						break;
+					}
+
+					handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_YUV | IMAGE_H264);
+					if (handle)
+					{
+						break;
+					}
+
+					handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_YUV | IMAGE_MJPEG);
+				} while (0);
+
 				if (handle != NULL)
 				{
 					ret = media_app_camera_close(&handle);
@@ -406,60 +424,69 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 		{
 			camera_handle_t handle = NULL;
 			media_ppi_t ppi = GET_PPI(PPI_640X480);
-			media_camera_device_t device = {0};
+			media_camera_device_t device = DEFAULT_CAMERA_CONFIG();
 			device.type = UVC_CAMERA;
-			device.mode = JPEG_MODE;
-			device.fmt = PIXEL_FMT_JPEG;
-			device.info.fps = FPS25;
-			device.num_uvc_dev = 1;
-
-			if (CMD_CONTAIN("h264"))
-			{
-				device.mode = H264_MODE;
-				device.fmt = PIXEL_FMT_H264;
-			}
+			device.width = ppi >> 16;
+			device.height = ppi & 0xFFFF;
+			device.fps = FPS30;
 
 			if (os_strcmp(argv[2], "open") == 0)
 			{
-				if (ppi == 0)
+				if (CMD_CONTAIN("h264"))
 				{
-					LOGI("resolution not support\r\n");
-					ret = BK_FAIL;
+					device.format = IMAGE_H264;
 				}
-				else
-				{
-					device.port = os_strtoul(argv[3], NULL, 10);
-					device.info.resolution.width  = ppi >> 16;
-					device.info.resolution.height = ppi & 0xFFFF;
-					//media_app_register_uvc_connect_state_cb(uvc_connect_state_callback);
 
-					if (CMD_CONTAIN("dual")) {
-						media_ppi_t h26x_ppi = 0;
-						device.dualstream = 1;
-						if (CMD_CONTAIN("H264")) {
-							device.d_fmt  = PIXEL_FMT_H264;
-							device.d_mode = H264_MODE;
-						} else if (CMD_CONTAIN("H265"))
-						{
-							device.d_fmt  = PIXEL_FMT_H265;
-							device.d_mode = H265_MODE;
-						}
-						h26x_ppi = GET_H26X_PPI();
-						device.num_uvc_dev = 2;
-						device.d_info.resolution.width	= h26x_ppi >> 16;
-						device.d_info.resolution.height = h26x_ppi & 0xFFFF;
-						device.d_info.fps = FPS30;
-						LOGI("Enter Second uvc device H26X Config.\n");
-					}
-					ret = media_app_camera_open(&handle, &device);
+				if (CMD_CONTAIN("h265"))
+				{
+					device.format = IMAGE_H265;
 				}
+
+				if (CMD_CONTAIN("yuv"))
+				{
+					device.format = IMAGE_YUV;
+				}
+
+				if (CMD_CONTAIN("dual"))
+				{
+					device.format = IMAGE_MJPEG | IMAGE_H264;
+				}
+
+				device.port = os_strtoul(argv[3], NULL, 10);
+				//media_app_register_uvc_connect_state_cb(uvc_connect_state_callback);
+				ret = media_app_camera_open(&handle, &device);
 			}
 
 			if (os_strcmp(argv[2], "close") == 0)
 			{
 				uint8_t port = os_strtoul(argv[3], NULL, 10);
 
-				handle = media_app_get_camera_handle_by_id(port);
+				do {
+					handle = bk_camera_handle_node_get_by_id_and_fomat(port, IMAGE_MJPEG);
+					if (handle)
+					{
+						break;
+					}
+
+					handle = bk_camera_handle_node_get_by_id_and_fomat(port, IMAGE_H264);
+					if (handle)
+					{
+						break;
+					}
+
+					handle = bk_camera_handle_node_get_by_id_and_fomat(port, IMAGE_H265);
+					if (handle != NULL)
+					{
+						ret = media_app_camera_close(&handle);
+					}
+
+					handle = bk_camera_handle_node_get_by_id_and_fomat(port, IMAGE_MJPEG | IMAGE_H264);
+					if (handle != NULL)
+					{
+						ret = media_app_camera_close(&handle);
+					}
+				} while (0);
+
 				if (handle != NULL)
 				{
 					ret = media_app_camera_close(&handle);

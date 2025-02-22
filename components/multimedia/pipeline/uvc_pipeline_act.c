@@ -47,8 +47,7 @@ static bk_err_t h264_jdec_pipeline_open(media_mailbox_msg_t *msg)
 	media_camera_device_t device = DEFAULT_CAMERA_CONFIG();
 	// step 1: init h264_encode_task
 	device.type = UVC_CAMERA;
-	device.mode = H264_MODE;
-	device.fmt = PIXEL_FMT_H264;
+	device.format = IMAGE_H264;
 	ret = h264_encode_task_open(&device);
 	if (ret != BK_OK)
 	{
@@ -144,7 +143,7 @@ static bk_err_t lcd_disp_pipeline_close(media_mailbox_msg_t *msg)
     ret = lcd_display_close();
 
     return ret;
-}
+}
 
 static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 {

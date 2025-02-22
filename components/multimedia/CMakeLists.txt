@@ -8,6 +8,7 @@ if (CONFIG_MEDIA_APP)
 		cli/media_cli.c
 		cli/camera_switch_test.c
 		app/media_app.c
+		app/camera_handle_list.c
 		comm/comm_act.c
 	)
 endif()  #CONFIG_MEDIA_APP

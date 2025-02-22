@@ -1009,7 +1009,7 @@ bk_err_t h264_encode_task_open(media_camera_device_t *device)
 			(uint32_t)(h264_encode_config->h264_frame->frame + h264_encode_config->h264_frame->size));
 
 	// step 4: init h264 encode hw
-	if (device->info.resolution.width * device->info.resolution.height > 1280 * 720)
+	if (device->width * device->height > 1280 * 720)
 	{
 		LOGE("%s, not support more than 1280X720 resolution\r\n", __func__);
 		ret = BK_FAIL;

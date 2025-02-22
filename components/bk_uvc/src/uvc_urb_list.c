@@ -16,7 +16,7 @@
 #include <os/os.h>
 #include <os/mem.h>
 #include <os/str.h>
-#include "uvc_urb_list_common.h"
+#include "uvc_urb_list.h"
 #include <driver/media_types.h>
 
 #define TAG "uvc_urb"

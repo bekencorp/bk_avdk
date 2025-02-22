@@ -21,14 +21,13 @@
 #include <driver/dvp_camera_types.h>
 #include <driver/pwr_clk.h>
 
-#include <components/video_transfer.h>
-
 #include "media_core.h"
 #include "media_evt.h"
 #include "media_app.h"
 #include "transfer_act.h"
 #include "camera_act.h"
 #include "img_service.h"
+#include "camera_handle_list.h"
 
 #include "storage_act.h"
 
@@ -94,37 +93,13 @@ uint32_t media_send_msg_sync_return_param(uint32_t event, uint32_t in_param, uin
 	return ret;
 }
 
-static bk_err_t media_app_check_all_camera_close(void)
-{
-	for (uint8_t i = 0; i < CAMERA_MAX_NUM; i++)
-	{
-		if (media_modules_state->cam_handle[i] != NULL)
-		{
-			return BK_FAIL;
-		}
-	}
-
-	return BK_OK;
-}
-
-camera_handle_t media_app_get_camera_handle_by_id(uint16_t id)
-{
-	if (id >= CAMERA_MAX_NUM || media_modules_state == NULL)
-	{
-		LOGE("%s, not support\n", __func__);
-		return NULL;
-	}
-
-	return media_modules_state->cam_handle[id];
-}
-
 bk_err_t media_app_camera_open(camera_handle_t *handle, media_camera_device_t *device)
 {
 	int ret = BK_FAIL;
 
 	LOGI("%s, type:%d, id:%d, W*H:%d*%d, format:%d\n",
-		__func__, device->type, device->port, device->info.resolution.width,
-		device->info.resolution.height, device->mode);
+		__func__, device->type, device->port, device->width,
+		device->height, device->format);
 
 	if (device == NULL || device->port >= CAMERA_MAX_NUM)
 	{
@@ -132,48 +107,13 @@ bk_err_t media_app_camera_open(camera_handle_t *handle, media_camera_device_t *d
 		return ret;
 	}
 
-	if (media_modules_state->cam_handle[device->port] != NULL)
+	camera_handle_t tmp = bk_camera_handle_node_get_by_id_and_fomat(device->port, device->format);
+	if (tmp)
 	{
-		LOGI("%s already opened, %p\n", __func__, media_modules_state->cam_handle[device->port]);
-		if (media_modules_state->cam_handle[device->port])
-		{
-			*handle = media_modules_state->cam_handle[device->port];
-		}
+		ret = BK_OK;
+		LOGI("%s already opened, %p\n", __func__, tmp);
+		*handle = tmp;
 		return ret;
-	}
-
-	if (device->dualstream == 1)
-	{
-		device->num_uvc_dev = 2;
-	}
-	else
-	{
-		device->num_uvc_dev = 1;
-	}
-
-	device->uvc_device[0].mode                   = device->mode;
-	device->uvc_device[0].fmt                    = device->fmt;
-	device->uvc_device[0].info.fps               = device->info.fps;
-	device->uvc_device[0].info.resolution.width  = device->info.resolution.width;
-	device->uvc_device[0].info.resolution.height = device->info.resolution.height;
-
-	if (device->num_uvc_dev == 1)
-	{
-		LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, device->uvc_device[0].info.resolution.width, device->uvc_device[0].info.resolution.height,
-		device->uvc_device[0].mode, device->type);
-	}
-	else
-	{
-		device->uvc_device[1].mode                   = device->d_mode;
-		device->uvc_device[1].fmt                    = device->d_fmt;
-		device->uvc_device[1].info.fps               = device->d_info.fps;
-		device->uvc_device[1].info.resolution.width  = device->d_info.resolution.width;
-		device->uvc_device[1].info.resolution.height = device->d_info.resolution.height;
-
-		LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, device->uvc_device[0].info.resolution.width, device->uvc_device[0].info.resolution.height,
-		device->uvc_device[0].mode, device->type);
-		LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, device->uvc_device[1].info.resolution.width, device->uvc_device[1].info.resolution.height,
-		device->uvc_device[1].mode, device->type);
 	}
 
 #ifdef CONFIG_BT_REUSE_MEDIA_MEMORY
@@ -192,11 +132,19 @@ bk_err_t media_app_camera_open(camera_handle_t *handle, media_camera_device_t *d
 
 	if (ret == BK_OK)
 	{
-		media_modules_state->cam_handle[device->port] = *handle;
+		media_camera_node_t *node = bk_camera_handle_node_init(device->port, device->format);
+		if (node == NULL)
+		{
+			LOGE("%s, %d\n", __func__, __LINE__);
+		}
+		else
+		{
+			node->cam_handle = *handle;
+		}
 	}
 	else
 	{
-		if (BK_OK == media_app_check_all_camera_close())
+		if (list_empty(&media_modules_state->cam_list))
 		{
 			bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_EN, PM_POWER_MODULE_STATE_OFF);
 		}
@@ -219,9 +167,8 @@ bk_err_t media_app_camera_close(camera_handle_t *handle)
 
 	camera_config_t *config = (camera_config_t *)*handle;
 
-	uint16_t id = config->id;
-
-	if (NULL == media_modules_state->cam_handle[id])
+	camera_handle_t tmp = bk_camera_handle_node_get_by_id_and_fomat(config->id, config->image_format);
+	if (tmp == NULL)
 	{
 		LOGI("%s already closed\n", __func__);
 		return BK_OK;
@@ -231,11 +178,10 @@ bk_err_t media_app_camera_close(camera_handle_t *handle)
 
 	if (ret == BK_OK)
 	{
-		LOGI("%s, %d\n", __func__, id);
-		media_modules_state->cam_handle[id] = NULL;
+		bk_camera_handle_node_deinit(tmp);
 	}
 
-	if (BK_OK == media_app_check_all_camera_close())
+	if (list_empty(&media_modules_state->cam_list))
 	{
 		bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_EN, PM_POWER_MODULE_STATE_OFF);
 	}
@@ -249,15 +195,10 @@ bk_err_t media_app_switch_main_camera(uint16_t id, camera_type_t type, image_for
 {
     int ret = BK_FAIL;
 
-    if (type == UVC_CAMERA && media_modules_state->cam_handle[id] == NULL)
+    camera_handle_t tmp = bk_camera_handle_node_get_by_id_and_fomat(id, format);
+    if (tmp == NULL)
     {
-        LOGI("%s uvc camera not open!\n", __func__);
-        return ret;
-    }
-
-    if (type == DVP_CAMERA && media_modules_state->cam_handle[0] == NULL)
-    {
-        LOGI("%s dvp camera not open!\n", __func__);
+        LOGI("%s camera not open\n", __func__);
         return ret;
     }
 
@@ -276,7 +217,7 @@ bk_err_t media_app_get_h264_encode_config(h264_base_config_t *config)
 {
     int ret = BK_FAIL;
 
-    if (media_app_check_all_camera_close() == BK_OK)
+    if (list_empty(&media_modules_state->cam_list))
     {
         LOGI("%s camera not open!\n", __func__);
         return ret;
@@ -312,7 +253,7 @@ bk_err_t media_app_set_uvc_device_param(uvc_config_t *config)
 		return ret;
 	}
 
-	if (NULL == media_modules_state->cam_handle[config->port])
+	if (list_empty(&media_modules_state->cam_list))
 	{
 		LOGE("%s uvc not open\n", __func__);
 		return ret;
@@ -329,11 +270,11 @@ bk_err_t media_app_set_compression_ratio(compress_ratio_t *ratio)
 
 	os_memcpy(&compress_factor, ratio, sizeof(compress_ratio_t));
 
-    if (media_app_check_all_camera_close() == BK_OK)
-    {
-        LOGI("%s camera not open!\n", __func__);
-        return ret;
-    }
+	if (list_empty(&media_modules_state->cam_list))
+	{
+		LOGE("%s camera not open\n", __func__);
+		return ret;
+	}
 
 	ret = media_send_msg_sync(EVENT_CAM_COMPRESS_IND, (uint32_t)ratio);
 
@@ -377,11 +318,11 @@ bk_err_t media_app_h264_regenerate_idr(camera_type_t type)
 {
 	int ret = BK_FAIL;
 
-    if (media_app_check_all_camera_close() == BK_OK)
-    {
-        LOGI("%s camera not open!\n", __func__);
-        return ret;
-    }
+	if (list_empty(&media_modules_state->cam_list))
+	{
+		LOGE("%s camera not open\n", __func__);
+		return ret;
+	}
 
 	if (type == UVC_CAMERA)
 	{
@@ -1195,10 +1136,11 @@ bk_err_t media_app_init(void)
 	}
 
 	media_modules_state->aud_state = AUDIO_STATE_DISABLED;
-	os_memset(&media_modules_state->cam_handle[0], 0, sizeof(camera_handle_t) * CAMERA_MAX_NUM);
+	INIT_LIST_HEAD(&media_modules_state->cam_list);
 	media_modules_state->lcd_state = LCD_STATE_DISABLED;
 	media_modules_state->stor_state = STORAGE_STATE_DISABLED;
 	media_modules_state->trs_state = TRS_STATE_DISABLED;
+	bk_camera_handle_list_init((void *)&media_modules_state->cam_list);
 
 	ret = rtos_init_queue(&media_app_msg_queue,
 	                      "media_app_msg_queue",

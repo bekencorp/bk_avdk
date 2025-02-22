@@ -59,7 +59,7 @@ typedef struct {
 
 typedef struct {
 	media_ppi_t ppi;
-	pixel_format_t fmt;
+	image_format_t fmt;
 	video_send_type_t send_type;
 } wifi_transfer_net_camera_param_t;
 
@@ -67,7 +67,7 @@ typedef struct {
 
 void wifi_transfer_data_check_caller(const char *func_name, int line,uint8_t *data, uint32_t length);
 
-bk_err_t bk_wifi_transfer_frame_open(const media_transfer_cb_t *cb);
+bk_err_t bk_wifi_transfer_frame_open(const media_transfer_cb_t *cb, uint16_t img_format);
 bk_err_t bk_wifi_transfer_frame_close(void);
 
 bk_err_t wifi_transfer_net_camera_open(media_camera_device_t *device);

@@ -109,7 +109,7 @@ bk_err_t bk_uvc_camera_open(camera_handle_t *handle, media_camera_device_t *devi
     uvc_config_t config = {0};
 
     // step 1: wait uvc connect ok
-    ret = bk_uvc_power_on(true);
+    ret = bk_uvc_power_on(device->format, 4000);
     if (ret != BK_OK)
     {
         LOGW("%s, uvc connect failed\n", __func__);
@@ -118,27 +118,10 @@ bk_err_t bk_uvc_camera_open(camera_handle_t *handle, media_camera_device_t *devi
 
     // step 2 : open
     config.port = device->port;
-    config.width = device->info.resolution.width;
-    config.height = device->info.resolution.height;
-    config.fps = device->info.fps;
-    switch (device->fmt)
-    {
-        case PIXEL_FMT_JPEG:
-            config.img_format = IMAGE_MJPEG;
-            break;
-        case PIXEL_FMT_H264:
-            config.img_format = IMAGE_H264;
-            break;
-        case PIXEL_FMT_H265:
-            config.img_format = IMAGE_H265;
-            break;
-        case PIXEL_FMT_YUV422:
-            config.img_format = IMAGE_YUV;
-            break;
-        default:
-            config.img_format = IMAGE_MJPEG;
-            break;
-    }
+    config.width = device->width;
+    config.height = device->height;
+    config.fps = device->fps;
+    config.img_format = device->format;
 
     ret = bk_uvc_init(handle, &config, &uvc_frame_cb);
     if (ret != BK_OK)

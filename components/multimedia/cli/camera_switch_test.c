@@ -87,11 +87,10 @@ void camera_switch_test_entry(void *param)
 		{
 			// open uvc1
 			device.type = UVC_CAMERA;
-			device.mode = JPEG_MODE;
-			device.fmt = PIXEL_FMT_JPEG;
-			device.info.fps = FPS30;
-			device.info.resolution.width = 864;
-			device.info.resolution.height = 480;
+			device.format = IMAGE_MJPEG;
+			device.fps = FPS30;
+			device.width = 864;
+			device.height = 480;
 			device.port = 1;
 			media_app_camera_open(&handle, &device);
 		}
@@ -140,13 +139,11 @@ void camera_switch_test_entry(void *param)
 			device.type = DVP_CAMERA;
 			if (format == IMAGE_H264)
 			{
-				device.mode = H264_YUV_MODE;
-				device.fmt = PIXEL_FMT_H264;
+				device.format = IMAGE_YUV | IMAGE_H264;
 			}
 			else
 			{
-				device.mode = JPEG_YUV_MODE;
-				device.fmt = PIXEL_FMT_JPEG;
+				device.format = IMAGE_YUV | IMAGE_MJPEG;
 			}
 
 			device.port = 0;
@@ -173,8 +170,7 @@ void camera_switch_test_entry(void *param)
 		{
 			// open uvc2
 			device.type = UVC_CAMERA;
-			device.mode = JPEG_MODE;
-			device.fmt = PIXEL_FMT_JPEG;
+			device.format = IMAGE_MJPEG;
 			device.port = 2;
 			media_app_camera_open(&handle, &device);
 		}

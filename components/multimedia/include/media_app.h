@@ -37,10 +37,8 @@ typedef struct {
 	media_transfer_drop_check_cb drop_check;
 	media_transfer_get_tx_buf_cb get_tx_buf;
 	media_transfer_get_tx_size_cb get_tx_size;
-	pixel_format_t fmt;
 } media_transfer_cb_t;
 
-camera_handle_t media_app_get_camera_handle_by_id(uint16_t id);
 bk_err_t media_app_camera_open(camera_handle_t *handle, media_camera_device_t *device);
 bk_err_t media_app_camera_close(camera_handle_t *handle);
 bk_err_t media_app_switch_main_camera(uint16_t id, camera_type_t type, image_format_t format);
