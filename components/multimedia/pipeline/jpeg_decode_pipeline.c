@@ -675,6 +675,15 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 		{
 			LOGI("%s, FMT: YUV420, PPI: %dX%d, use SOFTWARE DECODE\r\n",
 				__func__, jdec_config->jpeg_frame->width, jdec_config->jpeg_frame->height);
+			if (jdec_config->jpeg_frame->width >= PIXEL_1280 && jdec_config->jpeg_frame->height >= PIXEL_720)
+			{
+				LOGE("%s, not support this resloution for software decode\n", __func__);
+				frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, MODULE_DECODER);
+				jdec_config->jpeg_frame = NULL;
+				jdec_config->jdec_init = false;
+				jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
+				return;
+			}
 			jdec_config->jdec_mode = JPEGDEC_SW_MODE;
 			jdec_config->jdec_type = JPEGDEC_BY_FRAME;
 			if(CPU2_USER_JPEG_SW_DEC == vote_start_cpu2_core(CPU2_USER_JPEG_SW_DEC)) //first owner start CPU2, so needs to wait sem

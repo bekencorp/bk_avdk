@@ -53,6 +53,8 @@ typedef enum {
 	AUD_TRAS_DRV_UAC_SPK_CONT,					/**< recover uac speaker status after uac automatically connect */
 	AUD_TRAS_DRV_UAC_SPK_DISCONT,				/**< uac speaker abnormal disconnect */
 	AUD_TRAS_DRV_UAC_AUTO_CONT_CTRL,			/**< uac automatically connect enable control*/
+	AUD_TRAS_DRV_UAC_MIC_REQ,					/**< uac retry request mic data*/
+	AUD_TRAS_DRV_UAC_SPK_REQ,					/**< uac retry request speak data*/
 
 	/* debug op */
 #if CONFIG_AUD_TRAS_DAC_DEBUG

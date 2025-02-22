@@ -553,6 +553,15 @@ static void usb_hub_voc_uac_mic_port_dev_complete_callback(void *pCompleteParam,
 	bk_err_t ret = BK_OK;
 
 	//LOGI("[+]%s urb:0x%x nbytes:0x%x\r\n", __func__, urb, nbytes);
+	if (urb->errorcode != 0)
+	{
+		// data error, need retry request
+		LOGE("%s, error:%d\n", __func__, urb->errorcode);
+		urb->errorcode = 0;
+		urb->actual_length = 0;
+		aud_tras_drv_send_msg(AUD_TRAS_DRV_UAC_MIC_REQ, pCompleteParam);
+		return;
+	}
 
 	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_START) {
 		urb->transfer_buffer = aud_tras_drv_info.voc_info.uac_urb_mic_buff.buff_addr;
@@ -616,6 +625,15 @@ static void usb_hub_voc_uac_spk_port_dev_complete_callback(void *pCompleteParam,
 	bk_err_t ret = BK_OK;
 
 	//LOGI("[+]%s urb:0x%x nbytes: %d, buff_size: %d\n", __func__, urb, nbytes, aud_tras_drv_info.voc_info.uac_urb_spk_buff.buff_size);
+	if (urb->errorcode != 0)
+	{
+		// data error, need retry request
+		LOGE("%s, error:%d\n", __func__, urb->errorcode);
+		urb->errorcode = 0;
+		urb->actual_length = 0;
+		aud_tras_drv_send_msg(AUD_TRAS_DRV_UAC_SPK_REQ, pCompleteParam);
+		return;
+	}
 
 	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_START) {
 		urb->transfer_buffer = aud_tras_drv_info.voc_info.uac_urb_spk_buff.buff_addr;
@@ -633,8 +651,8 @@ static void usb_hub_voc_uac_spk_port_dev_complete_callback(void *pCompleteParam,
 		//os_memset(aud_tras_drv_info.voc_info.uac_spk_buff, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
 	}
 
-    /* debug */
-    AUD_SPK_COUNT_ADD_SIZE(nbytes);
+	/* debug */
+	AUD_SPK_COUNT_ADD_SIZE(nbytes);
 
 	/* send msg to notify app to write speaker data */
 	ret = aud_tras_drv_send_msg(AUD_TRAS_DRV_DECODER, NULL);
@@ -1912,12 +1930,12 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 		}
 
 		LOGI("%s, %d, power on uac spk port \n", __func__, __LINE__);
-        ret = bk_aud_uac_power_on(USB_HOST_MODE, aud_tras_drv_info.voc_info.spk_port_index, USB_UAC_SPEAKER_DEVICE);
-        if (ret != BK_OK) {
-            LOGE("%s, %d, power on uac mic port fail \n", __func__, __LINE__);
-            err = BK_ERR_AUD_INTF_UAC_DRV;
-            goto aud_tras_drv_voc_init_exit;
-        }
+		ret = bk_aud_uac_power_on(USB_HOST_MODE, aud_tras_drv_info.voc_info.spk_port_index, USB_UAC_SPEAKER_DEVICE);
+		if (ret != BK_OK) {
+			LOGE("%s, %d, power on uac mic port fail \n", __func__, __LINE__);
+			err = BK_ERR_AUD_INTF_UAC_DRV;
+			goto aud_tras_drv_voc_init_exit;
+		}
 		/* check whether device power on */
 		port_dev_info = NULL;
 		ret = bk_aud_uac_hub_port_check_device(aud_tras_drv_info.voc_info.spk_port_index, USB_UAC_SPEAKER_DEVICE, &port_dev_info);
@@ -2000,14 +2018,14 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 			break;
 	}
 
-    /* debug */
-    if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_UAC) {
-        AUD_MIC_COUNT_OPEN();
-    }
+	/* debug */
+	if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_UAC) {
+		AUD_MIC_COUNT_OPEN();
+	}
 
-    if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_UAC) {
-        AUD_SPK_COUNT_OPEN();
-    }
+	if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_UAC) {
+		AUD_SPK_COUNT_OPEN();
+	}
 
 	/* change status: AUD_TRAS_DRV_VOC_NULL --> AUD_TRAS_DRV_VOC_IDLE */
 	aud_tras_drv_info.voc_info.status = AUD_TRAS_DRV_VOC_STA_IDLE;
@@ -2720,6 +2738,30 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 					mailbox_msg = (media_mailbox_msg_t *)msg.param;
 					aud_tras_uac_auto_connect_ctrl((bool)mailbox_msg->param);
 					msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
+					break;
+
+				case AUD_TRAS_DRV_UAC_MIC_REQ:
+					if (aud_tras_drv_info.uac_mic_status == AUD_INTF_UAC_MIC_CONNECTED) {
+						ret = bk_aud_uac_hub_dev_request_data(aud_tras_drv_info.voc_info.mic_port_index, USB_UAC_MIC_DEVICE, (struct usbh_urb *)msg.param);
+						if (ret != BK_OK)
+						{
+							LOGW("%s, %d mic retry request data fail\n", __func__, __LINE__);
+							rtos_delay_milliseconds(5);
+							aud_tras_drv_send_msg(AUD_TRAS_DRV_UAC_MIC_REQ, NULL);
+						}
+					}
+					break;
+
+				case AUD_TRAS_DRV_UAC_SPK_REQ:
+					if (aud_tras_drv_info.uac_spk_status == AUD_INTF_UAC_SPK_CONNECTED) {
+						ret = bk_aud_uac_hub_dev_request_data(aud_tras_drv_info.voc_info.spk_port_index, USB_UAC_SPEAKER_DEVICE, (struct usbh_urb *)msg.param);
+						if (ret != BK_OK)
+						{
+							LOGW("%s, %d speak retry request data fail\n", __func__, __LINE__);
+							rtos_delay_milliseconds(5);
+							aud_tras_drv_send_msg(AUD_TRAS_DRV_UAC_SPK_REQ, NULL);
+						}
+					}
 					break;
 
 				/* voc int op */
