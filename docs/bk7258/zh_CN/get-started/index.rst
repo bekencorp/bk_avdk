@@ -38,7 +38,7 @@ Armino AVDK SDK代码下载
 
 .. note::
 
-    从官网的gitlab下载的为最近的SDK代码，相关账号找项目上审核申请。
+    github代码相对于gitlab有滞后性 。gitlab只针对企业用户开放，请找对应接口人申请。
 
 
 构建编译环境

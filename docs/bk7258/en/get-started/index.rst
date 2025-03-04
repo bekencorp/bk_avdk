@@ -36,10 +36,9 @@ Then switch to the stable branch Tag node, such as v2.0.1.8::
 
     Figure 1. AVDK Directiry structure
 
-!Note:
+.. note::
 
-    The latest SDK code is downloaded from gitlab on the official website, and
-	relevant accounts can be found on the project to review the application.
+    The code on GitHub lags behind that on GitLab. GitLab is only open to corporate users. Please contact the corresponding person to apply.
 
 
 Build Compilation Environment:
