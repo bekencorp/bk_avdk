@@ -457,6 +457,33 @@ bk_err_t media_app_lcd_blend(void *param)
 
     return ret;
 }
+bk_err_t media_app_lcd_blend_open(void)
+{
+    bk_err_t ret = BK_OK;
+    ret = media_send_msg_sync(EVENT_IMG_BLEND_OPEN_IND, 0);
+
+    if (ret != BK_OK)
+    {
+        LOGE("%s fail\n", __func__);
+        return ret;
+    }
+
+    return ret;
+}
+
+bk_err_t media_app_lcd_blend_close(void)
+{
+    bk_err_t ret = BK_OK;
+    ret = media_send_msg_sync(EVENT_IMG_BLEND_CLOSE_IND, 0);
+
+    if (ret != BK_OK)
+    {
+        LOGE("%s fail\n", __func__);
+        return ret;
+    }
+
+    return ret;
+}
 
 
 bk_err_t media_app_pipeline_jdec_open(void)

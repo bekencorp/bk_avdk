@@ -52,9 +52,6 @@
 #define DISPLAY_ISR_END()
 #endif
 
-#if (CONFIG_BLEND_UI)
-extern const blend_info_t blend_info[];
-#endif
 extern media_debug_t *media_debug;
 extern uint32_t  platform_is_in_interrupt_context(void);
 
@@ -320,11 +317,6 @@ static void lcd_display_task_entry(beken_thread_arg_t data)
                         blend_info_t *info = &g_dyn_array.entry[0];
                         bk_display_blend_handle((frame_buffer_t *)msg.param, lcd_disp_config->lcd_width,
                                                 lcd_disp_config->lcd_height, info);
-                    }
-                    else
-                    {
-                        bk_display_blend_handle((frame_buffer_t *)msg.param, lcd_disp_config->lcd_width,
-                                                lcd_disp_config->lcd_height, blend_info);
                     }
 #endif
                     lcd_display_frame((frame_buffer_t *)msg.param);

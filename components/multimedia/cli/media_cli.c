@@ -996,18 +996,26 @@ void media_cli_blend_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, cha
     int ret = UNKNOW_ERROR;
     char *msg = NULL;
 
-    if (argc < 1)
+    if (argc < 2)
     {
         goto output;
     }
-
+	if (os_strcmp(argv[1], "close") == 0)
+    {
+        ret = media_app_lcd_blend_close();
+        goto output;
+    }
+    if (os_strcmp(argv[1], "open") == 0)
+    {
+        ret = media_app_lcd_blend_open();
+        goto output;
+    }
     blend_info_t blend = {0};
     if (argv[1] != NULL)
         os_strcpy((char *)blend.name, argv[1]);
     if (argv[2] != NULL)
         os_strcpy((char *)blend.content, argv[2]);
     ret = media_app_lcd_blend(&blend);
-
 output:
 
     if (ret == UNKNOW_ERROR)
@@ -1139,7 +1147,7 @@ static const struct cli_command s_media_commands[] =
 	{"storage", "open|close|capture|save|save_stop...", media_cli_storage_cmd},
 	{"transfer", "open fmt|close...", media_cli_transfer_cmd},
 	{"test", "open|close|switch fmt", media_cli_switch_cmd},
-	{"blend", "wifi0|clock 12:30|bat", media_cli_blend_cmd},
+	{"blend", "open| clock 12:30|wifi wifi0 | close", media_cli_blend_cmd},
 #if (CONFIG_USB_CDC_ACM_DEMO)
 	{"cdc_test", "open|out|close|...", media_cli_for_usb_cdc_cmd},
 #endif

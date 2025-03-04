@@ -36,13 +36,21 @@
 #define DRAW_END()
 #endif
 
-#if (CONFIG_BLEND_UI)
-extern const uint32_t blend_assets_size;
-extern const blend_info_t blend_assets[];
-#else
-const uint32_t blend_assets_size = 0;
-const blend_info_t blend_assets[0];
-#endif
+#define BLEND_ARRAY_LENGTH(array) \
+    ({ \
+        size_t length = 0; \
+        if(array != NULL) { \
+            while(array[length].addr != NULL) { \
+                length++;  \
+            }   \
+        } \
+        length;\
+    })
+
+
+const blend_info_t *bk_blend_assets = NULL;
+const blend_info_t *bk_blend_info = NULL;
+uint32_t blend_assets_size = 0;
 
 dynamic_array_t g_dyn_array;
 
@@ -311,6 +319,27 @@ bk_err_t dynamic_array_init(dynamic_array_t * dyn_array, size_t initial_capacity
     return BK_OK;
 }
 
+void copy_existing_blend_info_to_dynamic_array(dynamic_array_t * dyn_array)
+{
+    size_t length = BLEND_ARRAY_LENGTH(bk_blend_info);
+
+    if (dyn_array->size + length > dyn_array->capacity)
+    {
+        dyn_array->capacity = dyn_array->size + length;
+        dyn_array->entry = os_realloc(dyn_array->entry, dyn_array->capacity * sizeof(dynamic_array_t));
+        if (dyn_array->entry == NULL)
+        {
+            LOGI("%s realloc fail \n", __func__);
+            return;
+        }
+    }
+
+    for (size_t i = 0; i < length; i++)
+    {
+        dyn_array->entry[dyn_array->size] = bk_blend_info[i];
+        dyn_array->size++;
+    }
+}
 
 const blend_info_t *find_blend_info_in_assets_by_name(const char *name)
 {
@@ -322,11 +351,11 @@ const blend_info_t *find_blend_info_in_assets_by_name(const char *name)
 
     for(int i = 0; i < blend_assets_size; i++)
     {
-        if (strcmp((char *)blend_assets[i].name, name) == 0)
+        if (strcmp((char *)bk_blend_assets[i].name, name) == 0)
         {
-            if (blend_assets[i].addr != NULL)
+            if (bk_blend_assets[i].addr != NULL)
             {
-                return &blend_assets[i];
+                return &bk_blend_assets[i];
             }
         }
     }
@@ -342,11 +371,11 @@ const blend_info_t *find_blend_info_in_assets_by_content(const char *content)
     }
     for(int i = 0; i < blend_assets_size; i++)
     {
-        if (strcmp((char *)blend_assets[i].content, content) == 0)
+        if (strcmp((char *)bk_blend_assets[i].content, content) == 0)
         {
-            if (blend_assets[i].addr != NULL)
+            if (bk_blend_assets[i].addr != NULL)
             {
-                return &blend_assets[i];
+                return &bk_blend_assets[i];
             }
         }
     }
@@ -371,10 +400,12 @@ blend_info_t *find_blend_info_in_dynamic_array(dynamic_array_t * dyn_array, cons
     return NULL;
 }
 
+
+
 void add_or_update_blend_info_to_dynamic_array(dynamic_array_t * dyn_array, const char *name, const char* content)
 {
     blend_info_t * exiting_info = find_blend_info_in_dynamic_array(dyn_array, name);
-    if (exiting_info != NULL) 
+    if (exiting_info != NULL)
     {
         os_strncpy(exiting_info->name, name, sizeof(exiting_info->name) - 1);
         exiting_info->name[sizeof(exiting_info->name) - 1] = '\0';
@@ -566,6 +597,18 @@ static bk_err_t blend_task_stop(void)
 
     return ret;
 }
+
+void get_blend_assets_array(const blend_info_t *assets)
+{
+    bk_blend_assets = assets;
+    blend_assets_size = BLEND_ARRAY_LENGTH(bk_blend_assets);
+}
+
+void get_blend_default_array(const blend_info_t *assets)
+{
+    bk_blend_info = assets;
+}
+
 bk_err_t bk_draw_blend_init(void)
 {
     bk_err_t ret = BK_OK;
@@ -596,11 +639,13 @@ bk_err_t bk_draw_blend_init(void)
         goto error;
     }
 
+
     ret = dynamic_array_init(&g_dyn_array, blend_assets_size);
     if(ret != BK_OK)
     {
-        return ret;
+        goto error;
     }
+    copy_existing_blend_info_to_dynamic_array(&g_dyn_array);
     blend->enable = true;
 
     LOGI("%s complete\n", __func__);

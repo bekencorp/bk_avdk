@@ -222,6 +222,10 @@ bk_err_t bk_draw_blend_deinit(void);
 
 bk_err_t bk_draw_blend_update(blend_info_t *blend);
 
+void get_blend_assets_array(const blend_info_t *assets);
+
+void get_blend_default_array(const blend_info_t *assets);
+
 #ifdef __cplusplus
 }
 #endif

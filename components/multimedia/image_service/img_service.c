@@ -940,19 +940,19 @@ void img_event_handle(media_mailbox_msg_t *msg)
             ret = lcd_display_open((lcd_open_t *)msg->param);
         break;
 
+        case EVENT_IMG_BLEND_OPEN_IND:
+            ret = bk_draw_blend_init();
+            break;
+
         case EVENT_IMG_BLEND_IND:
         {
             blend_info_t *blend = (blend_info_t *)msg->param;
-            if (!strcmp(blend->name, "close"))
-            {
-                LOGI(" EVENT_IMG_BLEND_IND CLOSE close\n");
-                bk_draw_blend_deinit();
-                break;
-            }
-            bk_draw_blend_init();
             ret = bk_draw_blend_update(blend);
         }
         break;
+        case EVENT_IMG_BLEND_CLOSE_IND:
+            ret = bk_draw_blend_deinit();
+            break;
 
         case EVENT_PIPELINE_LCD_DISP_CLOSE_IND:
             ret = lcd_display_close();

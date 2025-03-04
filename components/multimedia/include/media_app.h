@@ -123,7 +123,8 @@ bk_err_t media_app_lcd_fmt(pixel_format_t fmt);
 bk_err_t media_app_lcd_set_backlight(uint8_t level);
 
 bk_err_t media_app_lcd_blend(void *param);
-
+bk_err_t media_app_lcd_blend_close(void);
+bk_err_t media_app_lcd_blend_open(void);
 
 /******************************h264 API******************************************************/
 bk_err_t media_app_pipeline_h264_open(void);
