@@ -6,5 +6,5 @@ menu "INTEGRATION_DOORBELL"
     config INTEGRATION_DOORBELL_CS2
         bool "Doorbell integration CS2"
         default n
-
+		
 endmenu

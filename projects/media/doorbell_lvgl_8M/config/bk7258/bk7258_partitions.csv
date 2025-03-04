@@ -3,7 +3,7 @@
 #Name,Offset,Size,Type,Read,Write
 bootloader,,68k,code,TRUE,FALSE
 app,,1768k,code,TRUE,FALSE
-app1,,476k,code,TRUE,FALSE
+app1,,1768k,code,TRUE,FALSE
 app2,,272k,code,TRUE,FALSE
 download,,1428K,data,TRUE,
 usr_config,,68K,data,TRUE,
