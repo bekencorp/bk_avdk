@@ -51,20 +51,20 @@ extern uint32_t  platform_is_in_interrupt_context(void);
 
 frame_buffer_t *frame_buffer_display_malloc(uint32_t size)
 {
-	frame_buffer_t *frame = bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, size + sizeof(frame_buffer_t) + (1 << ALIGN_BITS));
+    frame_buffer_t *frame = bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, size + sizeof(frame_buffer_t) + (1 << ALIGN_BITS));
 
-	if (frame == NULL)
-	{
-		return NULL;
-	}
+    if (frame == NULL)
+    {
+        return NULL;
+    }
 
-	os_memset(frame, 0, sizeof(frame_buffer_t));
-	frame->frame = (uint8_t *)((((uint32_t)(frame + 1) >> ALIGN_BITS) + 1) << ALIGN_BITS);
-	frame->size = size;
-	frame->flag = FB_ALLOCATED_PATTERN;
+    os_memset(frame, 0, sizeof(frame_buffer_t));
+    frame->frame = (uint8_t *)((((uint32_t)(frame + 1) >> ALIGN_BITS) + 1) << ALIGN_BITS);
+    frame->size = size;
+    frame->flag = FB_ALLOCATED_PATTERN;
     frame->frame_crc = hnd_crc8((uint8_t *)frame, 6, 0xFF);
 
-	return frame;
+    return frame;
 }
 
 void frame_buffer_display_free(frame_buffer_t *frame)
@@ -96,20 +96,20 @@ void frame_buffer_display_free(frame_buffer_t *frame)
 
 frame_buffer_t *frame_buffer_encode_malloc(uint32_t size)
 {
-	frame_buffer_t *frame = bk_psram_frame_buffer_malloc(PSRAM_HEAP_ENCODE, size + sizeof(frame_buffer_t) + (1 << ALIGN_BITS));
+    frame_buffer_t *frame = bk_psram_frame_buffer_malloc(PSRAM_HEAP_ENCODE, size + sizeof(frame_buffer_t) + (1 << ALIGN_BITS));
 
-	if (frame == NULL)
-	{
-		return NULL;
-	}
+    if (frame == NULL)
+    {
+        return NULL;
+    }
 
-	os_memset(frame, 0, sizeof(frame_buffer_t));
-	frame->frame = (uint8_t *)((((uint32_t)(frame + 1) >> ALIGN_BITS) + 1) << ALIGN_BITS);
-	frame->size = size;
-	frame->flag = FB_ALLOCATED_PATTERN;
+    os_memset(frame, 0, sizeof(frame_buffer_t));
+    frame->frame = (uint8_t *)((((uint32_t)(frame + 1) >> ALIGN_BITS) + 1) << ALIGN_BITS);
+    frame->size = size;
+    frame->flag = FB_ALLOCATED_PATTERN;
     frame->frame_crc = hnd_crc8((uint8_t *)frame, 6, 0xFF);
 
-	return frame;
+    return frame;
 }
 
 void frame_buffer_encode_free(frame_buffer_t *frame)
@@ -140,23 +140,23 @@ void frame_buffer_encode_free(frame_buffer_t *frame)
 
 static bk_err_t frame_buffer_fb_node_remove(frame_node_t *f_node, LIST_HEADER_T *list)
 {
-	frame_node_t *tmp = NULL;
-	LIST_HEADER_T *pos, *n;
-	bk_err_t ret = BK_FAIL;
+    frame_node_t *tmp = NULL;
+    LIST_HEADER_T *pos, *n;
+    bk_err_t ret = BK_FAIL;
 
-	list_for_each_safe(pos, n, list)
-	{
-		tmp = list_entry(pos, frame_node_t, list);
-		if (tmp != NULL
-		    && (tmp == f_node))
-		{
-			list_del(pos);
-			ret = BK_OK;
-			break;
-		}
-	}
+    list_for_each_safe(pos, n, list)
+    {
+        tmp = list_entry(pos, frame_node_t, list);
+        if (tmp != NULL
+            && (tmp == f_node))
+        {
+            list_del(pos);
+            ret = BK_OK;
+            break;
+        }
+    }
 
-	return ret;
+    return ret;
 }
 
 bk_err_t frame_buffer_list_init(void)

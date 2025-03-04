@@ -89,7 +89,7 @@ bk_err_t jpeg_get_task_send_msg(uint8_t type, uint32_t param)
 			{
 				jpeg_get_config->module_decode_cp1_status = 0;
 			}
-            rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
+			rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
 			LOGE("%s push failed\n", __func__);
 		}
 	}
@@ -165,7 +165,6 @@ static void jpeg_get_start_handle(frame_module_t frame_module)
 		jpeg_get_config->jpeg_frame = frame_buffer_fb_read(jpeg_get_config->stream, frame_module, 50);
 		if (jpeg_get_config->jpeg_frame)
 		{
-			jpeg_decode_task_send_more_msg(JPEGDEC_START, (uint32_t)jpeg_get_config->jpeg_frame, frame_module);
 			rtos_lock_mutex(&jpeg_get_config->jdec_lock);
 			if (frame_module == MODULE_DECODER)
 			{
@@ -176,6 +175,7 @@ static void jpeg_get_start_handle(frame_module_t frame_module)
 				jpeg_get_config->module_decode_cp1_status = 0;
 			}
 			rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
+			jpeg_decode_task_send_more_msg(JPEGDEC_START, (uint32_t)jpeg_get_config->jpeg_frame, frame_module);
 			break;
 		}
 		else
