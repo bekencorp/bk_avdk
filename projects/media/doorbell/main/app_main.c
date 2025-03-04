@@ -14,6 +14,11 @@
 #include "media_evt.h"
 #include <driver/lcd.h>
 #endif
+
+#if (CONFIG_SYS_CPU1 && CONFIG_BLEND_UI)
+#include "blend.h"
+#endif
+
 extern void user_app_main(void);
 extern void rtos_set_user_app_entry(beken_thread_function_t entry);
 
@@ -176,6 +181,11 @@ int main(void)
 
 #if (CONFIG_SYS_CPU0)
     cli_lvcamera_init();
+#endif
+
+#if (CONFIG_SYS_CPU1 && CONFIG_BLEND_UI)
+    get_blend_assets_array(blend_assets);
+    get_blend_default_array(blend_info);
 #endif
 
     return 0;
