@@ -128,7 +128,7 @@ frame_buffer_t *bk_net_camera_frame_buffer_malloc(camera_handle_t *handle)
 
 	frame = frame_buffer_fb_malloc(config->arg, size);
 
-	LOGI("%s, %d, %p\n", __func__, __LINE__, frame);
+	LOGD("%s, %d, %p\n", __func__, __LINE__, frame);
 
 	return frame;
 }
