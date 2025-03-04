@@ -32,7 +32,8 @@ extern "C" {
 #define BLEND_MALLOC_SRAM           0
 #define LCD_BLEND_MALLOC_SIZE      (1024 * 15)
 #define LCD_BLEND_MALLOC_RGB_SIZE  (0)
-#define MAX_BLEND_NAME_LEN 16
+#define MAX_BLEND_NAME_LEN    20
+#define MAX_BLEND_CONTENT_LEN 30
 
 
 
@@ -133,10 +134,10 @@ typedef struct
 
 typedef struct 
 {
-    char name[20];
+    char name[MAX_BLEND_NAME_LEN];
     //const bk_blend_t *(*find_addr)[];  //the pointer, pointer to the struct pointer array
     const bk_blend_t *addr;            //the pointer, pointer to the struct
-    char content[20];
+    char content[MAX_BLEND_CONTENT_LEN];
 }blend_info_t;
 
 typedef struct{
