@@ -35,12 +35,6 @@ extern "C" {
 #define MAX_BLEND_NAME_LEN 16
 
 
-typedef enum
-{
-     BLEND_TYPE_IMAGE = 0,
-     BLEND_TYPE_FONT,
-}blend_type_t;
-
 
 /**< struct image blend used by api bk_image_blend(image_blend_cfg_t *cfg), include dma2d blend and cpu draw blend*/
 typedef struct
@@ -103,6 +97,12 @@ bk_err_t bk_dma2d_image_blend(image_blend_cfg_t *cfg);
 
 
 /*========================================user may used API==========================================================*/
+typedef enum
+{
+     BLEND_TYPE_IMAGE = 0,
+     BLEND_TYPE_FONT,
+}blend_type_t;
+
 typedef struct {
     uint8_t format;             /**< data_format_t, should be ARGB8888 (no used)                    */
     uint32_t data_len;          /**< ARGB8888 image size, should be: (xsize * ysize * 4) (no used)  */
@@ -111,18 +111,18 @@ typedef struct {
 
 typedef struct {
     const gui_font_digit_struct *const font_digit_type;   /**< character database */
-    uint32_t color;
+    uint32_t color;            /**< font color value used by RGB565 date*/
 }blend_font_t;
 
 typedef struct 
 {
     uint8_t version;
     blend_type_t blend_type;       /**< 0: image, 1:font */
-    const char name[MAX_BLEND_NAME_LEN];        /**< image name like "wifi3","wifi4", font name like "clock", "weather" */
-    uint32 width;         /**< image width   */
-    uint32 height;        /**< image height  */
-    uint16_t xpos;        /**< blend to background leyer, x pos based on bg_width   */
-    uint16_t ypos;        /**<  blend to background leyer, y pos based on bg_height */
+    const char name[MAX_BLEND_NAME_LEN];        /**< image name like "wifi","clock", "weather" */
+    uint32 width;         /**< icon width   */
+    uint32 height;        /**< icon height  */
+    uint16_t xpos;        /**< blend to lcd, x pos based on lcd width  */
+    uint16_t ypos;        /**< blend to lcd, y pos based on lcd height */
     union
     {
         blend_image_t image;
@@ -171,7 +171,7 @@ bk_err_t bk_display_blend_img_handle(frame_buffer_t *frame, uint16_t lcd_width, 
  * @param  struct addr of image type blend_info_t
  * @example:
  *          extern GUI_CONST_STORAGE bk_blend_t font_clock;
- *          blend_info_t blend_info = {.addr = &font_clock, .content = "12:30"};
+ *          blend_info_t blend_info = {.name = clock, .addr = &font_clock, .content = "12:30"};
  *          bk_display_blend_font_handle(frame, lcd_w, lcd_h, &blend_info);
  *
  * @return 

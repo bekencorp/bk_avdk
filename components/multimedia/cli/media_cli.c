@@ -1000,6 +1000,7 @@ void media_cli_blend_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, cha
     if (argv[2] != NULL)
         os_strcpy((char *)blend.content, argv[2]);
     ret = media_app_lcd_blend(&blend);
+
 output:
 
     if (ret == UNKNOW_ERROR)

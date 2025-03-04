@@ -56,7 +56,7 @@ static void dma2d_transfer_complete(void)
 }
 #endif
 
-static bk_err_t blend_check_mem(uint32_t icon_x, uint32_t icon_y)
+static bk_err_t blend_check_mem(uint32_t icon_x, uint32_t icon_y, uint8_t icon_rotate)
 {
     if (icon_x * icon_y * 2 > s_blend.buf1.size)
     {
@@ -96,6 +96,18 @@ static bk_err_t blend_check_mem(uint32_t icon_x, uint32_t icon_y)
             return BK_FAIL;
         }
         LOGI("%s malloc ICON size %d*%d*2 %d in %d(0:sram, 1:psram)\n", __func__, icon_x, icon_y, s_blend.buf1.size, s_blend.buf1.is_malloc_psram );
+
+        if (icon_rotate == ROTATE_270 )
+        {
+            s_blend.buf2.size = icon_x * icon_y *2;
+            s_blend.buf2.addr = (uint8_t *)psram_malloc(s_blend.buf2.size);
+            if (s_blend.buf2.addr == NULL)
+            {
+                LOGE("%s malloc buf2 in psram error\n", __func__);
+                return BK_FAIL;
+            }
+            s_blend.buf2.is_malloc_psram = 1;
+        }
     }
 
     return BK_OK;
@@ -107,7 +119,7 @@ static bk_err_t blend_check_mem(uint32_t icon_x, uint32_t icon_y)
 bk_err_t bk_image_blend(image_blend_cfg_t *cfg)
 {
 #if CONFIG_BLEND 
-    if (blend_check_mem(cfg->xsize, cfg->ysize) != BK_OK)
+    if (blend_check_mem(cfg->xsize, cfg->ysize, cfg->blend_rotate) != BK_OK)
     {
         return BK_FAIL;
     }
@@ -243,7 +255,7 @@ bk_err_t bk_image_blend(image_blend_cfg_t *cfg)
 bk_err_t bk_dma2d_image_blend(image_blend_cfg_t *cfg)
 {
 #if CONFIG_LCD_DMA2D_BLEND
-    if (blend_check_mem(cfg->xsize, cfg->ysize) != BK_OK)
+    if (blend_check_mem(cfg->xsize, cfg->ysize, cfg->blend_rotate) != BK_OK)
     {
         return BK_FAIL;
     }
@@ -340,12 +352,11 @@ bk_err_t bk_dma2d_image_blend(image_blend_cfg_t *cfg)
  */
 bk_err_t bk_font_blend(font_blend_cfg_t *cfg)
 {
-    if (blend_check_mem(cfg->xsize, cfg->ysize) != BK_OK)
+    if (blend_check_mem(cfg->xsize, cfg->ysize, cfg->font_rotate) != BK_OK)
     {
         LOGE("%s,%d\n", __func__, __LINE__);
         return BK_FAIL;
     }
-    
 
     int ret = BK_OK;
     uint8_t pixel_bytes;

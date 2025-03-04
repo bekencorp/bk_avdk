@@ -571,7 +571,7 @@ bk_err_t bk_draw_blend_init(void)
     bk_err_t ret = BK_OK;
     if (NULL != blend && blend->task_running)
     {
-        LOGI("%s already init\n", __func__);
+        LOGD("%s already init\n", __func__);
         return ret;
     }
      blend = (blend_t *)os_malloc(sizeof(blend_t));
@@ -651,6 +651,7 @@ bk_err_t bk_draw_blend_deinit(void)
        os_free(blend);
        blend = NULL;
    }
+
     LOGI("%s complete\n", __func__);
     return BK_OK;
 }
