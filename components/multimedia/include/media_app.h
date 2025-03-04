@@ -135,12 +135,10 @@ bk_err_t media_app_pipeline_dump(void);
 bk_err_t media_app_pipeline_mem_show(void);
 bk_err_t media_app_pipeline_mem_leak(void);
 
-// need modify fix
-bk_err_t media_app_frame_buffer_init(void);
-frame_buffer_t *media_app_frame_buffer_jpeg_malloc(void);
-frame_buffer_t *media_app_frame_buffer_h264_malloc(void);
-bk_err_t media_app_frame_buffer_push(frame_buffer_t *frame);
-bk_err_t media_app_frame_buffer_clear(frame_buffer_t *frame);
+// before use this api, must call media_app_camera_open() to create a stream, and return camera handle
+frame_buffer_t *media_app_frame_buffer_malloc(camera_handle_t *handle);
+bk_err_t media_app_frame_buffer_push(camera_handle_t *handle, frame_buffer_t *frame);
+bk_err_t media_app_frame_buffer_free(camera_handle_t *handle, frame_buffer_t *frame);
 
 #ifdef __cplusplus
 }

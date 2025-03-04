@@ -27,6 +27,9 @@ bk_err_t bk_uvc_camera_open(camera_handle_t *handle, media_camera_device_t *devi
 bk_err_t bk_uvc_camera_close(camera_handle_t *handle);
 bk_err_t bk_net_camera_open(camera_handle_t *handle, media_camera_device_t *device);
 bk_err_t bk_net_camera_close(camera_handle_t *handle);
+frame_buffer_t *bk_net_camera_frame_buffer_malloc(camera_handle_t *handle);
+bk_err_t bk_net_camera_frame_buffer_push(camera_handle_t *handle, frame_buffer_t *frame);
+bk_err_t bk_net_camera_frame_buffer_free(camera_handle_t *handle, frame_buffer_t *frame);
 
 #ifdef __cplusplus
 }

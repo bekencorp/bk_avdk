@@ -1,6 +1,6 @@
 if (CONFIG_SOC_BK7258) # CONFIG_SOC_BK7258
 if (CONFIG_MEDIA)
-set(incs include pipeline)
+set(incs include pipeline camera)
 
 
 if (CONFIG_MEDIA_APP)
@@ -30,6 +30,8 @@ if (CONFIG_MEDIA_MAJOR)
 	set(srcs
 		core/media_ui.c
 		comm/frame_buffer.c
+		camera/camera_act.c
+		camera/net_camera.c
 	)
 endif() #CONFIG_MEDIA_MAJOR
 
@@ -45,11 +47,6 @@ if ((CONFIG_CPU_CNT GREATER 1))
 	)
 endif()
 
-if (CONFIG_DVP_CAMERA OR CONFIG_USB_UVC)
-	list(APPEND incs camera)
-	list(APPEND srcs
-		camera/camera_act.c
-	)
 
 if (CONFIG_DVP_CAMERA)
 	list(APPEND srcs
@@ -62,14 +59,6 @@ if (CONFIG_USB_UVC)
 		camera/uvc.c
 	)
 endif()
-
-if (0)
-		list(APPEND srcs
-		camera/net_camera.c
-	)
-endif()
-
-endif()#(CONFIG_DVP_CAMERA OR CONFIG_USB_UVC)
 
 if (CONFIG_WIFI_TRANSFER)
 

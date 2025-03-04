@@ -86,9 +86,7 @@ static bk_err_t camera_open_handle(media_mailbox_msg_t *msg)
 	}
 	else if (config->type == NET_CAMERA)
 	{
-#ifdef CONFIG_NET_CAMERA
 		ret = bk_net_camera_open(handle, config);
-#endif
 	}
 	else
 	{
@@ -121,9 +119,7 @@ static bk_err_t camera_close_handle(media_mailbox_msg_t *msg)
 	}
 	else if (config->type == NET_CAMERA)
 	{
-#ifdef CONFIG_NET_CAMERA
 		ret = bk_net_camera_close(handle);
-#endif
 	}
 	else
 	{
@@ -165,10 +161,10 @@ static bk_err_t camera_set_uvc_param_handle(media_mailbox_msg_t *msg)
 {
    int ret = BK_FAIL;
 
+#ifdef CONFIG_USB_CAMERA
     media_device_t *device = (media_device_t*)msg->param;
     camera_handle_t *handle = (camera_handle_t *)device->param1;
     uvc_config_t *config = (uvc_config_t *)device->param2;
-#ifdef CONFIG_USB_CAMERA
    ret = bk_uvc_set_start(handle, config);
 #endif
 
@@ -183,7 +179,7 @@ static bk_err_t camera_compression_ratio_config_handle(media_mailbox_msg_t *msg)
 
     LOGI("%s\n", __func__);
 
-#if (defined(CONFIG_DVP_CAMERA) || defined(CONFIG_USB_CAMERA))
+#if (defined(CONFIG_H264) || defined(CONFIG_JPEGENC_HW))
     compress_ratio_t *ratio = (compress_ratio_t *)msg->param;
 
     if (ratio->mode == JPEG_MODE)
@@ -221,13 +217,9 @@ static bk_err_t camera_switch_main_stream_handle(media_mailbox_msg_t *msg)
 {
 	int ret = BK_FAIL;
 
-#if (defined(CONFIG_DVP_CAMERA) || defined(CONFIG_USB_CAMERA))
-
 	camera_config_t *config = (camera_config_t *)msg->param;
 
 	ret = frame_buffer_list_set_main_stream(config->id, config->type, config->image_format);
-
-#endif
 
 	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
 
@@ -238,8 +230,6 @@ static bk_err_t camera_get_main_stream_handle(media_mailbox_msg_t *msg)
 {
 	int ret = BK_FAIL;
 
-#if (defined(CONFIG_DVP_CAMERA) || defined(CONFIG_USB_CAMERA))
-
 	frame_list_node_t *node = NULL;
 
 	node = frame_buffer_list_get_main_stream();
@@ -248,12 +238,61 @@ static bk_err_t camera_get_main_stream_handle(media_mailbox_msg_t *msg)
 		os_memcpy((h264_base_config_t *)msg->param, node, sizeof(frame_list_node_t));
 		ret = BK_OK;
 	}
-#endif
+
 	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
 
 	return ret;
 }
 
+static bk_err_t camera_net_frame_buffer_malloc_handle(media_mailbox_msg_t *msg)
+{
+	bk_err_t ret = BK_FAIL;
+
+	media_device_t *device = (media_device_t*)msg->param;
+	camera_handle_t *handle = (camera_handle_t *)device->param1;
+	frame_buffer_t **frame = (frame_buffer_t **)device->param2;
+
+	*frame = bk_net_camera_frame_buffer_malloc(handle);
+
+	if (frame)
+	{
+		ret = BK_OK;
+	}
+
+	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+
+	return ret;
+}
+
+static bk_err_t camera_net_frame_buffer_push_handle(media_mailbox_msg_t *msg)
+{
+	bk_err_t ret = BK_FAIL;
+
+	media_device_t *device = (media_device_t*)msg->param;
+	camera_handle_t *handle = (camera_handle_t *)device->param1;
+	frame_buffer_t *frame = (frame_buffer_t *)device->param2;
+
+	ret = bk_net_camera_frame_buffer_push(handle, frame);
+
+	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+
+	return ret;
+}
+
+static bk_err_t camera_net_frame_buffer_free_handle(media_mailbox_msg_t *msg)
+{
+	bk_err_t ret = BK_FAIL;
+
+	media_device_t *device = (media_device_t*)msg->param;
+	camera_handle_t *handle = (camera_handle_t *)device->param1;
+	frame_buffer_t *frame = (frame_buffer_t *)device->param2;
+
+	ret = bk_net_camera_frame_buffer_free(handle, frame);
+
+	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+
+	return ret;
+}
 
 bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 {
@@ -273,27 +312,39 @@ bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 			break;
 
 		case EVENT_CAM_REG_UVC_INFO_CB_IND:
-			camera_uvc_register_device_info_cb_handle(msg);
+			ret = camera_uvc_register_device_info_cb_handle(msg);
 			break;
 
 		case EVENT_CAM_SET_UVC_PARAM_IND:
-			camera_set_uvc_param_handle(msg);
+			ret = camera_set_uvc_param_handle(msg);
 			break;
 
 		case EVENT_CAM_COMPRESS_IND:
-			camera_compression_ratio_config_handle(msg);
+			ret = camera_compression_ratio_config_handle(msg);
 			break;
 
 		case EVENT_CAM_GET_H264_INFO_IND:
-			camera_get_h264_encode_param_handle(msg);
+			ret = camera_get_h264_encode_param_handle(msg);
 			break;
 
 		case EVENT_CAM_SWITCH_MAIN_IND:
-			camera_switch_main_stream_handle(msg);
+			ret = camera_switch_main_stream_handle(msg);
 			break;
 
 		case EVENT_CAM_GET_MAIN_STREAM_IND:
-			camera_get_main_stream_handle(msg);
+			ret = camera_get_main_stream_handle(msg);
+			break;
+
+		case EVENT_FRAME_BUFFER_MALLOC_IND:
+			ret = camera_net_frame_buffer_malloc_handle(msg);
+			break;
+
+		case EVENT_FRAME_BUFFER_PUSH_IND:
+			ret = camera_net_frame_buffer_push_handle(msg);
+			break;
+
+		case EVENT_FRAME_BUFFER_FREE_IND:
+			ret = camera_net_frame_buffer_free_handle(msg);
 			break;
 
 		default:

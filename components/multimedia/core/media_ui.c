@@ -160,55 +160,6 @@ static void media_ui_major_common_event_handle(uint32_t event)
 	}
 }
 
-static void media_ui_frame_buffer_event_handle(media_mailbox_msg_t *msg)
-{
-	int ret = BK_FAIL;
-
-#if 0   // xiean need fix
-	frame_buffer_t *new_frame = (frame_buffer_t *)msg->param;
-	frame_buffer_t **alloc_frame = (frame_buffer_t **)msg->param;
-	switch (msg->event)
-	{
-		case EVENT_FRAME_BUFFER_INIT_IND:
-			frame_buffer_fb_init((fb_type_t)msg->param);
-			ret = BK_OK;
-			break;
-
-		case EVENT_FRAME_BUFFER_JPEG_MALLOC_IND:
-			*alloc_frame = frame_buffer_fb_malloc(FB_INDEX_JPEG, CONFIG_JPEG_FRAME_SIZE);
-			if (*alloc_frame != NULL)
-			{
-				ret = BK_OK;
-			}
-			break;
-
-		case EVENT_FRAME_BUFFER_H264_MALLOC_IND:
-			*alloc_frame = frame_buffer_fb_malloc(FB_INDEX_H264, CONFIG_H264_FRAME_SIZE);
-			if (*alloc_frame != NULL)
-			{
-				ret = BK_OK;
-			}
-			break;
-
-		case EVENT_FRAME_BUFFER_PUSH_IND:
-			frame_buffer_fb_push(new_frame);
-			ret = BK_OK;
-			break;
-
-		case EVENT_FRAME_BUFFER_FREE_IND:
-			frame_buffer_fb_direct_free(new_frame);
-			ret = BK_OK;
-			break;
-
-		default:
-			break;
-	}
-#endif
-
-	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
-}
-
-
 static void media_ui_task_main(beken_thread_arg_t data)
 {
 	int ret = kNoErr;
@@ -229,12 +180,11 @@ static void media_ui_task_main(beken_thread_arg_t data)
 		{
 			switch (msg.event >> MEDIA_EVT_BIT)
 			{
-#if (defined(CONFIG_DVP_CAMERA) || defined(CONFIG_USB_UVC))
 				case CAM_EVENT:
+				case FRAME_BUFFER_EVENT:
 					mb_msg = (media_mailbox_msg_t *)msg.param;
 					camera_event_handle(mb_msg);
 					break;
-#endif
 
 #ifdef CONFIG_LCD
 				case LCD_EVENT:
@@ -284,10 +234,6 @@ static void media_ui_task_main(beken_thread_arg_t data)
 
 				case MAJOR_COMM_EVENT:
 					media_ui_major_common_event_handle(msg.event);
-					break;
-
-				case FRAME_BUFFER_EVENT:
-					media_ui_frame_buffer_event_handle((media_mailbox_msg_t *)msg.param);
 					break;
 
 				case EXIT_EVENT:

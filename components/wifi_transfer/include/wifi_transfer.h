@@ -42,6 +42,8 @@ typedef struct {
 	uint8_t dma_psram;
 	/// the packet count of one frame
 	uint32_t frame_pkt_cnt;
+	/// stream handle
+	camera_handle_t handle;
 } wifi_transfer_net_camera_buffer_t;
 
 typedef struct {

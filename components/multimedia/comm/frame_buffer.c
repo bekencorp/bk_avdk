@@ -503,9 +503,9 @@ frame_buffer_t *frame_buffer_fb_malloc(frame_list_node_t *node, uint32_t size)
     LIST_HEADER_T *pos, *n;
     uint32_t isr_context = platform_is_in_interrupt_context();
 
-    if (node == NULL)
+    if (node == NULL || size == 0)
     {
-        BK_ASSERT_EX(0, "%s, %d node NULL\n", __func__, __LINE__);
+        BK_ASSERT_EX(0, "%s, %d size:%d node NULL\n", __func__, __LINE__, size);
         return NULL;
     }
 

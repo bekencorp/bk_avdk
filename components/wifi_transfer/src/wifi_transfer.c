@@ -312,8 +312,13 @@ static bk_err_t wifi_transfer_net_camera_free_memory(void)
 
 		if (wifi_transfer_net_camera_buf->frame)
 		{
-			media_app_frame_buffer_clear(wifi_transfer_net_camera_buf->frame);
+			media_app_frame_buffer_free(&wifi_transfer_net_camera_buf->handle, wifi_transfer_net_camera_buf->frame);
 			wifi_transfer_net_camera_buf->frame = NULL;
+		}
+
+		if (wifi_transfer_net_camera_buf->handle)
+		{
+			media_app_camera_close(&wifi_transfer_net_camera_buf->handle);
 		}
 
 		wifi_transfer_net_camera_buf->buf_ptr = NULL;
@@ -432,8 +437,8 @@ static void wifi_transfer_net_camera_process_packet(uint8_t *data, uint32_t leng
 
 			if (hdr->is_eof == 1)
 			{
-				media_app_frame_buffer_push(wifi_transfer_net_camera_buf->frame);
-				wifi_transfer_net_camera_buf->frame = media_app_frame_buffer_jpeg_malloc();
+				media_app_frame_buffer_push(&wifi_transfer_net_camera_buf->handle, wifi_transfer_net_camera_buf->frame);
+				wifi_transfer_net_camera_buf->frame = media_app_frame_buffer_malloc(&wifi_transfer_net_camera_buf->handle);
 				if (wifi_transfer_net_camera_buf->frame == NULL)
 				{
 					LOGE("frame buffer malloc failed\r\n");
@@ -505,8 +510,15 @@ bk_err_t wifi_transfer_net_camera_open(media_camera_device_t *device)
 			goto error;
 		}
 	}
-
 	os_memset(wifi_transfer_net_camera_buf, 0, sizeof(wifi_transfer_net_camera_buffer_t));
+
+	// step 2: open net camera
+	ret = media_app_camera_open(&wifi_transfer_net_camera_buf->handle, device);
+	if (ret != BK_OK)
+	{
+		LOGE("malloc net_camera open failed\r\n");
+		goto error;
+	}
 
 	wifi_transfer_net_camera_buf->dma_id = bk_dma_alloc(DMA_DEV_JPEG);
 	if ((wifi_transfer_net_camera_buf->dma_id < DMA_ID_0) || (wifi_transfer_net_camera_buf->dma_id >= DMA_ID_MAX))
@@ -524,10 +536,8 @@ bk_err_t wifi_transfer_net_camera_open(media_camera_device_t *device)
 
 	LOGI("net_camera_buf->dma_id:%d-%d\r\n", wifi_transfer_net_camera_buf->dma_id, wifi_transfer_net_camera_buf->dma_psram);
 
-    // need fix
-	//media_app_frame_buffer_init(FB_INDEX_JPEG);
 
-	wifi_transfer_net_camera_buf->frame = media_app_frame_buffer_jpeg_malloc();
+	wifi_transfer_net_camera_buf->frame = media_app_frame_buffer_malloc(&wifi_transfer_net_camera_buf->handle);
 	if (wifi_transfer_net_camera_buf->frame == NULL)
 	{
 		goto error;

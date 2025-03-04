@@ -932,28 +932,21 @@ bk_err_t media_app_lvcam_lvgl_close(void)
     return ret;
 }
 
-bk_err_t media_app_frame_buffer_init(void)
-{
-	int ret = BK_FAIL;
-
-	// need modify fix
-
-	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_INIT_IND, 0);
-
-	if (ret != BK_OK)
-	{
-		LOGE("%s, malloc fail\r\n", __func__);
-	}
-
-	return ret;
-}
-
-frame_buffer_t *media_app_frame_buffer_jpeg_malloc(void)
+frame_buffer_t *media_app_frame_buffer_malloc(camera_handle_t *handle)
 {
 	int ret = BK_FAIL;
 	frame_buffer_t *frame = NULL;
 
-	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_JPEG_MALLOC_IND, (uint32_t)&frame);
+	if (*handle == NULL)
+	{
+		return frame;
+	}
+
+	media_device_t media_device = {0};
+	media_device.param1 = (uint32_t)handle;
+	media_device.param2 = (uint32_t)&frame;
+
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_MALLOC_IND, (uint32_t)&media_device);
 
 	if (ret != BK_OK)
 	{
@@ -962,44 +955,41 @@ frame_buffer_t *media_app_frame_buffer_jpeg_malloc(void)
 
 	LOGD("%s, %p\r\n", __func__, frame);
 
-	if (frame)
-		frame->fmt = PIXEL_FMT_JPEG;
-
 	return frame;
 }
 
-frame_buffer_t *media_app_frame_buffer_h264_malloc(void)
+bk_err_t media_app_frame_buffer_push(camera_handle_t *handle, frame_buffer_t *frame)
 {
 	int ret = BK_FAIL;
-	frame_buffer_t *frame = NULL;
 
-	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_H264_MALLOC_IND, (uint32_t)&frame);
-
-	if (ret != BK_OK)
+	if (*handle == NULL)
 	{
-		LOGE("%s, malloc fail\r\n", __func__);
+		return ret;
 	}
 
-	if (frame)
-		frame->fmt = PIXEL_FMT_H264;
+	media_device_t media_device = {0};
+	media_device.param1 = (uint32_t)handle;
+	media_device.param2 = (uint32_t)frame;
 
-	return frame;
-}
-
-bk_err_t media_app_frame_buffer_push(frame_buffer_t *frame)
-{
-	int ret = BK_FAIL;
-
-	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_PUSH_IND, (uint32_t)frame);
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_PUSH_IND, (uint32_t)&media_device);
 
 	return ret;
 }
 
-bk_err_t media_app_frame_buffer_clear(frame_buffer_t *frame)
+bk_err_t media_app_frame_buffer_free(camera_handle_t *handle, frame_buffer_t *frame)
 {
 	int ret = BK_FAIL;
 
-	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_FREE_IND, (uint32_t)frame);
+	if (*handle == NULL)
+	{
+		return ret;
+	}
+
+	media_device_t media_device = {0};
+	media_device.param1 = (uint32_t)handle;
+	media_device.param2 = (uint32_t)frame;
+
+	ret = media_send_msg_sync(EVENT_FRAME_BUFFER_FREE_IND, (uint32_t)&media_device);
 
 	return ret;
 }

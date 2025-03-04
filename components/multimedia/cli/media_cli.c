@@ -360,7 +360,7 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 
 	if (argc <= 2)
 	{
-		ret = kParamErr;
+		ret = BK_FAIL;
 		goto output;
 	}
 	else
@@ -733,58 +733,65 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 			}
 		}
 
-		if (os_strcmp(argv[1], "fb") == 0)
+		if (os_strcmp(argv[1], "net_camera") == 0)
 		{
-			static frame_buffer_t *new_frame = NULL;
-#if 0
-			fb_type_t type = FB_INDEX_JPEG;
+			handle = bk_camera_handle_node_get_by_id_and_fomat(0, IMAGE_MJPEG);
 
-			if (os_strcmp(argv[2], "init") == 0)
+			if (os_strcmp(argv[2], "open") == 0)
 			{
-				if (os_strcmp(argv[3], "jpeg") == 0)
+				media_camera_device_t device = DEFAULT_CAMERA_CONFIG();
+				device.type = NET_CAMERA;
+				ret = media_app_camera_open(&handle, &device);
+			}
+			else if (os_strcmp(argv[2], "close") == 0)
+			{
+				if (handle != NULL)
 				{
-					type = FB_INDEX_JPEG;
-				}
-				else if (os_strcmp(argv[3], "h264") == 0)
-				{
-					type = FB_INDEX_H264;
+					ret = media_app_camera_close(&handle);
 				}
 				else
 				{
-					type = FB_INDEX_DISPLAY;
+					LOGE("%s, %d handle is null\n", __func__, __LINE__);
 				}
-
-				ret = media_app_frame_buffer_init(type);
 			}
-#endif
-
-			if (os_strcmp(argv[2], "malloc") == 0)
+			else if (os_strcmp(argv[2], "malloc") == 0)
 			{
-				if (os_strcmp(argv[3], "jpeg") == 0)
+				frame_buffer_t *frame = media_app_frame_buffer_malloc(&handle);
+				if (frame != NULL)
 				{
-					new_frame = media_app_frame_buffer_jpeg_malloc();
-					ret = BK_OK;
-				}
-				else if (os_strcmp(argv[3], "h264") == 0)
-				{
-					new_frame = media_app_frame_buffer_h264_malloc();
+					LOGE("%s, %d frame malloc:%p\n", __func__, __LINE__, frame);
 					ret = BK_OK;
 				}
 				else
 				{
-					//
-					ret = kParamErr;
+					LOGE("%s, %d frame malloc failed\n", __func__, __LINE__);
 				}
 			}
-
-			if (os_strcmp(argv[2], "push") == 0)
+			else if (os_strcmp(argv[2], "push") == 0)
 			{
-				ret = media_app_frame_buffer_push(new_frame);
+				if (argc > 3)
+				{
+					frame_buffer_t *frame = (frame_buffer_t *)os_strtoul(argv[3], NULL, 16);
+
+					ret = media_app_frame_buffer_push(&handle, frame);
+
+					LOGI("push frame:%p, ret:%d, %d\n", frame, ret, __LINE__);
+				}
 			}
-
-			if (os_strcmp(argv[2], "clear") == 0)
+			else if (os_strcmp(argv[2], "free") == 0)
 			{
-				ret = media_app_frame_buffer_clear(new_frame);
+				if (argc > 3)
+				{
+					frame_buffer_t *frame = (frame_buffer_t *)os_strtoul(argv[3], NULL, 16);
+
+					ret = media_app_frame_buffer_free(&handle, frame);
+
+					LOGI("free frame:%p, ret:%d, %d\n", frame, ret, __LINE__);
+				}
+			}
+			else
+			{
+				LOGE("%s, %d param error\n", __func__, __LINE__);
 			}
 		}
 	}
