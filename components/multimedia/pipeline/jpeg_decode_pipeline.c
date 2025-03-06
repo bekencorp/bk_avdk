@@ -919,8 +919,8 @@ static void jpeg_decode_line_done_handle(uint32_t param)
 	request.sequence = jdec_config->jpeg_frame->sequence;
 	request.buffer = &mux_buf->buffer;
 
+	int j = 0;
 	rtos_lock_mutex(&jdec_info->lock);
-
 	for (int i = 0; i < PIPELINE_MOD_LINE_MAX; i++)
 	{
 		if (mux_buf->state[i] == MUX_BUFFER_PRESET)
@@ -931,6 +931,7 @@ static void jpeg_decode_line_done_handle(uint32_t param)
 			{
 				LOGD("%s, %d\n", __func__, i);
 				ret = jdec_config->cb[i](&request, mux_callback[i]);
+				j++;
 			}
 
 			if (ret != BK_OK)
@@ -945,6 +946,11 @@ static void jpeg_decode_line_done_handle(uint32_t param)
 	}
 
 	rtos_unlock_mutex(&jdec_info->lock);
+	if (j == 0)
+	{
+		LOGI("%s, %d\n", __func__, __LINE__);
+		jpeg_decode_task_send_msg(JPEGDEC_FINISH, 0);
+	}
 }
 
 static void jpeg_decode_finish_handle(uint32_t param)
