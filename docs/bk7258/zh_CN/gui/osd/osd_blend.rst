@@ -123,8 +123,7 @@ UI工具的使用请参考 ` https://docs.bekencorp.com/arminodoc/bk_app/gui_des
 
 ::
 
-	const uint32_t blend_assets_size = 11;
-	const blend_info_t blend_assets[11] =
+	const blend_info_t blend_assets[] =
 	{
 		{.name = "clock", .addr = &font_clock, .content = "12:30"},
 		{.name = "date",  .addr = &font_dates, .content = "2025/1/2 周四"},
@@ -145,9 +144,9 @@ UI工具的使用请参考 ` https://docs.bekencorp.com/arminodoc/bk_app/gui_des
 
 	typedef struct 
 	{
-		char name[20];
+		char name[MAX_BLEND_NAME_LEN];
 		const bk_blend_t *addr;            //the pointer, pointer to the struct
-		char content[20];
+		char content[MAX_BLEND_CONTENT_LEN];
 	}blend_info_t;
 
 
@@ -209,7 +208,7 @@ UI工具的使用请参考 ` https://docs.bekencorp.com/arminodoc/bk_app/gui_des
 
 ::
 
-	const blend_info_t blend_info[7] =
+	const blend_info_t blend_info[] =
 	{
 		{.name = "clock", .addr = &font_clock, .content = "12:30"},
 		{.name = "date",  .addr = &font_dates, .content = "2025/1/2 周四"},
@@ -238,12 +237,6 @@ UI工具的使用请参考 ` https://docs.bekencorp.com/arminodoc/bk_app/gui_des
 
 ::
 
-	bk_display_blend_handle((frame_buffer_t *)msg.param, lcd_disp_config->lcd_width, lcd_disp_config->lcd_height, blend_info);
-
-或
-
-::
-
 	blend_info_t *info = &g_dyn_array.entry[0];
 	bk_display_blend_handle((frame_buffer_t *)msg.param, lcd_disp_config->lcd_widthlcd_disp_config->lcd_height, info);
 
@@ -262,11 +255,7 @@ UI工具的使用请参考 ` https://docs.bekencorp.com/arminodoc/bk_app/gui_des
 	#define BLEND_MALLOC_SRAM           1
 	#define LCD_BLEND_MALLOC_SIZE      (1024 * 15)
 
-
-.. attention::
-
-	对于CPU进行字库小图标融合，背景数据为YUV（一般为解码后的YUV数据）或RGB565数据，软件实现是直接将汉字画到背景YUV/RGB565数据中，所以需要将背景中的YUV数据拷贝到blend buf1中，
-	如果不需要小图标的旋转，即不需要申请blend_addr2,如果小图标还需要额外的旋转，则需要增加一块相同内存大小的内存blend buf2。
+	图标的尺寸如何确定请参考字库生成文档 `font generate <../osd/font_generate.html>`_
 
 
 .. attention::
