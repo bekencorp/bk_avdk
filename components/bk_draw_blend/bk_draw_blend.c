@@ -44,7 +44,7 @@
                 length++;  \
             }   \
         } \
-        length;\
+        ++length;\
     })
 
 
@@ -101,13 +101,23 @@ bk_err_t bk_display_blend_font_handle(frame_buffer_t *frame, uint16_t lcd_width,
 
 #if (CONFIG_BLEND)
     const bk_blend_t *font_strings = font_info->addr;
+    if ((font_strings->width + font_strings->xpos > lcd_width) || (font_strings->height + font_strings->ypos > lcd_height))
+    {
+        LOGW("%s %d fonts size is beyond the boundaries of lcd\n", __func__, __LINE__);
+        if (font_strings->xpos + font_strings->width > lcd_width)
+            LOGI("content: %s, xpos %d + width %d > lcd_width %d\n", __func__, font_strings->xpos, font_strings->width, lcd_width);
+        if (font_strings->ypos  + font_strings->height > lcd_height)
+            LOGI("content: %s, ypos %d + height %d > lcd_width %d\n", __func__, font_strings->ypos, font_strings->height, lcd_height);
+        os_memset((void *)font_info->content, 0, sizeof(font_info->content));
+        return BK_FAIL;
+    }
+
     font_blend_cfg_t cfg = {0};
     cfg.pbg_addr = (uint8_t *)(frame->frame);
     cfg.xsize = font_strings->width;
     cfg.ysize = font_strings->height;
     cfg.xpos = font_strings->xpos;
     cfg.ypos = font_strings->ypos;
-    
     cfg.str_num = 1;
     if (frame->fmt == PIXEL_FMT_VUYY)
     {
@@ -151,10 +161,20 @@ bk_err_t bk_display_blend_img_handle(frame_buffer_t *frame, uint16_t lcd_width, 
     {
         return BK_FAIL;
     }
-#if CONFIG_LCD_DMA2D_BLEND
-    /**>  b7258 hw rotate output RGB565(big endian) is incompatible with DMA2D input RGB565 data format.*/
     image_blend_cfg_t cfg = {0};
     const bk_blend_t *img_dsc = (bk_blend_t *)img_info;
+    if ((img_info->width + img_info->xpos > lcd_width) || (img_info->height + img_info->ypos > lcd_height))
+    {
+        LOGW("%s %d img  size is beyond the boundaries of lcd\n", __func__, __LINE__);
+        if (img_dsc->width + img_dsc->xpos > lcd_width)
+            LOGI("content: %s, xpos %d + width %d > lcd_width %d\n", __func__, img_dsc->xpos, img_dsc->width, lcd_width);
+        if (img_dsc->height + img_dsc->ypos > lcd_height)
+            LOGI("content: %s, ypos %d + height %d > lcd_width %d\n", __func__, img_dsc->ypos, img_dsc->height, lcd_height);
+
+        return BK_FAIL;
+    }
+#if CONFIG_LCD_DMA2D_BLEND
+    /**>  b7258 hw rotate output RGB565(big endian) is incompatible with DMA2D input RGB565 data format.*/
     cfg.pfg_addr = (uint8_t *)img_dsc->image.data;
     cfg.pbg_addr = (uint8_t *)(frame->frame);
     cfg.xsize = img_dsc->width;
@@ -170,8 +190,6 @@ bk_err_t bk_display_blend_img_handle(frame_buffer_t *frame, uint16_t lcd_width, 
     cfg.lcd_height = lcd_height;
     bk_dma2d_image_blend(&cfg);
 #elif CONFIG_BLEND
-    image_blend_cfg_t cfg = {0};
-    const bk_blend_t *img_dsc = (bk_blend_t *)img_info;
     cfg.pfg_addr = (uint8_t *)img_dsc->image.data;
     cfg.pbg_addr = (uint8_t *)(frame->frame);
     cfg.xpos = img_dsc->xpos;
@@ -286,11 +304,19 @@ bk_err_t blend_task_send_msg(uint8_t type, uint32_t param)
 {
     int ret = BK_FAIL;
     blend_msg_t msg;
+    blend_info_t *info = NULL;
+
+    if (param != 0)
+    {
+        info = os_malloc(sizeof(blend_info_t));
+        os_memcpy(info, (blend_info_t *)param, sizeof(blend_info_t));
+        LOGD("%s %d %p %s %s\n", __func__,__LINE__, info, info->name, info->content);
+    }
 
     if (blend && blend->task_running)
     {
         msg.event = type;
-        msg.param = param;
+        msg.param = (uint32_t)info;
         ret = rtos_push_to_queue(&blend->queue, &msg, BEKEN_WAIT_FOREVER);
 
         if (ret != BK_OK)
@@ -298,16 +324,26 @@ bk_err_t blend_task_send_msg(uint8_t type, uint32_t param)
             LOGE("%s push failed\n", __func__);
         }
     }
+    if (ret != BK_OK)
+    {
+        if (info != NULL)
+        {
+            os_free(info);
+        }
+    }
     return ret;
 }
 
 bk_err_t dynamic_array_init(dynamic_array_t * dyn_array, size_t initial_capacity)
 {
-    dyn_array->entry = os_malloc(initial_capacity * sizeof(blend_info_t));
+    uint32_t len = initial_capacity * sizeof(blend_info_t);
+    dyn_array->entry = os_malloc(len);
     if (dyn_array->entry == NULL)
     {
         return BK_FAIL;
     }
+
+    os_memset((void *)dyn_array->entry, 0, len);
 
     for(int i = 0; i < initial_capacity; i++)
     {
@@ -326,7 +362,7 @@ void copy_existing_blend_info_to_dynamic_array(dynamic_array_t * dyn_array)
     if (dyn_array->size + length > dyn_array->capacity)
     {
         dyn_array->capacity = dyn_array->size + length;
-        dyn_array->entry = os_realloc(dyn_array->entry, dyn_array->capacity * sizeof(dynamic_array_t));
+        dyn_array->entry = os_realloc(dyn_array->entry, dyn_array->capacity * sizeof(blend_info_t));
         if (dyn_array->entry == NULL)
         {
             LOGI("%s realloc fail \n", __func__);
@@ -385,7 +421,7 @@ const blend_info_t *find_blend_info_in_assets_by_content(const char *content)
 blend_info_t *find_blend_info_in_dynamic_array(dynamic_array_t * dyn_array, const char *name)
 {
     BLEND_RETURN_NOT_INIT();
-    if (name == NULL  && name[0] == '\0')
+    if (name == NULL && name[0] == '\0')
     {
         return NULL;
     }
@@ -404,6 +440,8 @@ blend_info_t *find_blend_info_in_dynamic_array(dynamic_array_t * dyn_array, cons
 
 void add_or_update_blend_info_to_dynamic_array(dynamic_array_t * dyn_array, const char *name, const char* content)
 {
+    size_t dyn_array_size = dyn_array->size;
+
     blend_info_t * exiting_info = find_blend_info_in_dynamic_array(dyn_array, name);
     if (exiting_info != NULL)
     {
@@ -443,43 +481,44 @@ void add_or_update_blend_info_to_dynamic_array(dynamic_array_t * dyn_array, cons
         LOGW("%s, not fint assets %s\n", __func__, name);
         return;
     }
-    if (dyn_array->size >= dyn_array->capacity)
+
+    if (dyn_array_size >= dyn_array->capacity)
     {
         dyn_array->capacity *= 2;
-        dyn_array->entry = os_realloc(dyn_array->entry, dyn_array->capacity * sizeof(dynamic_array_t));
+        dyn_array->entry = os_realloc(dyn_array->entry, dyn_array->capacity * sizeof(blend_info_t));
         if (dyn_array->entry == NULL)
         {
             LOGI("%s realloc fail \n", __func__);
             return;
         }
-        for(int i = dyn_array->size; i < dyn_array->capacity; i++)
+        for(int i = dyn_array_size; i < dyn_array->capacity; i++)
         {
             dyn_array->entry[i].name[0] = '\0';
             dyn_array->entry[i].addr = NULL;
         }
         LOGI("%s extend dyn_array capacity * 2\n", __func__);
     }
-    dyn_array->entry[dyn_array->size] = *assets_info;
+    dyn_array->entry[dyn_array_size] = *assets_info;
 
-    strncpy(dyn_array->entry[dyn_array->size].name, name, sizeof(dyn_array->entry[dyn_array->size].name) - 1);
-    dyn_array->entry[dyn_array->size].name[sizeof(dyn_array->entry[dyn_array->size].name) - 1] = '\0';
+    strncpy(dyn_array->entry[dyn_array_size].name, name, sizeof(dyn_array->entry[dyn_array_size].name) - 1);
+    dyn_array->entry[dyn_array_size].name[sizeof(dyn_array->entry[dyn_array_size].name) - 1] = '\0';
     if (content != NULL)
     {
-        strncpy(dyn_array->entry[dyn_array->size].content, content, sizeof(dyn_array->entry[dyn_array->size].content) - 1);
-        dyn_array->entry[dyn_array->size].content[sizeof(dyn_array->entry[dyn_array->size].content) - 1] = '\0';
+        strncpy(dyn_array->entry[dyn_array_size].content, content, sizeof(dyn_array->entry[dyn_array_size].content) - 1);
+        dyn_array->entry[dyn_array_size].content[sizeof(dyn_array->entry[dyn_array_size].content) - 1] = '\0';
         if (content[0] != '\0')
         {
-            if (dyn_array->entry[dyn_array->size].addr->blend_type == BLEND_TYPE_IMAGE)
+            if (dyn_array->entry[dyn_array_size].addr->blend_type == BLEND_TYPE_IMAGE)
             {
                 const blend_info_t *update_img = find_blend_info_in_assets_by_content(content);
                 if (update_img != NULL)
                 {
-                    dyn_array->entry[dyn_array->size].addr = update_img->addr;
+                    dyn_array->entry[dyn_array_size].addr = update_img->addr;
                 }
                 else
                 {
                     LOGW("warring!!!, not find img %s,'%s' in assets\n", assets_info->name, content);
-                    dyn_array->entry[dyn_array->size].content[0] = '\0';
+                    dyn_array->entry[dyn_array_size].content[0] = '\0';
                 }
             }
         }
@@ -489,7 +528,6 @@ void add_or_update_blend_info_to_dynamic_array(dynamic_array_t * dyn_array, cons
         }
     }
 
-    LOGD("%s,%d, %s %p %s\n", __func__,__LINE__, dyn_array->entry[dyn_array->size].name,  dyn_array->entry[dyn_array->size].addr,  dyn_array->entry[dyn_array->size].content);
     dyn_array->size++;
     dyn_array->entry[dyn_array->size].addr = NULL;
 }
@@ -517,6 +555,7 @@ static void blend_task_entry(beken_thread_arg_t data)
                 {
                     blend_info_t *info = (blend_info_t *)msg.param;
                     add_or_update_blend_info_to_dynamic_array(&g_dyn_array, info->name, info->content);
+                    os_free(info);
                 }
                 break;
 
@@ -602,11 +641,13 @@ void get_blend_assets_array(const blend_info_t *assets)
 {
     bk_blend_assets = assets;
     blend_assets_size = BLEND_ARRAY_LENGTH(bk_blend_assets);
+    LOGD("%s bk_blend_assets=%p blend_assets_size=%d \n", __func__,bk_blend_assets, blend_assets_size);
 }
 
 void get_blend_default_array(const blend_info_t *assets)
 {
     bk_blend_info = assets;
+    LOGD("%s bk_blend_info=%p \n", __func__, bk_blend_info);
 }
 
 bk_err_t bk_draw_blend_init(void)

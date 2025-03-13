@@ -95,7 +95,7 @@ static bk_err_t blend_check_mem(uint32_t icon_x, uint32_t icon_y, uint8_t icon_r
             LOGE("%s malloc ICON size %d*%d*2 %d in %d(0:sram, 1:psram) error\n", __func__, icon_x, icon_y, s_blend.buf1.size, s_blend.buf1.is_malloc_psram );
             return BK_FAIL;
         }
-        LOGI("%s malloc ICON size %d*%d*2 %d in %d(0:sram, 1:psram)\n", __func__, icon_x, icon_y, s_blend.buf1.size, s_blend.buf1.is_malloc_psram );
+        LOGI("%s malloc ICON size %d*%d*2 %d in %d(0:sram, 1:psram) %p-%p\n", __func__, icon_x, icon_y, s_blend.buf1.size, s_blend.buf1.is_malloc_psram, s_blend.buf1.addr, (char*)(s_blend.buf1.addr + s_blend.buf1.size));
 
         if (icon_rotate == ROTATE_270 )
         {

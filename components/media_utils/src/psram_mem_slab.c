@@ -66,6 +66,7 @@ static bool frame_buffer_mem_is_in_heap(uint8_t type, void* mem_ptr)
 	return ret;
 }
 
+
 void bk_psram_frame_buffer_init(void)
 {
 	uint32_t end_adderss = PSRAM_ADDR;

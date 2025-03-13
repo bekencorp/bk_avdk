@@ -33,7 +33,7 @@ extern "C" {
 #define LCD_BLEND_MALLOC_SIZE      (1024 * 15)
 #define LCD_BLEND_MALLOC_RGB_SIZE  (0)
 #define MAX_BLEND_NAME_LEN    20
-#define MAX_BLEND_CONTENT_LEN 30
+#define MAX_BLEND_CONTENT_LEN 31
 
 
 
