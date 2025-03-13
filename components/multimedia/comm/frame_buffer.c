@@ -475,6 +475,8 @@ bk_err_t frame_buffer_list_node_deinit(frame_list_node_t *node)
         tmp_node = NULL;
     }
 
+    LOGI("%s, %p, %d\n", __func__, node, __LINE__);
+
     return BK_OK;
 }
 
@@ -822,8 +824,7 @@ bk_err_t frame_buffer_fb_deregister(frame_list_node_t *node, frame_module_t modu
                     tmp->frame = NULL;
                 }
                 list_del(pos);
-                os_free(tmp);
-                tmp = NULL;
+                list_add_tail(&tmp->list, &node->free);
             }
         }
     }
