@@ -367,7 +367,7 @@ void uvc_camera_stream_connect_callback(bk_usb_hub_port_info *port_info, void *a
 
 void uvc_camera_stream_disconnect_callback(bk_usb_hub_port_info *port_info, void *arg)
 {
-    uint8_t delay_cnt = 5;
+    uint8_t delay_cnt = 100;
     uvc_stream_handle_t *uvc_handle = (uvc_stream_handle_t *)arg;
 
     LOGI("%s, %d, port:%d\r\n", __func__, __LINE__, port_info->port_index);
@@ -382,11 +382,17 @@ void uvc_camera_stream_disconnect_callback(bk_usb_hub_port_info *port_info, void
 
         while (camera_param->camera_state == UVC_CONFIGING_STATE && delay_cnt > 0)
         {
-            rtos_delay_milliseconds(2);// this is task callback
+            rtos_delay_milliseconds(20);// this is task callback
             delay_cnt--;
         }
 
+        if (delay_cnt == 0)
+        {
+            LOGW("%s, timeout, need attation %d\n", __func__, __LINE__);
+        }
+
         camera_param->camera_state = UVC_DISCONNECT_STATE;
+        camera_param->port_info = NULL;
     }
 
     uvc_handle->connect_camera_count--;
@@ -787,12 +793,6 @@ bk_err_t uvc_camera_stream_rx_config(uvc_stream_handle_t *uvc_handle, camera_par
     ret = bk_usbh_hub_dev_request_data(uvc_param->info->port, uvc_param->port_info->device_index, urb);
     if (ret != BK_OK)
     {
-        // maybe send notify to user
-        if (uvc_param->camera_state != UVC_DISCONNECT_STATE)
-        {
-            uvc_param->camera_state = UVC_CONNECT_STATE;
-        }
-
         uvc_handle->callback.frame_free(uvc_param->info->img_format, uvc_param->stream, uvc_param->frame);
         uvc_camera_urb_free(uvc_param->urb);
         uvc_param->frame = NULL;
@@ -802,7 +802,6 @@ bk_err_t uvc_camera_stream_rx_config(uvc_stream_handle_t *uvc_handle, camera_par
     }
 
     LOGI("[%d]%s, %d, state:%d\r\n", uvc_param->info->port, __func__, __LINE__, uvc_param->camera_state);
-
     return ret;
 }
 
@@ -871,6 +870,11 @@ bk_err_t uvc_camera_stream_start_handle(uint32_t param)
 
     if (ret != BK_OK)
     {
+        // maybe send notify to user
+        if (uvc_param->camera_state != UVC_DISCONNECT_STATE)
+        {
+            uvc_param->camera_state = UVC_CONNECT_STATE;
+        }
         LOGW("uvc config error, camera_id:%d\r\n", uvc_param->info->port);
         if (uvc_connect_state_cb)
         {
@@ -897,6 +901,11 @@ static void uvc_camera_stream_connect_handle(uint32_t param)
     ret = uvc_camera_stream_rx_config(uvc_handle, uvc_param);
     if (ret != BK_OK)
     {
+        // maybe send notify to user
+        if (uvc_param->camera_state != UVC_DISCONNECT_STATE)
+        {
+            uvc_param->camera_state = UVC_CONNECT_STATE;
+        }
         LOGW("uvc config error, camera_id:%d\r\n", uvc_param->info->port);
         if (uvc_connect_state_cb)
         {
