@@ -28,6 +28,7 @@ Common Problems with DVP
     This problem may be caused by poor physical contact, and needs to be unplugged and reinstalled.
     Possible data collection anomalies may be caused by inconsistent line sequence with the default BK7258.
     Perhaps due to electromagnetic interference from the board, the sampling of the main control may be inaccurate in PCLK. A pull-up filter capacitor 8-22pf can be connected to PLK.
+    Because the dvp lines are too long, it is recommended to wrap them with copper wire to reduce electromagnetic interference.
 
     Q: Abnormal image output and printing: "sensor FIFO is full".
 

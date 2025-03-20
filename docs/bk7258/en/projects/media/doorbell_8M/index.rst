@@ -6,7 +6,8 @@ Doorbell_8M
 1. Introduction
 ---------------------------------
 
-This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 device) to mobile app demonstrations. The default PSRAM used is 8Mbyte.
+This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 device) to mobile app demonstrations.
+Support LVGL and multi camera switch, 1 dvp camera and 2 uvc (need connect with usb hub). The default PSRAM used is 8Mbyte.
 
 1.1 Specifications
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

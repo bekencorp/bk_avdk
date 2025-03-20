@@ -7,7 +7,8 @@ Doorbell_720p
 ---------------------------------
 
 This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 device) to mobile app demonstrations. The default PSRAM used is 8Mbyte.
-Support uvc output 1280X720 image transfer to mobilephone, and scale display to 480X854 lcd screen.
+Support uvc output 1280X720 image transfer to mobilephone, and scale display to 480X854 lcd screen. This project no adapt to camera switch funcion.
+Customer can reference project "doorbell" if need.
 
 1.1 Specifications
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

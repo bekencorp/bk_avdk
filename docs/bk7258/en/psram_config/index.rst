@@ -62,6 +62,13 @@ PSRAM MEM Config
 	PSRAM is not used as Heap by default on CPU2. So CONFIG_PSRAM_HEAP_CPU0_BASE_ADDER=0x60700000. Whether psram is required as heap on a kernel is
 	controlled by CONFIG_PSRAM_AS_SYS_MEMORY.
 
+.. figure:: ../../_static/psram_config_diag.png
+    :align: center
+    :alt: psram architecture 
+    :figclass: align-center
+
+    Figure 1. psram architecture
+
 4. PSRAM used for heap
 ------------------------
 
@@ -108,6 +115,13 @@ PSRAM MEM Config
 	Note: The value defined by the above macro is defined by default, which can be dynamically adjusted according to its own needs when used,
 	and can be modified directly in the cpu config of the corresponding project. However, note that the length added up above cannot exceed the address used by the
 	Heap(CONFIG_PSRAM_HEAP_CPU0_BASE_ADDER), otherwise there will be problems.
+
+.. figure:: ../../_static/psram_media_config_diag.png
+    :align: center
+    :alt: psram multimedia architecture 
+    :figclass: align-center
+
+    Figure 2. psram multimedia architecture
 
 6. Each module of multimedia memory adjustment
 -----------------------------------------------

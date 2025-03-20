@@ -6,7 +6,8 @@ Doorbell
 1. Introduction
 ---------------------------------
 
-This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 device) to mobile app demonstrations.
+This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 device) to mobile app demonstrations. Support multi camera switch for door lock,
+include 1 dvp and 2 uvc. The default use 16M psram.
 
 
 1.1 Specifications
@@ -15,11 +16,13 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     * Hardware configuration:
         * Core board, **BK7258_QFN88_9X9_V3.2**
         * Display adapter board, **BK7258_LCD_interface_V3.0**
-        * Mac Xiaoban, **BK_madule_Microphone_V1.1**
-        * Speaker small board, **BKnModule_Speaker_V1.1**
+        * MIC small board, **BK_Module_Microphone_V1.1**
+        * SPEAKER small board, **BK_Module_Speaker_V1.1**
         * PSRAM 8M/16M
     * Support, UVC
         * Reference peripherals, UVC resolution of **864 * 480**
+    * Support, DVP
+        * Reference peripherals, gc2145 resolution of **864 * 480**
     * Support, UAC
     * Support, TCP LAN image transmission
     * Support UDP LAN image transmission
@@ -56,7 +59,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
 
     As shown in the following figure, BK7258 has multiple CPUs:
         * CPU0, running WIFI/BLE as a low-power CPU.
-        * CPU1, runs multimedia and serves as a high-performance multimedia CPU.
+        * CPU1, running multimedia and serves as a high-performance multimedia CPU.
 
 .. figure:: ../../../../_static/doorbell_arch.png
     :align: center
@@ -76,6 +79,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
         * When closing, it is important to note that both the display and image transfer are closed before closing this module. The default demo already includes this logic.
     * MJPEG SW Decoder, two decoders will not work simultaneously at the same time.
         * Once the image is confirmed to be YUV420 or YUV422, it is decided whether to use software decoding or hardware decoding.
+        * When work camera switch, one camera may output JPEG(YUV422) and another may output JPEG(YUV420), the system can recognize format and readapt decode method, customer not need do other work.
     * Rota HW and Rota SW will only use one type of rotating module at the same time.
         * Rota HW, supports RGB 565 image output, supports 0°, 90°, 270°.
         * Rota SW supports 0°, 90°, 180°, and 270°.
@@ -174,7 +178,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     Please visit `APP Usage Document <https://docs.bekencorp.com/arminodoc/bk_app/app/zh_CN/v2.0.1/app_usage/app_usage_guide/index.html#debug>`__.
 
 .. hint::
-    If you do not have cloud account permissions, you can use debug mode to set the local area network TCP image transmission method.
+    If you do not have cloud account permissions, you can use debug mode to set the local area network TCP/UDP/CS2 image transmission method.
 
 5. Code explanation
 ---------------------------------
@@ -202,17 +206,29 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     {
         ...
 
-        //turn onUVCcamera
-        ret = media_app_camera_open(&device);
+        //turn on camera
+        ret = media_app_camera_open(&db_device_info->video_handle, &device);
 
-        //Set local display rotation.
-        //It should be noted that:
-        //    1.When MJPEG is YUV422 MJPEG, only the local display will rotate. That is, H264 images do not rotate.
-        //    2.When MJPEG is YUV420 MJPEG, rotation will be performed during software decoding. Both local display and H264 encoded images are rotated data.
-        media_app_pipline_set_rotate(rot_angle);
+        //set rotate angle
+        //attentions:
+        //    1.while MJPEG be YUV422 MJPEG, only rotate on local lcd, the h264 stream not rotate.
+        //    2.while MJPEG be UV420 MJPEG, rotate do the same time with jpeg decode, 
+        media_app_set_rotate(rot_angle);
 
-        //Open H264 Hardware Encoding Accelerator
+        //enable h264 encode pipeline
         ret = media_app_h264_pipeline_open();
+
+        if (device.type == UVC_CAMERA)
+        {
+            // uvc output jpeg frame and open jpeg decode, decode by 16 lines outout yuv format.
+            media_app_pipeline_jdec_open();
+        }
+        else if (device.type == DVP_CAMERA)
+        {
+            // dvp output yuv format data, enable yuv deal task
+            media_app_frame_jdec_open(NULL);
+        }
+
 
         ...
     }
@@ -225,7 +241,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     //Path      :  components/multimedia/app/media_app.c
     //Loaction  :  CPU0
 
-    bk_err_t media_app_camera_open(media_camera_device_t *device)
+    bk_err_t media_app_camera_open(camera_handle_t *handle, media_camera_device_t *device)
     {
         ...
 
@@ -240,52 +256,64 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
         bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_EN, PM_POWER_MODULE_STATE_ON);
 
         //Notify CPU1 to turn on the UVC camera.
-        ret = media_send_msg_sync(EVENT_CAM_UVC_OPEN_IND, (uint32_t)device);
+        media_device_t media_device = {0};
+        media_device.param1 = (uint32_t)handle;
+        media_device.param2 = (uint32_t)device;
+        //notify cpu1 open camera
+        ret = media_send_msg_sync(EVENT_CAM_UVC_OPEN_IND, (uint32_t)media_device);
 
         ...
     }
+
+    typedef struct {
+        camera_type_t type; // camera type
+        uint16_t port;      // camera port index(uvc:[1,3], dvp:0)
+        uint16_t format;    // camera output image format, reference image_format_t
+        uint16_t width;     // camera output image width
+        uint16_t height;    // camera output image height
+        uint32_t fps;       // camera output image fps
+        media_rotate_t rotate;// reserve
+    } media_camera_device_t;
 
 5.1.2 Obtain an image
 .................................
 
-5.1.2.1 Application Code
+5.1.2.1 Enable interface
 *********************************
 
 ::
 
-    //Path      :  components/multimedia/camera/uvc.c
-    //Loaction  :  CPU1
-    
-    bk_err_t bk_uvc_camera_open(media_camera_device_t *device)
+    //Path      : components/multimedia/app/media_app.c
+    //Loaction  :  CPU0
+
+    bk_err_t media_app_register_read_frame_callback(image_format_t fmt, frame_cb_t cb)
     {
         ...
 
-        //Register the MJPEG data callback for obtaining UVC images.
-        //If frame loss processing is required, it can be done in this callback.
-        uvc_camera_config_st->jpeg_cb.push   = frame_buffer_fb_push;
+        //cb: register image process callback, will return a frame buffer in callback function
+        //fmt: the image format you want to read
 
         ...
     }
 
-5.1.2.2 Interface Code
+5.1.2.2 Disable interface
 *********************************
 
 ::
 
-    //Path      :  bk_idk/middleware/driver/camera/uvc_camera.c
-    //Loaction  :  CPU1
-    static void uvc_camera_eof_handle(uint32_t idx_uvc)
+    //Path      : components/multimedia/app/media_app.c
+    //Loaction  :  CPU0
+    bk_err_t media_app_unregister_read_frame_callback(void)
     {
         ...
 
-        //Here is a stack of data streams obtained through ISO or BULK transfer from USB. And unpacking, grouping, and finally obtaining a complete frame of UVC data. And call back to the application layer.
-        uvc_camera_config_ptr->jpeg_cb.push(curr_frame_buffer);
+        //called this function, will stop read frame, and the callback that be register not been called again
 
         ...
     }
 
 .. attention::
-    Here is an introduction to how to obtain MJPEG images on CPU1. If your application is running on CPU0, it needs to be sent to CPU0 through a mailbox for use, and after use, it needs to be returned to CPU1 for release.
+    Here introduces how to read images, through the above interface, users can get the image, but in the callback function, do not handle it too long, it is recommended to copy the image data to the customer thread for processing in the callback function, otherwise, the task of reading images will be stuck, leading to frame loss.
 
 5.1.3 Turn off UVC
 .................................
@@ -304,8 +332,25 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
         //Disable H264 encoding
         media_app_h264_pipeline_close();
 
-        //Turn off UVC camera
-        media_app_camera_close(UVC_CAMERA);
+        //close jpeg decode pipeline function(maybe not open before)
+        media_app_pipeline_jdec_close();
+        //close yuv data process task(maybe not open before)
+        media_app_frame_jdec_close();
+
+        //close all camera have been opened
+        do {
+            //get current camera handle
+            db_device_info->video_handle = bk_camera_handle_node_pop();
+            if (db_device_info->video_handle)
+            {
+                LOGI("%s, %d, %p\n", __func__, __LINE__, db_device_info->video_handle);
+                media_app_camera_close(&db_device_info->video_handle);
+            }
+            else
+            {
+                break;
+            }
+        } while (1);
 
         ...
     }
@@ -318,15 +363,31 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     //Path      :  components/multimedia/app/media_app.c
     //Loaction  :  CPU0
 
-    bk_err_t media_app_camera_close(camera_type_t type)
+    bk_err_t media_app_camera_close(camera_handle_t *handle)
     {
         ...
 
-        //Turn off UVC camera
-        ret = media_send_msg_sync(EVENT_CAM_UVC_CLOSE_IND, 0);
+        //Turn off UVC camera by handle
+        ret = media_send_msg_sync(EVENT_CAM_UVC_CLOSE_IND, (uint32_t)handle);
 
         //Vote to allow CPU1 to be turned off. The purpose of voting is to ensure that CPU1 can be automatically turned off when not in use, in order to achieve the goal of low power consumption.
         bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_EN, PM_POWER_MODULE_STATE_OFF);
+
+        ...
+    }
+
+    bk_err_t media_app_pipeline_jdec_open(void)
+    {
+        ...
+
+        //vote to enable cpu1
+        bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_DE, PM_POWER_MODULE_STATE_ON);
+
+        //set jpeg decode yuv data need rotate or not
+        ret = media_send_msg_sync(EVENT_PIPELINE_SET_ROTATE_IND, jpeg_decode_pipeline_param.rotate);
+
+        //enable jpeg decode pipeline function
+        ret = media_send_msg_sync(EVENT_PIPELINE_LCD_JDEC_OPEN_IND, 0);
 
         ...
     }
@@ -384,10 +445,10 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
                 break;
         }
 
-        media_app_pipline_set_rotate(rot_angle);
+        media_app_set_rotate(rot_angle);
 
         //Open local LCD display
-       media_app_lcd_pipeline_open(&lcd_open);
+       media_app_lcd_disp_open(&lcd_open);
 
         ...
     }
@@ -413,7 +474,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
         ...
     }
 
-    bk_err_t media_app_lcd_pipeline_disp_open(void *config)
+    bk_err_t media_app_lcd_disp_open(void *config)
     {
         ...
 
@@ -421,25 +482,9 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
         bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_ON);
 
         //Notify CPU1 to turn on the LCD
-        ret = media_send_msg_sync(EVENT_PIPELINE_LCD_DISP_OPEN_IND, (uint32_t)ptr);
+        ret = media_send_msg_sync(EVENT_PIPELINE_LCD_DISP_OPEN_IND, (uint32_t)config);
 
         ...
-    }
-
-    bk_err_t media_app_lcd_pipeline_jdec_open(void)
-    {
-        int ret = BK_OK;
-
-        //Vote to activate CPU1. The purpose of voting is to ensure that CPU1 can be automatically turned off when not in use, in order to achieve the goal of low power consumption.
-        bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_DE, PM_POWER_MODULE_STATE_ON);
-
-        //Set rotation angle
-        ret = media_send_msg_sync(EVENT_PIPELINE_SET_ROTATE_IND, jpeg_decode_pipeline_param.rotate);
-
-        //Open the rotation, scaling, and decoding modules that display dependencies.
-        ret = media_send_msg_sync(EVENT_PIPELINE_LCD_JDEC_OPEN_IND, 0);
-
-        return ret;
     }
 
 5.2.2 Turn off LCD
@@ -472,15 +517,15 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     //Path      : components/multimedia/app/media_app.c
     //Loaction  :  CPU0
 
-    bk_err_t media_app_lcd_pipeline_close(void)
+    bk_err_t media_app_lcd_disp_close(void)
     {
         ...
 
-        //Disable MJPEG, decoding/rotation, and other functions.
-        ret = media_app_lcd_pipeline_jdec_close();
-
         //Turn off the display LCD
-        ret = media_app_lcd_pipeline_disp_close();
+        ret = media_send_msg_sync(EVENT_PIPELINE_LCD_DISP_CLOSE_IND, 0);
+
+        //vote to close cpu1
+        bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_OFF)
 
         ...
     }
@@ -682,7 +727,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     //Path      :  components/wifi_transfer/src/wifi_transfer.c
     //Loaction  :  CPU0
 
-    bk_err_t bk_wifi_transfer_frame_open(const media_transfer_cb_t *cb)
+    bk_err_t bk_wifi_transfer_frame_open(const media_transfer_cb_t *cb, uint16_t img_format)
     {
         ...
 
@@ -692,8 +737,8 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
 
         ...
 
-        //Register H264 image data and obtain callback
-        ret = media_app_register_read_frame_callback(cb->fmt, wifi_transfer_read_frame_callback);
+        //Register H264 image data and obtain callback(if need h264 fmt=IMAGE_H264)
+        ret = media_app_register_read_frame_callback(img_format, wifi_transfer_read_frame_callback);
 
         ...
     }
@@ -711,7 +756,21 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
         ...
 
         //Open image transfer
-        ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb);
+        if (db_device_info->camera_transfer_cb)
+        {
+            if (db_device_info->h264_transfer)
+            {
+                ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb, IMAGE_H264);
+            }
+            else
+            {
+                ret = bk_wifi_transfer_frame_open(db_device_info->camera_transfer_cb, IMAGE_MJPEG);
+            }
+        }
+        else
+        {
+            LOGE("media_transfer_cb: NULL\n");
+        }
 
         ...
     }
@@ -735,3 +794,250 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
         ...
     }
 
+
+    5.6 Camera switch
+    .................................
+
+    ::
+
+        //Path      : projects/media/doorbell/main/src/app_main.c
+        //Loaction  : CPU0
+
+        static void media_app_camera_switch(media_camera_device_t *device)
+        {
+            os_printf("%s\r\n", __func__);
+            bk_err_t ret;
+
+            //judge current camera is woring
+            if (db_device_info->video_handle != NULL) {
+                //close h264 pipeline function
+                ret = media_app_pipeline_h264_close();
+                if (ret != BK_OK)
+                {
+                    os_printf("media_app_pipeline_h264_close failed\n");
+                    return;
+                }
+
+                //close dvp yuv image display function
+                ret = media_app_frame_jdec_close();
+                if (ret != BK_OK) {
+                    os_printf("media_app_frame_jdec_close failed\r\n");
+                    return;
+                }
+
+                //close jpegdec pipeline function(include yuv rotate pipeline function)
+                ret = media_app_pipeline_jdec_close();
+                if (ret != BK_OK) {
+                    os_printf("media_app_pipeline_jdec_close failed\r\n");
+                    return;
+                }
+
+                //close the camera is working
+                ret = media_app_camera_close(&db_device_info->video_handle);
+                if (ret != BK_OK) {
+                    os_printf("media_app_camera_close failed\r\n");
+                    return;
+                }
+            }
+
+            //set yuv rotate angle
+            media_app_set_rotate(ROTATE_90);
+
+            //open the camera wanted switch
+            ret = media_app_camera_open(&db_device_info->video_handle, device);
+            if (ret != BK_OK) {
+                os_printf("media_app_camera_open failed\r\n");
+                return;
+            }
+
+            if (device->type == DVP_CAMERA) {
+                //open dvp yuv image display function
+                ret = media_app_frame_jdec_open(NULL);
+                if (ret != BK_OK) {
+                    os_printf("media_app_frame_jdec_open failed\r\n");
+                    return;
+                }
+            } else {
+                //open jpegdec pipeline function(include yuv rotate pipeline function)
+                ret = media_app_pipeline_jdec_open();
+                if (ret != BK_OK) {
+                    os_printf("media_app_pipeline_jdec_open failed\r\n");
+                    return;
+                }
+
+                if (db_device_info->h264_transfer) {
+                    //if enable h264 wifi transfer, need open h264 encode pipeline function
+                    ret = media_app_pipeline_h264_open();
+                    if (ret != BK_OK)
+                    {
+                        os_printf("media_app_pipeline_h264_open failed\n");
+                        return;
+                    }
+                }
+            }
+        }
+
+5.6.1 Camera Switching Interface Call Flow
+................................................
+
+    1. jpeg (864x480) + Wi-Fi Transmission + LCD Rotating Display (480x854)
+
+        - Open the first camera, assumed to be DVP, with image formats of IMAGE_YUV & IMAGE_MJPEG (supporting simultaneous output of MJPEG and YUV), using media_app_camera_open().
+        - Open the jpeg transmission, assuming the network port and channel are already configured, read the jpeg image using the interface, format=IMAGE_MJPEG, using media_app_register_read_frame_callback().
+        - If you need to display on the LCD screen, open the hardware display function using media_app_lcd_disp_open().
+        - If you need to display on the LCD screen and require rotation, since DVP supports YUV output by default, rotate the YUV image and let the display module show it, configure the rotation angle using media_app_set_rotate().
+        - If you need to display on the LCD screen, send the YUV image (which may already be rotated) to the hardware display using the YUV processing function using media_app_frame_jdec_open().
+        - If you need to open SD card storage for MJPEG images, currently supporting two storage modes:
+
+            1) Single shot MJPEG capture, store one frame of MJPEG image per call, using media_app_capture(). Close storage when no longer needed using media_app_storage_close().
+
+            2) Continuous MJPEG storage, store every frame captured by the camera to the SD card, using media_app_save_start(). Pause storage using media_app_save_stop(), (the storage task remains open and can be restarted). Close storage when no longer needed using media_app_storage_close().
+
+        When switching to another camera (UVC), close the current camera's processes first, then start the target camera, and preferably start other functions.
+
+        - If you need to display on the LCD screen, close the YUV image processing function using media_app_frame_jdec_close().
+        - Close the current camera using media_app_camera_close().
+        - Open the other camera (UVC) using media_app_camera_open().
+        - If you need to display on the LCD, open the JPEG decoding and rotation function using media_app_pipeline_jdec_open(), which may require setting the rotation angle.
+
+        When switching to another camera (UVC), close the current camera's processes first, then start the target camera, and preferably start other functions.
+
+        - If you need to display on the LCD screen, close the decoding and rotation function using media_app_pipeline_jdec_close().
+        - Close the current camera using media_app_camera_close().
+        - Open the other camera (UVC) using media_app_camera_open().
+        - If you need to display on the LCD, open the JPEG decoding and rotation function using media_app_pipeline_jdec_open(), which may require setting the rotation angle.
+
+        When switching to another camera (DVP), close the current camera's processes first, then start the target camera, and preferably start other functions.
+
+        - If you need to display on the LCD screen, close the decoding and rotation function using media_app_pipeline_jdec_close().
+        - Close the current camera using media_app_camera_close().
+        - Open the other camera (UVC) using media_app_camera_open().
+        - If you need to display on the LCD, send the YUV image (which may already be rotated) to the hardware display using the YUV processing function using media_app_frame_jdec_open().
+
+        During the switching process, follow this flow arbitrarily.
+
+        - When closing multimedia functions, ensure all called functions are closed. All closing interfaces are protected, meaning they can be called even if the function was not opened:
+
+            1) If you need to display on the LCD screen, close the decoding and rotation function using media_app_pipeline_jdec_close().
+
+            2) If you need to display on the LCD screen, close the YUV image processing function using media_app_frame_jdec_close().
+
+            3) Close the transmission using media_app_unregister_read_frame_callback().
+
+            4) Close storage using media_app_storage_close().
+
+            5) Close all opened cameras, obtain the opened camera using bk_camera_handle_node_pop() and close it using media_app_camera_close(), until no more cameras can be obtained from bk_camera_handle_node_pop().
+
+    2. h264 (864x480) + Wi-Fi Transmission + LCD Rotating Display (480x854)
+
+        - Open the first camera, assumed to be DVP, with image formats of IMAGE_YUV & IMAGE_H264 (supporting simultaneous output of H264 and YUV), using media_app_camera_open().
+        - Open the h264 transmission, assume the network port and channel are already configured, read the h264 image using the interface, format=IMAGE_H264, using media_app_register_read_frame_callback().
+        - If you need to display on the LCD screen, open the hardware display function using media_app_lcd_disp_open().
+        - If you need to display on the LCD screen and require rotation, since DVP supports YUV output by default, rotate the YUV image and let the display module show it, configure the rotation angle using media_app_set_rotate().
+        - If you need to display on the LCD screen, send the YUV image (which may already be rotated) to the hardware display using the YUV processing function using media_app_frame_jdec_open().
+        - If you need to open SD card storage for H264 images, currently supporting continuous H264 storage, store the H264 bitstream continuously, using media_app_save_start(). Pause storage using media_app_save_stop(), (the storage task remains open and can be restarted). Close storage when no longer needed using media_app_storage_close().
+
+        When switching to another camera (UVC), close the current camera's processes first, then start the target camera, and preferably start other functions.
+
+        - If you need to display on the LCD screen, close the YUV image processing function using media_app_frame_jdec_close().
+        - Close the current camera using media_app_camera_close().
+        - Open the other camera (UVC) using media_app_camera_open().
+        - Open the H264 encoding function using media_app_h264_pipeline_open().
+        - If you need to display on the LCD, open the JPEG decoding and rotation function using media_app_pipeline_jdec_open(), which may require setting the rotation angle.
+
+        When switching to another camera (UVC), close the current camera's processes first, then start the target camera, and preferably start other functions.
+
+        - Close the H264 encoding function using media_app_h264_pipeline_close().
+        - If you need to display on the LCD screen, close the decoding and rotation function using media_app_pipeline_jdec_close().
+        - Close the current camera using media_app_camera_close().
+        - Open the other camera (UVC) using media_app_camera_open().
+        - Open the H264 encoding function using media_app_h264_pipeline_open().
+        - If you need to display on the LCD, open the JPEG decoding and rotation function using media_app_pipeline_jdec_open(), which may require setting the rotation angle.
+
+        When switching to another camera (DVP), close the current camera's processes first, then start the target camera, and preferably start other functions.
+
+        - Close the H264 encoding function using media_app_h264_pipeline_close().
+        - If you need to display on the LCD screen, close the decoding and rotation function using media_app_pipeline_jdec_close().
+        - Close the current camera using media_app_camera_close().
+        - Open the other camera (UVC) using media_app_camera_open().
+        - If you need to display on the LCD, send the YUV image (which may already be rotated) to the hardware display using the YUV processing function using media_app_frame_jdec_open().
+
+        During the switching process, follow this flow arbitrarily.
+
+        When closing multimedia functions, ensure all called functions are closed. All closing interfaces are protected, meaning they can be called even if the function was not opened:
+
+            1) Close the H264 encoding function using media_app_h264_pipeline_close().
+
+            2) If you need to display on the LCD screen, close the decoding and rotation function using media_app_pipeline_jdec_close().
+
+            3) If you need to display on the LCD screen, close the YUV image processing function using media_app_frame_jdec_close().
+
+            4) Close the transmission using media_app_unregister_read_frame_callback().
+
+            5) Close storage using media_app_storage_close().
+
+            6) Close all opened cameras, obtain the opened camera using bk_camera_handle_node_pop() and close it using media_app_camera_close(), until no more cameras can be obtained from bk_camera_handle_node_pop().
+
+.. warning::
+        * All multimedia operations must ensure low power consumption requirements. That is, open devices must be closed, otherwise, the entire system cannot enter low power mode.
+        * Operations involving CPU1 voting (opening and closing) must be paired, otherwise, CPU1 cannot be turned off, leading to increased power consumption.
+        * If the system fails to enter low power mode or CPU1 cannot drop power, use the command media_debug 8 to check if any module has not voted.
+
+6 Doorbell
+.......................
+
+    Below flowchart provides a simple introduction to the start-up process, camera switching process,
+    and shutting-down process of the video component in doorbell, involving functional modules: wifi_transfer, sdcard_storage, lcd_display.
+
+6.1 Enable video function
+............................
+
+    Video-related features include modules involving images throughout the entire application.
+
+.. figure:: ../../../../_static/doorbell_video_open_diag.png
+    :align: center
+    :alt: video open diagram Overview
+    :figclass: align-center
+
+    Figure 3. doorbell video open diagram
+
+6.2 Camera switch
+..................
+
+    As shown in the flowchart, when switching cameras, first check if there is currently an active camera.
+    If there is, shut down some of the existing processes, close the currently running camera,then open the new camera,
+    and finally restart the image processing flow at the end.
+
+.. figure:: ../../../../_static/doorbell_camera_switch_diag.png
+    :align: center
+    :alt: camera switch diagram Overview
+    :figclass: align-center
+
+    Figure 4. doorbell camera switch diagram
+
+6.3 Disable video function
+.............................
+
+    When video-related functions are not in use, the image transmission tasks, image storage tasks, image processing tasks,
+    screen display tasks, and all peripherals (such as cameras/screens) should be closed. By default, all video functions will be turned off,
+    but customers can disable specific functions based on their own needs.
+
+.. figure:: ../../../../_static/doorbell_video_close_diag.png
+    :align: center
+    :alt: video close diagram Overview
+    :figclass: align-center
+
+    Figure 5. doorbell video close diagram
+
+7 frame_buffer
+..................
+
+    For complete image data in multimedia, all are stored in PSRAM and stored in the "frame_buffer_t" structure.
+    And managed in the form of a linked list stream, with the specific structure as follows:
+
+.. figure:: ../../../../_static/frame_buffer_list.png
+    :align: center
+    :alt: frame_buffer list diagram Overview
+    :figclass: align-center
+
+    Figure 6. frame_buffer stream list diagram

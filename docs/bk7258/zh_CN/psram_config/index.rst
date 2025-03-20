@@ -56,6 +56,13 @@ PSRAM内存配置
 	CONFIG_PSRAM_HEAP_BASE=0x60780000，CONFIG_PSRAM_HEAP_SIZE=0x80000，CPU2上默认PSRAM不作为Heap使用，所以CONFIG_PSRAM_HEAP_CPU0_BASE_ADDER=0x60700000。
 	某个核上是否需要将psram作为heap，是由CONFIG_PSRAM_AS_SYS_MEMORY控制。
 
+.. figure:: ../../_static/psram_config_diag.png
+    :align: center
+    :alt: psram architecture 
+    :figclass: align-center
+
+    Figure 1. psram architecture
+
 4、PSRAM作为heap使用
 -----------------------
 
@@ -101,6 +108,13 @@ PSRAM内存配置
 
 	注意：上面宏定义的值是默认定义的，使用时可以根据自身需求，动态调整，直接在对应project中cpu的config进行修改即可，但是注意上面的长度加起来,
 	不能超过Heap使用的地址(CONFIG_PSRAM_HEAP_CPU0_BASE_ADDER)，否则会出问题。
+
+.. figure:: ../../_static/psram_media_config_diag.png
+    :align: center
+    :alt: psram multimedia architecture 
+    :figclass: align-center
+
+    Figure 2. psram multimedia architecture
 
 5、多媒体各个模块内存调整
 -----------------------------
@@ -154,3 +168,5 @@ PSRAM内存配置
 .. note::
 
 	客户使用时，建议使用系统的接口去申请和释放psram内存(psram_malloc\psram_free)，不建议使用上面多媒体模块自定义的申请和释放psram内存接口
+
+7、PSRAM的配置

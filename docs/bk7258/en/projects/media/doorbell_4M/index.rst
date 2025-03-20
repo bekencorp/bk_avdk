@@ -14,7 +14,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     * Hardware configuration:
         * Core board, **BK7258_QFN88_9X9_V3.2**
         * Display adapter board, **BK7258_LCD_interface_V3.0**
-        * Speaker small board, **BKnModule_Speaker_V1.1**
+        * Speaker small board, **BK_Module_Speaker_V1.1**
         * PSRAM 8M/16M
     * Support, UVC
         * Reference peripherals, UVC resolution of **864 * 480**
@@ -40,7 +40,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
 1.2 Path
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 
-    <bk_avdk source code path>/projects/thirdparty/doorbell_cs2_4M
+    <bk_avdk source code path>/projects/media/doorbell_4M
 
 
 2. Framework diagram
@@ -56,25 +56,25 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
 3.1 Differences
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 
-    The difference between doorbell_cs2_4M and doorbell_cs2_8M is that the former does not support DVP cameras and does not support the on-board microphone.
+    The difference between doorbell_4M and doorbell_8M is that the former does not support DVP cameras and does not support the on-board microphone.
 
-    The macros supporting 4M are configured on CPU1, The path is thirdparty/doorbell_cs2_4M/config/bk7258_cp1/config, and the macro configuration differences between the two projects are as follows:
+    The macros supporting 4M are configured on CPU1, The path is media/doorbell_4M/config/bk7258_cp1/config, and the macro configuration differences between the two projects are as follows:
 
-    +------------------+-------------------------------------+---------------+-------------------------------------+
-    | project          |          marco                      |     value     |           implication               |
-    +------------------+-------------------------------------+---------------+-------------------------------------+
-    | doorbell_cs2_4M  | CONFIG_MEDIA_PSRAM_SIZE_4M          |       Y       | PSRAM is 4M                         |
-    +------------------+-------------------------------------+---------------+-------------------------------------+
-    | doorbell_cs2_8M  | CONFIG_MEDIA_PSRAM_SIZE_4M          |       N       | PSRAM is 8M                         |
-    +------------------+-------------------------------------+---------------+-------------------------------------+
+    +--------------+-------------------------------------+---------------+-------------------------------------+
+    | project      |          marco                      |     value     |           implication               |
+    +--------------+-------------------------------------+---------------+-------------------------------------+
+    | doorbell_4M  | CONFIG_MEDIA_PSRAM_SIZE_4M          |       Y       | PSRAM is 4M                         |
+    +--------------+-------------------------------------+---------------+-------------------------------------+
+    | doorbell_8M  | CONFIG_MEDIA_PSRAM_SIZE_4M          |       N       | PSRAM is 8M                         |
+    +--------------+-------------------------------------+---------------+-------------------------------------+
 
     The allocation of PSRAM with different sizes is shown in the following table. The config file needs to be modified, with the file path as follows:
 
-    thirdparty/doorbell_cs2_4M/config/bk7258/config
+    media/doorbell_4M/config/bk7258/config
 
-    thirdparty/doorbell_cs2_4M/config/bk7258_cp1/config
+    media/doorbell_4M/config/bk7258_cp1/config
 
-    thirdparty/doorbell_cs2_4M/config/bk7258_cp2/config
+    media/doorbell_4M/config/bk7258_cp2/config
 
     +------------------------------------+---------------------------------+---------------------------------+
     | project                            |          doorbell_cs2_4M        |          doorbell_cs2_8M        |
@@ -96,17 +96,17 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
 
 .. figure:: ../../../../_static/decode_proc_4M.png
     :align: center
-    :alt: relationship diagram Overview
+    :alt: process diagram Overview
     :figclass: align-center
 
-    Figure 1. doorbell_cs2_4M decode process
+    Figure 1. doorbell_4M decode process
 
 .. figure:: ../../../../_static/decode_proc_8M.png
     :align: center
-    :alt: relationship diagram Overview
+    :alt: process diagram Overview
     :figclass: align-center
 
-    Figure 2. doorbell_cs2_8M decode process
+    Figure 2. doorbell_8M decode process
 
 
     The main differences in the process are as shown in the following table:
@@ -114,11 +114,11 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     +------------------+--------------------------------------------------------------------------------------------------------------------------------+
     | project          |          decode process                                                                                                        |
     +------------------+--------------------------------------------------------------------------------------------------------------------------------+
-    | doorbell_cs2_4M  |Firstly, attempt to obtain the YUV image, and continue with the decoding only after the allocation is successful.               |
+    | doorbell_4M      |Firstly, attempt to obtain the YUV image, and continue with the decoding only after the allocation is successful.               |
     |                  |                                                                                                                                |
     |                  |The LCD display triggers the next image capture process immediately after completion.                                           |
     +------------------+--------------------------------------------------------------------------------------------------------------------------------+
-    | doorbell_cs2_8M  |Directly decode, and upon failure to obtain the YUV image, immediately release the JPEG and wait for the next frame of JPEG.    |
+    | doorbell_8M      |Directly decode, and upon failure to obtain the YUV image, immediately release the JPEG and wait for the next frame of JPEG.    |
     +------------------+--------------------------------------------------------------------------------------------------------------------------------+
 
 
@@ -131,7 +131,7 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     After decoding, the YUV is encoded with H264 and transmitted to the mobile phone for display via WIFI (864X480).
 
 .. hint::
-    If you do not have cloud account permissions, you can use debug mode to set the local area network TCP image transmission method.
+    If you do not have cloud account permissions, you can use debug mode to set the local area network TCP/UDP image transmission method.
 
 
 5. Code explanation
@@ -147,9 +147,9 @@ This project is a demo of a USB camera door lock, supporting end-to-end (BK7258 
     +------------------+---------------------------------+-------------------------------+-------------------------------+
     | project          |          YUV images             |     JPEG images               |      H264 images              |
     +------------------+---------------------------------+-------------------------------+-------------------------------+
-    | doorbell_cs2_4M  |      3                          |      4                        |      4                        |
+    | doorbell_4M      |             3                   |      4                        |      4                        |
     +------------------+---------------------------------+-------------------------------+-------------------------------+
-    | doorbell_cs2_8M  |      5                          |      4                        |      8                        |
+    | doorbell_8M      |             5                   |      4                        |      8                        |
     +------------------+---------------------------------+-------------------------------+-------------------------------+
 
     To modify the project from 8M FLASH + 8M PSRAM to 4M FLASH + 4M PSRAM, follow the steps below:
@@ -193,13 +193,13 @@ Step 2:
     |                                 |                                                                   |
     |                                 |part_table.mk                                                      |
     +---------------------------------+-------------------------------------------------------------------+
-    |projects                         |thirdparty/doorbell_cs2_4M/config/bk7258_cp1/config                |
+    |projects                         |media/doorbell_4M/config/bk7258_cp1/config                         |
     |                                 |                                                                   |
-    |                                 |thirdparty/doorbell_cs2_4M/config/bk7258_cp2/config                |
+    |                                 |media/doorbell_4M/config/bk7258_cp2/config                         |
     |                                 |                                                                   |
-    |                                 |thirdparty/doorbell_cs2_4M/config/bk7258/config                    |
+    |                                 |media/doorbell_4M/config/bk7258/config                             |
     |                                 |                                                                   |
-    |                                 |thirdparty/doorbell_cs2_4M/config/bk7258/bk7258_partitions.csv     |
+    |                                 |media/doorbell_4M/config/bk7258/bk7258_partitions.csv              |
     +---------------------------------+-------------------------------------------------------------------+
 
     Key modification points are as shown in the following table:
@@ -225,11 +225,11 @@ Step 2:
     |                                                                   |                                                                                     |
     |part_table.mk                                                      |                                                                                     |
     +-------------------------------------------------------------------+-------------------------------------------------------------------------------------+
-    |thirdparty/doorbell_cs2_4M/config/bk7258_cp1/config                |Enable the macro CONFIG_MEDIA_PSRAM_SIZE_4M                                          |
+    |media/doorbell_4M/config/bk7258_cp1/config                         |Enable the macro CONFIG_MEDIA_PSRAM_SIZE_4M                                          |
     |                                                                   |                                                                                     |
-    |thirdparty/doorbell_cs2_4M/config/bk7258_cp2/config                |Modify PSRAM allocation, moving the USB to run on CP1                                |
+    |media/doorbell_4M/config/bk7258_cp2/config                         |Modify PSRAM allocation, moving the USB to run on CP1                                |
     |                                                                   |                                                                                     |
-    |thirdparty/doorbell_cs2_4M/config/bk7258/config                    |The specific modifications to the PSRAM are detailed in the table above.             |
+    |media/doorbell_4M/config/bk7258/config                             |The specific modifications to the PSRAM are detailed in the table above.             |
     +-------------------------------------------------------------------+-------------------------------------------------------------------------------------+
-    |thirdparty/doorbell_cs2_4M/config/bk7258/bk7258_partitions.csv     |Modify the FLASH space allocation to 4M                                              |
+    |media/doorbell_4M/config/bk7258/bk7258_partitions.csv              |Modify the FLASH space allocation to 4M                                              |
     +-------------------------------------------------------------------+-------------------------------------------------------------------------------------+
