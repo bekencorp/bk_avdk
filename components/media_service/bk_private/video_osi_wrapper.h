@@ -16,13 +16,13 @@ typedef struct
 	void (* osi_assert)(uint8_t expr, char *expr_s, const char *func);
 	uint32_t (* get_time)(void);
 
-	uint32_t (* f_open)(void **fp, const void *path, uint8_t mode);
-	uint32_t (* f_close)(void *fp);
-	uint32_t (* f_write)(void *fp, const void *buff, uint32_t btw, uint32_t *bw);
-	uint32_t (* f_read)(void *fp, const void *buff, uint32_t btr, uint32_t *br);
-	uint32_t (* f_lseek)(void *fp, uint32_t ofs, uint32_t whence);
-	uint32_t (* f_tell)(void *fp);
-	uint32_t (* f_size)(void *fp);
+	int (* f_open)(void **fp, const void *path, uint8_t mode);
+	int (* f_close)(void *fp);
+	int (* f_write)(void *fp, const void *buff, uint32_t btw, uint32_t *bw);
+	int (* f_read)(void *fp, const void *buff, uint32_t btr, uint32_t *br);
+	int (* f_lseek)(void *fp, uint32_t ofs, uint32_t whence);
+	int (* f_tell)(void *fp);
+	int (* f_size)(void *fp);
 
 	uint32_t (* get_avi_index_start_addr)(void);
 	uint32_t (* get_avi_index_count)(void);

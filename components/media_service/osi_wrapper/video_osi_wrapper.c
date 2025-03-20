@@ -80,7 +80,7 @@ static uint32_t get_time_wrapper(void)
 	return rtos_get_time();
 }
 
-static uint32_t f_open_wrapper(void **fp, const void *path, uint8_t mode)
+static int f_open_wrapper(void **fp, const void *path, uint8_t mode)
 {
 #if (CONFIG_FATFS) && (!CONFIG_VFS)
 	*fp = os_malloc(sizeof(FIL));
@@ -99,6 +99,10 @@ static uint32_t f_open_wrapper(void **fp, const void *path, uint8_t mode)
 	else if(mode == (0x01 | 0x02))
 	{
 		flags = O_RDWR;
+	} else if (mode == (0x01 | 0x02 |
+ 0x08))
+	{
+		flags = O_CREAT | O_RDWR;
 	}
 
 	int f = open(path, flags);
@@ -114,7 +118,7 @@ static uint32_t f_open_wrapper(void **fp, const void *path, uint8_t mode)
 #endif
 }
 
-static uint32_t f_close_wrapper(void *fp)
+static int f_close_wrapper(void *fp)
 {
 #if (CONFIG_FATFS) && (!CONFIG_VFS)
 	FRESULT ret = FR_OK;
@@ -122,14 +126,14 @@ static uint32_t f_close_wrapper(void *fp)
 	os_free(fp);
 	return ret;
 #elif (CONFIG_VFS)
-	close((int)fp);
-	return 0;
+	int ret = close((int)fp);
+	return ret < 0 ? -1 : 0;
 #else
 	return -1;
 #endif
 }
 
-static uint32_t f_write_wrapper(void *fp, const void *buff, uint32_t btw, uint32_t *bw)
+static int f_write_wrapper(void *fp, const void *buff, uint32_t btw, uint32_t *bw)
 {
 #if (CONFIG_FATFS) && (!CONFIG_VFS)
 	return f_write((FIL *)fp, (void *)buff, (UINT)btw, (UINT *)bw);
@@ -141,7 +145,7 @@ static uint32_t f_write_wrapper(void *fp, const void *buff, uint32_t btw, uint32
 #endif
 }
 
-static uint32_t f_read_wrapper(void *fp, const void *buff, uint32_t btr, uint32_t *br)
+static int f_read_wrapper(void *fp, const void *buff, uint32_t btr, uint32_t *br)
 {
 #if (CONFIG_FATFS) && (!CONFIG_VFS)
 	return f_read((FIL *)fp, (void *)buff, (UINT)btr, (UINT *)br);
@@ -153,19 +157,26 @@ static uint32_t f_read_wrapper(void *fp, const void *buff, uint32_t btr, uint32_
 #endif
 }
 
-static uint32_t f_lseek_wrapper(void *fp, uint32_t ofs, uint32_t whence)
+static int f_lseek_wrapper(void *fp, uint32_t ofs, uint32_t whence)
 {
 #if (CONFIG_FATFS) && (!CONFIG_VFS)
-	return f_lseek((FIL *)fp, (FSIZE_t)ofs);
+	if (whence == SEEK_SET) {
+		return f_lseek((FIL *)fp, (FSIZE_t)ofs);
+	} else if (whence == SEEK_CUR) {
+		return f_lseek((FIL *)fp, f_tell((FIL *)fp) + (FSIZE_t)ofs);
+	} else if (whence == SEEK_END) {
+		return f_lseek((FIL *)fp, f_size((FIL *)fp) + (FSIZE_t)ofs);
+	} else {
+		return -1;
+	}
 #elif (CONFIG_VFS)
-	off_t offset = lseek((int)fp, ofs, whence);
-	return offset < 0 ? -1 : offset;
+	return lseek((int)fp, ofs, whence);
 #else
 	return -1;
 #endif
 }
 
-static uint32_t f_tell_wrapper(void *fp)
+static int f_tell_wrapper(void *fp)
 {
 #if (CONFIG_FATFS) && (!CONFIG_VFS)
 	FIL *tmp_fp = (FIL *)fp;
@@ -177,7 +188,7 @@ static uint32_t f_tell_wrapper(void *fp)
 #endif
 }
 
-static uint32_t f_size_wrapper(void *fp)
+static int f_size_wrapper(void *fp)
 {
 #if (CONFIG_FATFS) && (!CONFIG_VFS)
 	FIL *tmp_fp = (FIL *)fp;

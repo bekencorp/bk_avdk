@@ -63,21 +63,32 @@ void lv_vendor_init(lv_vnd_config_t *config)
 
     lv_port_indev_init();
 
-#if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
-    lv_fatfs_init();
-#endif
-
-#if (CONFIG_VFS)
-    lv_vfs_init();
-#endif
-
-    rtos_init_mutex(&g_disp_mutex);
+    ret = rtos_init_mutex(&g_disp_mutex);
+    if (BK_OK != ret) {
+        LOGE("%s g_disp_mutex init failed\n", __func__);
+        return;
+    }
 
     ret = rtos_init_semaphore_ex(&lvgl_sem, 1, 0);
     if (BK_OK != ret) {
-        LOGE("%s semaphore init failed\n", __func__);
+        LOGE("%s lvgl_sem init failed\n", __func__);
+        rtos_deinit_mutex(&g_disp_mutex);
         return;
     }
+
+#if (CONFIG_VFS)
+    ret = lv_vfs_init();
+    if (ret != BK_OK) {
+        LOGE("%s lv_vfs_init failed\n", __func__);
+        rtos_deinit_mutex(&g_disp_mutex);
+        rtos_deinit_semaphore(&lvgl_sem);
+        return;
+    }
+#else
+    #if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
+        lv_fatfs_init();
+    #endif
+#endif
 
     lv_vendor_initialized = true;
 
@@ -95,12 +106,16 @@ void lv_vendor_deinit(void)
 
     lv_port_indev_deinit();
 
-#if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
-    lv_fatfs_deinit();
-#endif
-
 #if (CONFIG_VFS)
-    lv_vfs_deinit();
+    bk_err_t ret = lv_vfs_deinit();
+    if (ret != BK_OK) {
+        LOGE("%s lv_vfs_deinit fail\n", __func__);
+        return;
+    }
+#else
+    #if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
+        lv_fatfs_deinit();
+    #endif
 #endif
 
     rtos_deinit_mutex(&g_disp_mutex);
@@ -184,6 +199,7 @@ void lv_vendor_stop(void)
     ret = rtos_get_semaphore(&lvgl_sem, BEKEN_NEVER_TIMEOUT);
     if (BK_OK != ret) {
         LOGE("%s lvgl_sem get failed\n", __func__);
+        return;
     }
 
     LOGI("%s complete\n", __func__);

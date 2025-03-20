@@ -169,14 +169,14 @@ set(srcs
 if (CONFIG_VFS)
 	list(APPEND srcs
 		hal/vfs/lv_fs_bk_posix.c
-        hal/vfs/lv_vfs.c
+		hal/vfs/lv_vfs.c
 	)
-endif()
-
+else()
 if (CONFIG_FATFS)
 	list(APPEND srcs
 		hal/fatfs/lv_fatfs.c
 	)
+endif()
 endif()
 
 if (CONFIG_LV_IMG_UTILITY_CUSTOMIZE)

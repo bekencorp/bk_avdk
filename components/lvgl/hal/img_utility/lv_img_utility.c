@@ -8,6 +8,8 @@
 #include "lvgl.h"
 #include "bk_posix.h"
 
+uint8_t lv_dma2d_is_init = 0;
+
 static s32 lv_img_jpeg_sw_decode(frame_buffer_t *jpeg_frame, lv_img_dsc_t *img_dst)
 {
     s32 ret = BK_FAIL;
@@ -359,6 +361,11 @@ s32 lv_jpeg_img_load_with_hw_dec(char *filename, lv_img_dsc_t *img_dst)
             break;
         }
 
+        if (lv_dma2d_is_init == 0) {
+            lv_dma2d_yuyv2rgb565_init();
+            lv_dma2d_is_init = 1;
+        }
+
         lv_jpeg_hw_decode_output_fmt_set(JH_OUTPUT_YUYV);
         ret = lv_img_file_jpeg_hw_dec(filename, img_dst);
         if (ret != BK_OK) {
@@ -401,5 +408,10 @@ void lv_img_decode_unload(lv_img_dsc_t *img_dst)
 {
     psram_free((void *)img_dst->data);
     img_dst->data = NULL;
+
+    if (lv_dma2d_is_init) {
+        lv_dma2d_yuyv2rgb565_deinit();
+        lv_dma2d_is_init = 0;
+    }
 }
 
