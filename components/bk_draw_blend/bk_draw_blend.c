@@ -101,21 +101,27 @@ bk_err_t bk_display_blend_font_handle(frame_buffer_t *frame, uint16_t lcd_width,
 
 #if (CONFIG_BLEND)
     const bk_blend_t *font_strings = font_info->addr;
-    if ((font_strings->width + font_strings->xpos > lcd_width) || (font_strings->height + font_strings->ypos > lcd_height))
-    {
-        LOGW("%s %d fonts size is beyond the boundaries of lcd\n", __func__, __LINE__);
-        if (font_strings->xpos + font_strings->width > lcd_width)
-            LOGI("content: %s, xpos %d + width %d > lcd_width %d\n", __func__, font_strings->xpos, font_strings->width, lcd_width);
-        if (font_strings->ypos  + font_strings->height > lcd_height)
-            LOGI("content: %s, ypos %d + height %d > lcd_width %d\n", __func__, font_strings->ypos, font_strings->height, lcd_height);
-        os_memset((void *)font_info->content, 0, sizeof(font_info->content));
-        return BK_FAIL;
-    }
-
     font_blend_cfg_t cfg = {0};
     cfg.pbg_addr = (uint8_t *)(frame->frame);
     cfg.xsize = font_strings->width;
     cfg.ysize = font_strings->height;
+
+    if ((font_strings->width + font_strings->xpos > lcd_width) || (font_strings->height + font_strings->ypos > lcd_height))
+    {
+        if (font_strings->xpos + font_strings->width > lcd_width)
+        {
+            LOGD("content: %s, xpos %d + width %d > lcd_width %d\n", __func__, font_strings->xpos, font_strings->width, lcd_width);
+            cfg.xsize = lcd_width - font_strings->xpos;
+        }
+        if (font_strings->ypos  + font_strings->height > lcd_height)
+        {
+            LOGD("content: %s, ypos %d + height %d > lcd_width %d\n", __func__, font_strings->ypos, font_strings->height, lcd_height);
+            cfg.ysize = lcd_height - font_strings->ypos;
+        }
+//        os_memset((void *)font_info->content, 0, sizeof(font_info->content));
+//        return BK_FAIL;
+    }
+
     cfg.xpos = font_strings->xpos;
     cfg.ypos = font_strings->ypos;
     cfg.str_num = 1;

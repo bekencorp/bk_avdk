@@ -120,8 +120,8 @@ typedef struct
     uint8_t version;
     blend_type_t blend_type;       /**< 0: image, 1:font */
     const char name[MAX_BLEND_NAME_LEN];        /**< image name like "wifi","clock", "weather" */
-    uint32 width;         /**< icon width   */
-    uint32 height;        /**< icon height  */
+    uint32_t width;         /**< icon width   */
+    uint32_t height;        /**< icon height  */
     uint16_t xpos;        /**< blend to lcd, x pos based on lcd width  */
     uint16_t ypos;        /**< blend to lcd, y pos based on lcd height */
     union
@@ -182,21 +182,11 @@ bk_err_t bk_display_blend_img_handle(frame_buffer_t *frame, uint16_t lcd_width, 
 bk_err_t bk_display_blend_font_handle(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd_height, const blend_info_t *font_info);
 
 /**
- * @brief  blend array include image and font
+ * @brief  blend array include image and font(no used), use API bk_display_blend_handle replease
  * @param  blend background layer frame
  * @param  blend panel lcd width, to calculate postion in panel by (x, y) pos
  * @param  blend panel lcd heighe, to calculate postion in panel by (x, y) pos
  * @param  struct array add
- * @example:
- *          extern GUI_CONST_STORAGE bk_blend_t blend_info[4];
- *          GUI_CONST_STORAGE blend_info_t blend_info[4] =
- *          {
- *              {.addr = &font_clock, .content = "12:30"},
- *              {.addr = &font_dates, .content = "2025/1/2 周四"},
- *              {.addr = &font_ver, .content = "v 1.0.0"},
- *              {.find_addr = &img_logo, .content = "wifi2"},     // or {.addr = &img_wifi_rssi0, .content = "wifi1"}
- *          }
- *          bk_display_blend_handle(frame, lcd_w, lcd_h, blend_info, 4);
  * @return 
  *     - BK_OK: no error
  *     - BK_FAIL:not find blend image
@@ -208,7 +198,18 @@ bk_err_t bk_display_blend_handle_by_array(frame_buffer_t *frame, uint16_t lcd_wi
  * @param  blend background layer frame
  * @param  blend panel lcd width, to calculate postion in panel by (x, y) pos
  * @param  blend panel lcd heighe, to calculate postion in panel by (x, y) pos
- * @param  array ptr, the arrays end must be NULL
+ * @example:
+ *          extern GUI_CONST_STORAGE bk_blend_t blend_info[];
+ *          GUI_CONST_STORAGE blend_info_t blend_info[] =
+ *          {
+ *              {.name = "clock", addr = &font_clock, .content = "12:30"},
+ *              {.name = "date", .addr = &font_dates, .content = "2025/1/2 周四"},
+ *              {.name = "ver", .addr = &font_ver, .content = "v 1.0.0"},
+ *              {.name = "wifi",.addr = &img_wifi_rssi0, .content = "wifi1"},
+ *              {.addr = NULL}
+ *          }
+ *          bk_display_blend_handle(frame, lcd_w, lcd_h, &blend_info[0]);
+
  * @return 
  *     - BK_OK: no error
  *     - BK_FAIL:not find blend image
