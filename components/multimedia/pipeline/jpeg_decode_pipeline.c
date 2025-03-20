@@ -563,6 +563,7 @@ static void jpeg_decode_software_decode_start_handle(frame_module_t module)
 		frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, module);
 		jdec_config->jpeg_frame = NULL;
 	}
+	jpeg_decode_get_next_frame();
 }
 
 static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t module)
@@ -653,6 +654,7 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 				jdec_config->jdec_init = false;
 				frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, module);
 				jdec_config->jpeg_frame = NULL;
+				jpeg_decode_task_send_msg(JPEGDEC_RESET, 0);
 				return;
 			}
 			if (module == MODULE_DECODER_CP1)
@@ -661,7 +663,7 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 				jdec_config->jdec_init = false;
 				frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, module);
 				jdec_config->jpeg_frame = NULL;
-				jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
+//				jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
 				return;
 			}
 			LOGI("%s, FMT: YUV422, PPI: %dX%d, use HARDWARE DECODE\r\n",
@@ -680,6 +682,17 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 		}
 		else
 		{
+			if (jdec_config->jdec_mode == JPEGDEC_HW_MODE)
+			{
+				LOGI("%s, FMT: YUV420, PPI: %dX%d, HARDWARE change to SOFTWARE DECODE\r\n",
+					__func__, jdec_config->jpeg_frame->width, jdec_config->jpeg_frame->height);
+				jdec_config->jdec_mode = JPEGDEC_SW_MODE;
+				jdec_config->jdec_init = false;
+				frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, module);
+				jdec_config->jpeg_frame = NULL;
+				jpeg_decode_task_send_msg(JPEGDEC_RESET, 0);
+				return;
+			}
 			LOGI("%s, FMT: YUV420, PPI: %dX%d, use SOFTWARE DECODE\r\n",
 				__func__, jdec_config->jpeg_frame->width, jdec_config->jpeg_frame->height);
 			if (jdec_config->jpeg_frame->width >= PIXEL_1280 && jdec_config->jpeg_frame->height >= PIXEL_720)
@@ -970,7 +983,7 @@ static void jpeg_decode_finish_handle(uint32_t param)
 		jdec_config->jpeg_frame = NULL;
 	}
 
-	if (param == 1)
+	if (param == MUX_DEC_OK)
 	{
 		media_debug->isr_decoder++;
 	}
@@ -1033,13 +1046,16 @@ static void jpeg_decode_finish_handle(uint32_t param)
 
 void jpeg_decode_get_next_frame()
 {
-	if (!jdec_config->mux_buf[1].state[PIPELINE_MOD_SW_DEC])
+	if (jdec_config && jdec_config->jdec_mode == JPEGDEC_SW_MODE)
 	{
-		jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER_CP2);
-	}
-	if (!jdec_config->mux_buf[0].state[PIPELINE_MOD_SW_DEC] && jdec_config->jdec_mode == JPEGDEC_SW_MODE)
-	{
-		jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER_CP1);
+		if (!jdec_config->mux_buf[1].state[PIPELINE_MOD_SW_DEC])
+		{
+			jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
+		}
+		if (!jdec_config->mux_buf[0].state[PIPELINE_MOD_SW_DEC])
+		{
+			jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER_CP1);
+		}
 	}
 }
 
@@ -1614,7 +1630,7 @@ exit:
 
 static void jpeg_decode_init(void)
 {
-	if (jdec_config->jdec_mode == JPEGDEC_HW_MODE)
+	if (1)//jdec_config->jdec_mode == JPEGDEC_HW_MODE)
 	{
 		bk_jpeg_dec_driver_init();
 		bk_jpeg_dec_isr_register(DEC_ERR, jpeg_decode_err_handler);
@@ -1715,7 +1731,7 @@ bk_err_t jpeg_decode_task_open(media_decode_mode_t jdec_mode, media_decode_type_
 		LOGD("%s decode sram %p\n", __func__, jdec_config->decoder_buf);
 	}
 
-	jdec_config->jdec_mode = jdec_mode;
+	jdec_config->jdec_mode = NONE_DECODE;
 	jdec_config->jdec_type = jdec_type;
 
 	if (!rtos_is_oneshot_timer_init(&jdec_config->decoder_timer))
