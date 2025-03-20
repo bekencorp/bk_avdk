@@ -392,7 +392,7 @@ void uvc_camera_stream_disconnect_callback(bk_usb_hub_port_info *port_info, void
         }
 
         camera_param->camera_state = UVC_DISCONNECT_STATE;
-        camera_param->port_info = NULL;
+        // camera_param->port_info = NULL;
     }
 
     uvc_handle->connect_camera_count--;
