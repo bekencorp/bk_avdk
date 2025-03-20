@@ -588,11 +588,11 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 	// step 1: read a jpeg frame
 	if (jdec_config->jdec_mode == JPEGDEC_SW_MODE)
 	{
-		jdec_config->jpeg_frame = jpeg_frame;
-		if (jdec_config->jpeg_frame == NULL)
+		if (jpeg_frame == NULL)
 		{
 			return;
 		}
+		jdec_config->jpeg_frame = jpeg_frame;
 
 		if (module == MODULE_DECODER_CP2)
 		{
@@ -626,6 +626,12 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 	}
 	else
 	{
+		if (jdec_config->jpeg_frame != NULL)
+		{
+			frame_buffer_fb_read_free(jdec_config->stream, jpeg_frame, module);
+			return;
+		}
+
 		jdec_config->jpeg_frame = jpeg_frame;
 	}
 
@@ -666,7 +672,7 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 		else if (yuv_fmt == YUV_ERR)
 		{
 			LOGI("%s, FMT:ERR\r\n", __func__);
-			frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, MODULE_DECODER);
+			frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, module);
 			jdec_config->jpeg_frame = NULL;
 			jdec_config->jdec_init = false;
 			jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
@@ -679,7 +685,7 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 			if (jdec_config->jpeg_frame->width >= PIXEL_1280 && jdec_config->jpeg_frame->height >= PIXEL_720)
 			{
 				LOGE("%s, not support this resloution for software decode\n", __func__);
-				frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, MODULE_DECODER);
+				frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, module);
 				jdec_config->jpeg_frame = NULL;
 				jdec_config->jdec_init = false;
 				jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
@@ -874,7 +880,7 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 			jdec_config->jdec_frame = NULL;
 		}
 
-		frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, MODULE_DECODER);
+		frame_buffer_fb_read_free(jdec_config->stream, jdec_config->jpeg_frame, module);
 		jdec_config->jpeg_frame = NULL;
 
 		jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
