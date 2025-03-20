@@ -15,4 +15,4 @@ list(APPEND srcs
 	osi_wrapper/audio_osi_wrapper.c
 )
 
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES "${priv_req}" REQUIRES avdk_libs media_utils bk_peripheral)
+armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES "${priv_req}" REQUIRES avdk_libs media_utils bk_peripheral bk_vfs)

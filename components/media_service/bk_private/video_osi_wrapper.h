@@ -20,7 +20,7 @@ typedef struct
 	uint32_t (* f_close)(void *fp);
 	uint32_t (* f_write)(void *fp, const void *buff, uint32_t btw, uint32_t *bw);
 	uint32_t (* f_read)(void *fp, const void *buff, uint32_t btr, uint32_t *br);
-	uint32_t (* f_lseek)(void *fp, uint32_t ofs);
+	uint32_t (* f_lseek)(void *fp, uint32_t ofs, uint32_t whence);
 	uint32_t (* f_tell)(void *fp);
 	uint32_t (* f_size)(void *fp);
 
