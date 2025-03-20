@@ -54,7 +54,7 @@
 //#define CONFIG_AUD_RING_BUFF_SAFE_INTERVAL    20
 
 #define AUD_MIC_COUNT
-//#define AUD_SPK_COUNT
+#define AUD_SPK_COUNT
 
 #ifdef AUD_MIC_COUNT
 #include "count_util.h"
