@@ -1317,6 +1317,7 @@ void h264_frame_start()
 			ret = bk_h264_encode_request(&jdec_pipeline_info, &h264_encode_frame_complete_callback);
 			if (ret != BK_OK)
 			{
+				jdec_config->mux_buf[0].state[PIPELINE_MOD_H264] = MUX_BUFFER_IDLE;
 				LOGE("%s %d h264_encode_task_send_msg error\r\n", __func__, __LINE__);
 			}
 		}
