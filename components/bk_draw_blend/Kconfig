@@ -2,6 +2,7 @@ menu "Draw Blend"
 
 	config BLEND
 		depends on SYS_CPU1
+        depends on MEDIA
 		bool "Enable Draw Blend"
 		default y
 endmenu

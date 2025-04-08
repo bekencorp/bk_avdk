@@ -9,17 +9,22 @@
 #include "cli.h"
 
 #if (CONFIG_SYS_CPU1) || (CONFIG_SYS_CPU0)
+#if CONFIG_MEDIA
 #include "img_service.h"
 #include "media_app.h"
 #include "media_evt.h"
+#endif
 #include <driver/lcd.h>
 #endif
 extern void user_app_main(void);
 extern void rtos_set_user_app_entry(beken_thread_function_t entry);
 
 #if (CONFIG_SYS_CPU0)
+#if CONFIG_INTEGRATION_DOORBELL
 #include "doorbell_devices.h"
+#endif
 
+#if CONFIG_MEDIA
 extern db_device_info_t *db_device_info;
 
 media_camera_device_t camera_device = {
@@ -156,6 +161,7 @@ int cli_lvcamera_init(void)
     return cli_register_commands(s_lvcamera_commands, CMDS_COUNT);
 }
 #endif
+#endif
 
 void user_app_main(void)
 {
@@ -172,10 +178,14 @@ int main(void)
     // shell_set_log_level(BK_LOG_WARN);
 #endif
     bk_init();
+#if CONFIG_MEDIA
     media_service_init();
+#endif
 
 #if (CONFIG_SYS_CPU0)
+#if CONFIG_MEDIA
     cli_lvcamera_init();
+#endif
 #endif
 
     return 0;
