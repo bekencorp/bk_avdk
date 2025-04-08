@@ -28,6 +28,7 @@
 #include "img_service.h"
 
 #include "driver/dvp_camera.h"
+#include "doorbell_cs2_service.h"
 
 #include "cli.h"
 
@@ -534,6 +535,10 @@ int doorbell_video_transfer_turn_off(void)
 	}
 
 	ret = bk_wifi_transfer_frame_close();
+
+#if (CONFIG_INTEGRATION_DOORBELL_CS2)
+	doorbell_cs2_img_timer_deinit();
+#endif
 
 	db_device_info->transfer_enable = false;
 
