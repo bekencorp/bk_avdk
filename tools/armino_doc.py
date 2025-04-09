@@ -6,6 +6,7 @@ import subprocess
 import sys
 import argparse
 import glob
+import shutil
 
 PRINT_READ = "\033[91m"
 PRINT_RESET = "\033[0m"
@@ -18,6 +19,10 @@ def run_cmd(cmd):
 
 def log_error(log):
 	print(PRINT_READ + log + PRINT_RESET)
+
+def remove_dir(dir_path):
+	if os.path.isdir(dir_path):
+		shutil.rmtree(dir_path)
 
 def print_error_lines(file_path, error_log):
 	ret = False
@@ -61,8 +66,8 @@ def build_armino_doc(source_path, dest_path, build_path, landir, version):
 
 
 	#clean before build
-	run_cmd(f'rm -rf {build_path}/{landir}')
-	run_cmd(f'rm -rf {source_path}/source')
+	remove_dir(f'{build_path}/{landir}')
+	remove_dir(f'{source_path}/source')
 
 	run_cmd(command)
 
@@ -71,17 +76,18 @@ def build_armino_doc(source_path, dest_path, build_path, landir, version):
 		exit(-1)
 
 	#copy
-	run_cmd(f'cp -rf {dest_path} {build_path}/{landir}')
-	run_cmd(f'cp -rf {build_path}/{landir}/latex/AVDKDocument.pdf {build_path}/{landir}/{version}/AVDKDocument.pdf')
+	shutil.copytree(dest_path, f'{build_path}/{landir}')
+	shutil.copy(f'{build_path}/{landir}/latex/AVDKDocument.pdf', f'{build_path}/{landir}/{version}/AVDKDocument.pdf')
   
 	#clean after build
-	run_cmd(f'rm -rf {source_path}/xml')
-	run_cmd(f'rm -rf {source_path}/xml_in')
-	run_cmd(f'rm -rf {source_path}/man')
-	run_cmd(f'rm -rf {source_path}/../__pycache__')
-	run_cmd(f'rm -rf {dest_path}')
-	run_cmd(f'rm -rf {dest_path} {build_path}/{landir}/inc')
-	run_cmd(f'rm -rf {dest_path} {build_path}/{landir}/latex')
+	remove_dir(f'{source_path}/xml')
+	remove_dir(f'{source_path}/xml_in')
+	remove_dir(f'{source_path}/man')
+	remove_dir(f'{source_path}/../__pycache__')
+	remove_dir(f'{dest_path}')
+	remove_dir(f'{dest_path}')
+	remove_dir(f'{build_path}/{landir}/inc')
+	remove_dir(f'{build_path}/{landir}/latex')
 
 def build_html(source_path, dest_path, build_path, landir):
 	print("found souce: " + source_path + " dest: " + dest_path + " build: " + build_path)
@@ -90,14 +96,14 @@ def build_html(source_path, dest_path, build_path, landir):
 
 
 	#clean before build
-	run_cmd(f'rm -rf {build_path}/{landir}')
+	remove_dir(f'{build_path}/{landir}')
 
 	if run_cmd(command) is not True:
 		log_error("### Build Docs Error, Exit ###")
 		exit(-1)
 
 	#copy
-	run_cmd(f'cp -rf {dest_path} {build_path}/{landir}')
+	shutil.copytree(dest_path, f'{build_path}/{landir}')
 	#run_cmd(f'cp -rf {build_path}/{landir}/latex/AVDKDocument.pdf {build_path}/{landir}/AVDKDocument.pdf')
   
 	#clean after build
@@ -116,12 +122,12 @@ def build_pdf(source_path, dest_path, build_path, landir):
 
 
 	#clean before build
-	run_cmd(f'rm -rf {build_path}/{landir}')
+	remove_dir(f'{build_path}/{landir}')
 
 	run_cmd(command)
 
 	#copy
-	run_cmd(f'cp -rf {dest_path} {build_path}/{landir}')
+	shutil.copytree(dest_path, f'{build_path}/{landir}')
 	#run_cmd(f'cp -rf {build_path}/{landir}/latex/AVDKDocument.pdf {build_path}/{landir}/AVDKDocument.pdf')
   
 	#clean after build
@@ -141,7 +147,7 @@ def build_doc(target, docs_path, build_path, version):
 	target_dirs = [x for x in subdirectories if x in white_list]
 
 	if not os.path.exists(build_path):
-		run_cmd(f'mkdir -p {build_path}')
+		os.makedirs(build_path)
 
 	for subdir in target_dirs:
 		source_path = docs_path + "/" + subdir
@@ -155,7 +161,7 @@ def build_all(docs_path, build_path, version):
 	print("build all docs")
 
 	subdirectories = [d for d in os.listdir(docs_path) if os.path.isdir(os.path.join(docs_path, d))]
-	black_list = {"common", ".git"};
+	black_list = {"common", ".git"}
 	target_dirs = [x for x in subdirectories if x not in black_list]
 
 	for subdir in target_dirs:
@@ -176,9 +182,9 @@ def main(argv):
 	root_path = os.getcwd()
 	build_path = root_path + "/build/armino"
 	if os.path.exists(build_path) == False:
-		run_cmd("mkdir -p " + build_path)
+		os.makedirs(build_path)
 
-	run_cmd(f'cp {root_path}/docs/version.json {root_path}/build/armino/version.json')
+	shutil.copy(f'{root_path}/docs/version.json', f'{root_path}/build/armino/version.json')
 
 	if args.clean and args.target == "all":
 		clean_all(build_path)
