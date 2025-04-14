@@ -179,7 +179,7 @@ int32_t bluetooth_storage_update_to_newest(uint8_t *addr)
         return -1;
     }
 
-    if (index < 0 || index >= sizeof(s_bt_user_storage->linkkey) / sizeof(s_bt_user_storage->linkkey[0]))
+    if (index >= sizeof(s_bt_user_storage->linkkey) / sizeof(s_bt_user_storage->linkkey[0]))
     {
         os_printf("%s index err %d\n", __func__, index);
         return -1;

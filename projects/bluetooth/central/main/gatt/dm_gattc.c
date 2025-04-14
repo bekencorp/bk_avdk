@@ -39,7 +39,11 @@
 #define INVALID_ATTR_HANDLE 0
 #define MIN_VALUE(x, y) (((x) < (y)) ? (x): (y))
 
-#define AUTO_ENABLE_NOTIFY 1
+#define AUTO_GATTC_TEST 1
+
+#if AUTO_GATTC_TEST
+    #define AUTO_ENABLE_NOTIFY 1
+#endif
 
 enum
 {
@@ -149,6 +153,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
 
         gatt_logi("job_status %d", app_env_tmp->job_status);
+#if AUTO_GATTC_TEST
 
         if (app_env_tmp->job_status == GATTC_STATUS_IDLE)
         {
@@ -172,6 +177,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_READ_BY_TYPE;
             }
         }
+#endif
     }
     break;
 
@@ -375,6 +381,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
 
         if (!param->status && app_env_tmp->job_status == GATTC_STATUS_READ_CHAR)
         {
@@ -387,24 +394,18 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_READ_CHAR_DESC;
             }
         }
+#endif
     }
     break;
 
     case BK_GATTC_READ_DESCR_EVT:
     {
         struct gattc_read_char_evt_param *param = (typeof(param))comm_param;
-        bk_gattc_multi_t multi;
+
 
         gatt_logi("BK_GATTC_READ_DESCR_EVT %x %d %d", param->status, param->handle, param->value_len);
 
-        memset(&multi, 0, sizeof(multi));
 
-        multi.num_attr = 5;
-        multi.handles[0] = 3;
-        multi.handles[1] = 5;
-        multi.handles[2] = 9;
-        multi.handles[3] = 13;
-        multi.handles[4] = 16;
 
         common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
 
@@ -415,6 +416,18 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
+
+        bk_gattc_multi_t multi;
+
+        memset(&multi, 0, sizeof(multi));
+
+        multi.num_attr = 5;
+        multi.handles[0] = 3;
+        multi.handles[1] = 5;
+        multi.handles[2] = 9;
+        multi.handles[3] = 13;
+        multi.handles[4] = 16;
 
         if (app_env_tmp->job_status == GATTC_STATUS_READ_CHAR_DESC)
         {
@@ -427,6 +440,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_READ_MULTI;
             }
         }
+#endif
     }
     break;
 
@@ -445,6 +459,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
 
         if (app_env_tmp->job_status == GATTC_STATUS_READ_BY_TYPE)
         {
@@ -457,6 +472,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_READ_CHAR;
             }
         }
+#endif
     }
     break;
 
@@ -475,6 +491,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
 
         if (app_env_tmp->job_status == GATTC_STATUS_READ_MULTI)
         {
@@ -487,6 +504,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_WRITE_DESC_NEED_RSP;
             }
         }
+#endif
     }
     break;
 
@@ -525,6 +543,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
 
         if (app_env_tmp->job_status == GATTC_STATUS_WRITE_DESC_NEED_RSP)
         {
@@ -550,6 +569,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_PREP_WRITE_STEP_1;
             }
         }
+#endif
     }
     break;
 
@@ -568,6 +588,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
 
         if (app_env_tmp->job_status == GATTC_STATUS_PREP_WRITE_STEP_1)
         {
@@ -593,6 +614,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_WRITE_EXEC;
             }
         }
+#endif
     }
     break;
 
@@ -611,6 +633,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
 
         if (app_env_tmp->job_status == GATTC_STATUS_WRITE_EXEC)
         {
@@ -640,6 +663,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_WRITE_READ_SAMETIME;
             }
         }
+#endif
     }
     break;
 
@@ -667,6 +691,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         }
 
         app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+#if AUTO_GATTC_TEST
 
         if (app_env_tmp->job_status == GATTC_STATUS_WRITE_READ_SAMETIME && app_env_tmp->noti_indicate_recv_count++ >= 3)
         {
@@ -688,6 +713,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 gatt_loge("bk_ble_gattc_write_char_descr switch err");
             }
         }
+#endif
     }
     break;
 
@@ -1066,6 +1092,10 @@ int dm_gattc_main(cli_gatt_param_t *param)
         current_addr[0]++;
         current_addr[5] |= 0xc0; // static random addr[47:46] must be 0b11 in msb !!!
         need_set_random_addr = 1;
+    }
+    else
+    {
+        gatt_logw("no need set random addr");
     }
 
     if (need_set_random_addr)

@@ -33,20 +33,20 @@ endif()
 
 if(CONFIG_BLE)
     list(APPEND incs
-        gatt
+        ../../central/main/gatt
     )
 
     list(APPEND srcs
-        gatt/dm_gatt.c
-        gatt/dm_gattc.c
-        gatt/dm_gatts.c
-        gatt/dm_gatt_cli.c
-        gatt/dm_gatt_connection.c
-		gatt/dm_gap_utils.c
-		hogpd/hogpd_demo.c
-		hogpd/hogpd_demo_cli.c
-        wifi_boarding/wifi_boarding_demo.c
-        wifi_boarding/wifi_boarding_demo_cli.c
+        ../../central/main/gatt/dm_gatt.c
+        ../../central/main/gatt/dm_gattc.c
+        ../../central/main/gatt/dm_gatts.c
+        ../../central/main/gatt/dm_gatt_cli.c
+        ../../central/main/gatt/dm_gatt_connection.c
+		../../central/main/gatt/dm_gap_utils.c
+		../../central/main/hogpd/hogpd_demo.c
+		../../central/main/hogpd/hogpd_demo_cli.c
+        ../../central/main/wifi_boarding/wifi_boarding_demo.c
+        ../../central/main/wifi_boarding/wifi_boarding_demo_cli.c
     )
 
 endif()
@@ -56,6 +56,7 @@ if (CONFIG_BT)
     list(APPEND incs
         hfp_hf
         a2dp_sink
+		../../central/main/a2dp_source/
     )
 
 	list(APPEND srcs
@@ -64,18 +65,18 @@ if (CONFIG_BT)
 		a2dp_sink/mpeg4_latm_dec.c
 		a2dp_sink_demo_cli.c
 		hfp_hf/hfp_hf_demo.c
-		hfp_hf/ring_buffer_particle.c
+		../../central/main/a2dp_source/ring_buffer_particle.c
         bt_manager.c
 		)
 endif()
 
 if (CONFIG_BLE OR CONFIG_BT)
     list(APPEND incs
-        storage
+        ../../central/main/storage
     )
 
 	list(APPEND srcs
-		storage/bluetooth_storage.c
+		../../central/main/storage/bluetooth_storage.c
 	)
 endif()
 

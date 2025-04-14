@@ -9,10 +9,12 @@
 
 #include "media_service.h"
 #include "bt_manager.h"
+#if 0
 #include "gatt/dm_gatt.h"
 #include "gatt/dm_gatts.h"
 #include "hogpd/hogpd_demo.h"
 #include "wifi_boarding/wifi_boarding_demo.h"
+#endif
 
 #define AUTO_ENABLE_BLUETOOTH_DEMO 1
 
