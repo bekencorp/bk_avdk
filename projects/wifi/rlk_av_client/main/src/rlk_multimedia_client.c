@@ -433,12 +433,36 @@ void rlk_mm_client_video_aud_deinit(void)
 
     if (db_mm_service->aud_channel)
     {
+        if (db_mm_service->aud_channel->tbuf)
+        {
+            LOGI("%s aud_tbf %x\n", __func__,db_mm_service->aud_channel->tbuf);
+            os_free(db_mm_service->aud_channel->tbuf);
+        }
+
+        if (db_mm_service->aud_channel->cbuf)
+        {
+            LOGI("%s aud_cbf %x\n", __func__,db_mm_service->aud_channel->cbuf);
+            os_free(db_mm_service->aud_channel->cbuf);
+        }
+
         os_free(db_mm_service->aud_channel);
         db_mm_service->aud_channel = NULL;
     }
 
     if (db_mm_service->img_channel)
     {
+        if (db_mm_service->img_channel->tbuf)
+        {
+            LOGI("%s img_cbf %x\n", __func__,db_mm_service->img_channel->tbuf);
+            os_free(db_mm_service->img_channel->tbuf);
+        }
+
+        if (db_mm_service->img_channel->cbuf)
+        {
+            LOGI("%s img_cbf %x\n", __func__,db_mm_service->img_channel->cbuf);
+            os_free(db_mm_service->img_channel->cbuf);
+        }
+
         os_free(db_mm_service->img_channel);
         db_mm_service->img_channel = NULL;
     }
