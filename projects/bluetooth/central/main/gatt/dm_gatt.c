@@ -32,6 +32,9 @@ static bk_ble_local_keys_t s_dm_gap_local_key;
 
 static beken_semaphore_t s_ble_er_ir_sema = NULL;
 
+static uint8_t s_dm_adv_enable = 0;
+static uint8_t s_dm_scan_enable = 0;
+
 #if 1
     static uint8_t s_dm_gatt_iocap = BK_IO_CAP_NONE;
     static uint8_t s_dm_gatt_auth_req = BK_LE_AUTH_BOND;
@@ -142,6 +145,7 @@ static void dm_ble_gap_private_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_par
 
 static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t *param)
 {
+    int32_t ret = DM_BLE_GAP_APP_CB_RET_PROCESSED;
     dm_gatt_app_env_t *dm_gatt_env_p = NULL;
     bk_ble_bond_dev_t *dm_bond_dev_p = NULL;
 
@@ -163,7 +167,7 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
                   evt->status,
                   evt->link_role,
                   evt->hci_handle
-                  );
+                 );
 
         if (evt->status)
         {
@@ -187,13 +191,15 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
                   evt->status,
                   evt->reason,
                   evt->hci_handle
-                  );
+                 );
 
         dm_ble_del_app_env_by_addr(evt->remote_bda);
 
         if (evt->reason == BK_BT_STATUS_TERMINATED_MIC_FAILURE)
         {
             bk_ble_bond_dev_t *tmp_dev = NULL;
+
+            gatt_logw("remove pair because mic err");
 
             if ((tmp_dev = dm_ble_find_bond_info_by_nominal_addr(evt->remote_bda, evt->remote_bda_type)) == NULL)
             {
@@ -819,25 +825,109 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
     break;
 #endif
 
-    case BK_BLE_GAP_EXT_ADV_STOP_COMPLETE_EVT:
+    case BK_BLE_GAP_EXT_SCAN_START_COMPLETE_EVT:
     {
-        struct ble_adv_stop_cmpl_evt_param *pm = (typeof(pm))param;
+        struct ble_adv_start_cmpl_evt_param *pm = (typeof(pm))param;
+
         if (pm->status)
         {
-            gatt_loge("set adv disable err %d", pm->status);
+            gatt_loge("set adv enable err %d", pm->status);
         }
+        else
+        {
+            s_dm_adv_enable = 1;
+        }
+    }
+    break;
+
+    case BK_BLE_GAP_EXT_SCAN_STOP_COMPLETE_EVT:
+    {
+        struct ble_scan_stop_cmpl_param *pm = (typeof(pm))param;
+        gatt_logw("BK_BLE_GAP_EXT_SCAN_STOP_COMPLETE_EVT status 0x%x", pm->status);
+
+        s_dm_scan_enable = 0;
+
+        if (pm->status)
+        {
+            gatt_loge("set scan disable err 0x%x", pm->status);
+        }
+
         if (s_ble_sema != NULL)
         {
             rtos_set_semaphore( &s_ble_sema );
         }
     }
     break;
+
+    case BK_BLE_GAP_EXT_ADV_START_COMPLETE_EVT:
+    {
+        struct ble_adv_start_cmpl_evt_param *pm = (typeof(pm))param;
+
+        if (pm->status)
+        {
+            gatt_loge("set adv enable err %d", pm->status);
+        }
+        else
+        {
+            s_dm_adv_enable = 1;
+        }
+
+        ret = DM_BLE_GAP_APP_CB_RET_NO_INTERESTING;
+    }
+    break;
+
+    case BK_BLE_GAP_EXT_ADV_STOP_COMPLETE_EVT:
+    {
+        struct ble_adv_stop_cmpl_evt_param *pm = (typeof(pm))param;
+        gatt_logw("BK_BLE_GAP_EXT_ADV_STOP_COMPLETE_EVT status 0x%x", pm->status);
+
+        s_dm_adv_enable = 0;
+
+        if (pm->status)
+        {
+            gatt_loge("set adv disable err 0x%x", pm->status);
+        }
+
+        if (s_ble_sema != NULL)
+        {
+            rtos_set_semaphore( &s_ble_sema );
+        }
+    }
+    break;
+
+    case BK_BLE_GAP_ADV_TERMINATED_EVT:
+    {
+        struct ble_adv_terminate_param *pm = (typeof(pm))param;
+        gatt_logw("BK_BLE_GAP_ADV_TERMINATED_EVT status 0x%x hci_handle 0x%04x count %d", pm->status, pm->conn_idx, pm->completed_event);
+        s_dm_adv_enable = 0;
+
+        switch (pm->status)
+        {
+        case BK_BT_STATUS_SUCCESS:
+            //because connection completed
+            break;
+
+        case BK_BT_STATUS_ADV_TO:
+        case BK_BT_STATUS_LIMIT_REACHED:
+            break;
+
+        default:
+            break;
+        }
+    }
+    break;
+
+    case BK_BLE_GAP_SCAN_TIMEOUT_EVT:
+        gatt_logw("BK_BLE_GAP_SCAN_TIMEOUT_EVT");
+        s_dm_scan_enable = 0;
+        break;
+
     default:
-        return DM_BLE_GAP_APP_CB_RET_NO_INTERESTING;
+        ret = DM_BLE_GAP_APP_CB_RET_NO_INTERESTING;
         break;
     }
 
-    return DM_BLE_GAP_APP_CB_RET_PROCESSED;
+    return ret;
 }
 
 
@@ -1173,6 +1263,22 @@ int dm_ble_gap_remove_bond(uint8_t *addr)
         return -1;
     }
 
+    ret = bk_ble_gap_stop_scan();
+
+    if (ret)
+    {
+        gatt_loge("bk_ble_gap_stop_scan err %d", ret);
+        return -1;
+    }
+
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set scan disable err %d", ret);
+        return -1;
+    }
+
     bk_ble_bond_dev_t bond_dev;
 
     os_memset(&bond_dev, 0, sizeof(bond_dev));
@@ -1299,6 +1405,22 @@ int32_t dm_ble_gap_clean_bond(void)
     if (ret != kNoErr)
     {
         gatt_loge("wait set adv disable err %d", ret);
+        return -1;
+    }
+
+    ret = bk_ble_gap_stop_scan();
+
+    if (ret)
+    {
+        gatt_loge("bk_ble_gap_stop_scan err %d", ret);
+        return -1;
+    }
+
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("wait set scan disable err %d", ret);
         return -1;
     }
 
@@ -1468,6 +1590,35 @@ void dm_ble_gap_get_identity_addr(uint8_t *addr)
         uint8_t tmp = identity_addr[i];
         identity_addr[i] = identity_addr[BK_BD_ADDR_LEN - 1 - i];
         identity_addr[BK_BD_ADDR_LEN - 1 - i] = tmp;
+    }
+}
+
+int16_t dm_ble_gap_get_current_conn_id(void)
+{
+    uint32_t connected_count = 0;
+    dm_gatt_app_env_t *tmp_env = NULL;
+
+    int32_t nest_func_get_connected_all(dm_gatt_app_env_t *env, void *arg)
+    {
+        if (env && env->status == GAP_CONNECT_STATUS_CONNECTED)
+        {
+            connected_count++;
+            tmp_env = env;
+        }
+
+        return 0;
+    }
+
+    dm_ble_app_env_foreach(nest_func_get_connected_all, NULL);
+
+    if (connected_count == 1)
+    {
+        return tmp_env->conn_id;
+    }
+    else
+    {
+        gatt_loge("connected count %d, ret invalid", connected_count);
+        return -1;
     }
 }
 

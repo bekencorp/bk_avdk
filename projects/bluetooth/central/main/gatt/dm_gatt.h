@@ -75,5 +75,6 @@ int32_t dm_ble_gap_clean_local_key(void);
 int dm_ble_gap_update_param(uint8_t *addr, uint16_t interval, uint16_t tout);
 int32_t dm_ble_gap_get_rpa(uint8_t *rpa);
 void dm_ble_gap_get_identity_addr(uint8_t *addr);
+int16_t dm_ble_gap_get_current_conn_id(void);
 
 extern uint8_t g_dm_gap_use_rpa;

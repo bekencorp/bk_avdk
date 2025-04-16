@@ -1,5 +1,6 @@
 #pragma once
 
+#include "wifi_boarding_demo_service.h"
 #include <stdint.h>
 
 #define WIFI_BOARDING_DEMO_ENABLE 1
@@ -21,4 +22,6 @@ enum
 #define wboard_logd(format, ...) do{if(BOARDING_DEBUG_LEVEL >= BOARDING_DEBUG_LEVEL_DEBUG)   BK_LOGI("app_board", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 #define wboard_logv(format, ...) do{if(BOARDING_DEBUG_LEVEL >= BOARDING_DEBUG_LEVEL_VERBOSE) BK_LOGI("app_board", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 
-int32_t wifi_boarding_demo_main(void);
+#define STREAM_TO_UINT16(u16, p) {u16 = ((uint16_t)(*(p)) + (((uint16_t)(*((p) + 1))) << 8)); (p) += 2;}
+int32_t wifi_boarding_demo_main(ble_boarding_info_t * info);
+int wifi_boarding_notify(uint8_t *data, uint16_t length);

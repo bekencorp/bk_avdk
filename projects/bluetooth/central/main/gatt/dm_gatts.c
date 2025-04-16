@@ -37,6 +37,7 @@
 
 #define INVALID_ATTR_HANDLE 0
 #define ADV_HANDLE 0
+#define BEKEN_COMPANY_ID                    (0x05F0)
 
 #define MIN_VALUE(x, y) (((x) < (y)) ? (x): (y))
 
@@ -157,14 +158,26 @@ static const bk_gatts_attr_db_t s_gatts_attr_db_service_1[] =
     },
 };
 
+#define NUS_SERVICE 0
+
+#if NUS_SERVICE
 //static const uint8_t s_gatts_128_attr[] = {0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x34, 0x22, 0x00, 0x00};
+static const uint8_t s_gatts_nus_service_128_attr[] = {0x9e, 0xca, 0xdc, 0x24, 0x0e, 0xe5, 0xa9, 0xe0, 0x93, 0xf3, 0xa3, 0xb5, 0x01, 0x00, 0x40, 0x6e};
+static const uint8_t s_gatts_nus_rx_char_128_attr[] = {0x9e, 0xca, 0xdc, 0x24, 0x0e, 0xe5, 0xa9, 0xe0, 0x93, 0xf3, 0xa3, 0xb5, 0x02, 0x00, 0x40, 0x6e};
+static const uint8_t s_gatts_nus_tx_char_128_attr[] = {0x9e, 0xca, 0xdc, 0x24, 0x0e, 0xe5, 0xa9, 0xe0, 0x93, 0xf3, 0xa3, 0xb5, 0x03, 0x00, 0x40, 0x6e};
+static uint8_t s_gatts_nus_rx_test_buffer[128] = {0};
+static uint8_t s_gatts_nus_tx_cli_config[2] = {0};
+#endif
 
 static const bk_gatts_attr_db_t s_gatts_attr_db_service_2[] =
 {
     //service
     {
+#if NUS_SERVICE
+        BK_GATT_PRIMARY_SERVICE_DECL_128(s_gatts_nus_service_128_attr),
+#else
         BK_GATT_PRIMARY_SERVICE_DECL(0x2234),
-        //BK_GATT_PRIMARY_SERVICE_DECL_128(s_gatts_128_attr),
+#endif
     },
 
     //char 1
@@ -207,6 +220,30 @@ static const bk_gatts_attr_db_t s_gatts_attr_db_service_2[] =
                           BK_GATT_PERM_READ_ENC_MITM | BK_GATT_PERM_WRITE_ENC_MITM, //gap iocap must not be BK_IO_CAP_NONE !!!
                           BK_GATT_AUTO_RSP),
     },
+
+#if NUS_SERVICE
+    {
+        BK_GATT_CHAR_DECL_128(s_gatts_nus_rx_char_128_attr,
+                          sizeof(s_gatts_nus_rx_test_buffer), s_gatts_nus_rx_test_buffer,
+                          BK_GATT_CHAR_PROP_BIT_WRITE_NR,
+                          BK_GATT_PERM_WRITE,
+                          BK_GATT_AUTO_RSP),
+    },
+
+    {
+        BK_GATT_CHAR_DECL_128(s_gatts_nus_tx_char_128_attr,
+                          0, NULL,
+                          BK_GATT_CHAR_PROP_BIT_NOTIFY,
+                          BK_GATT_PERM_WRITE,
+                          BK_GATT_AUTO_RSP),
+    },
+    {
+        BK_GATT_CHAR_DESC_DECL(BK_GATT_UUID_CHAR_CLIENT_CONFIG,
+                               sizeof(s_gatts_nus_tx_cli_config), (uint8_t *)s_gatts_nus_tx_cli_config,
+                               BK_GATT_PERM_READ | BK_GATT_PERM_WRITE,
+                               BK_GATT_AUTO_RSP),
+    },
+#endif
 };
 
 static uint16_t *const s_attr_handle_list[sizeof(s_gatts_attr_db_service_1) / sizeof(s_gatts_attr_db_service_1[0])] =
@@ -1477,6 +1514,12 @@ int32_t dm_gatts_is_init(void)
     return s_dm_gatts_is_init;
 }
 
+
+bk_gatt_if_t dm_gatts_get_current_if(void)
+{
+    return s_gatts_if;
+}
+
 int dm_gatts_main(cli_gatt_param_t *param)
 {
     ble_err_t ret = 0;
@@ -1934,6 +1977,8 @@ int dm_gatts_main(cli_gatt_param_t *param)
         }
     }
 
+    uint8_t company_id[2] = {BEKEN_COMPANY_ID & 0xFF, BEKEN_COMPANY_ID >> 8};
+
 #if 0
     //use hid service
     const uint8_t hogp_service_uuid[16] =
@@ -1943,15 +1988,16 @@ int dm_gatts_main(cli_gatt_param_t *param)
         BK_GATT_UUID_HID_SVC & 0xff, (BK_GATT_UUID_HID_SVC >> 8) & 0xff, 0x00, 0x00
     };
 
+    uint8_t company_id[2] = {BEKEN_COMPANY_ID & 0xFF, BEKEN_COMPANY_ID >> 8};
     bk_ble_adv_data_t adv_data =
     {
         .set_scan_rsp = 0,
         .include_name = 1,
-        .min_interval = 0x0006,
-        .max_interval = 0x0010,
+        //.min_interval = 0x0006,
+        //.max_interval = 0x0010,
         .appearance = 0x8001,//0xc103,
-        .manufacturer_len = 0,
-        .p_manufacturer_data = NULL,
+        .manufacturer_len = sizeof(company_id),
+        .p_manufacturer_data = company_id,
         .service_data_len = 0,
         .p_service_data = NULL,
         .service_uuid_len = sizeof(hogp_service_uuid),
@@ -1966,8 +2012,8 @@ int dm_gatts_main(cli_gatt_param_t *param)
         .min_interval = 0x0006,
         .max_interval = 0x0010,
         .appearance = 0,
-        .manufacturer_len = 0,
-        .p_manufacturer_data = NULL,
+        .manufacturer_len = sizeof(company_id),
+        .p_manufacturer_data = company_id,
         .service_data_len = 0,
         .p_service_data = NULL,
         .service_uuid_len = 0,

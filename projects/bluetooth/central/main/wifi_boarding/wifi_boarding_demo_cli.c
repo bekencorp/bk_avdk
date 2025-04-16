@@ -37,7 +37,7 @@ static void cmd_wboarding_demo(char *pcWriteBuffer, int xWriteBufferLen, int arg
 
     if (os_strcmp(argv[1], "init") == 0)
     {
-        wifi_boarding_demo_main();
+        wifi_boarding_demo_main(NULL);
     }
     else
     {

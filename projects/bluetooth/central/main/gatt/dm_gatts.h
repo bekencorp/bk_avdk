@@ -78,3 +78,5 @@ int32_t dm_gatts_enable_adv(uint8_t enable);
 int32_t dm_gatts_enable_service(uint32_t index, uint8_t enable);
 int32_t dm_gatts_reg_db(bk_gatts_attr_db_t *list, uint32_t count, uint16_t *attr_handle_list, dm_ble_gatts_db_cb cb);
 int32_t dm_gatts_get_buff_from_attr_handle(bk_gatts_attr_db_t *attr_list, uint16_t *attr_handle_list, uint32_t size, uint16_t attr_handle, uint32_t *output_index, uint8_t **output_buff, uint32_t *output_size);
+bk_gatt_if_t dm_gatts_get_current_if(void);
+

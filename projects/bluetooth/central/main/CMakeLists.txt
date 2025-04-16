@@ -63,6 +63,8 @@ if(CONFIG_SYS_CPU0)
             hogpd/hogpd_demo.c
             hogpd/hogpd_demo_cli.c
             wifi_boarding/wifi_boarding_demo.c
+            wifi_boarding/wifi_boarding_demo_service.c
+            wifi_boarding/wifi_boarding_network.c
             wifi_boarding/wifi_boarding_demo_cli.c
         )
 
@@ -81,7 +83,7 @@ if (("${ARMINO_SOC}" STREQUAL "bk7258") OR ("${ARMINO_SOC}" STREQUAL "bk7258_cp1
     list(APPEND priv_req_list multimedia media_service)
 endif()
 
-list(APPEND priv_req_list bk_init bk_cli)
+list(APPEND priv_req_list bk_init bk_cli lwip_intf_v2_1)
 
 armino_component_register(
 	SRCS "${srcs}"

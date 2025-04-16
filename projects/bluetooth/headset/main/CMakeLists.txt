@@ -46,6 +46,8 @@ if(CONFIG_BLE)
 		../../central/main/hogpd/hogpd_demo.c
 		../../central/main/hogpd/hogpd_demo_cli.c
         ../../central/main/wifi_boarding/wifi_boarding_demo.c
+        ../../central/main/wifi_boarding/wifi_boarding_demo_service.c
+        ../../central/main/wifi_boarding/wifi_boarding_network.c
         ../../central/main/wifi_boarding/wifi_boarding_demo_cli.c
     )
 
@@ -84,7 +86,7 @@ endif()
 armino_component_register(
 	SRCS "${srcs}"
 	INCLUDE_DIRS "${incs}"
-	PRIV_REQUIRES bk_init bk_cli media_service multimedia aac_decoder audio_play audio_record
+	PRIV_REQUIRES bk_init bk_cli media_service multimedia aac_decoder audio_play audio_record lwip_intf_v2_1
 )
 
 get_filename_component(config_component_name ${CMAKE_CURRENT_LIST_DIR} NAME)
