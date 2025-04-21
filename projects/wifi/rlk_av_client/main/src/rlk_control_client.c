@@ -311,7 +311,7 @@ void rlk_cntrl_client_handle_tx_cb(struct rlk_msg_t msg)
 {
     if (rlk_client_local_env.state == RLK_STATE_PROBEING)
     {
-        rlk_mm_client_video_aud_deinit();
+        rlk_mm_client_prepare_sleep();
         rlk_cntrl_client_tx_mgmt_data(rlk_client_local_env.bc_mac_addr, RLK_MM_HEADER_MGMT_SUBTYPE_PROBE_REQ);
     }
     else if ((rlk_client_local_env.state == RLK_STATE_WAIT_SLEEP_END) && (msg.arg != BK_RLK_SEND_SUCCESS))
