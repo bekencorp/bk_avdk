@@ -48,9 +48,10 @@ if(CONFIG_SYS_CPU0)
     if(CONFIG_BLE)
         list(APPEND incs
             gatt
-			storage
-			hogpd
-			wifi_boarding
+	    storage
+	    hogpd
+	    wifi_boarding
+            ble_ota
         )
 
         list(APPEND srcs
@@ -83,7 +84,7 @@ if (("${ARMINO_SOC}" STREQUAL "bk7258") OR ("${ARMINO_SOC}" STREQUAL "bk7258_cp1
     list(APPEND priv_req_list multimedia media_service)
 endif()
 
-list(APPEND priv_req_list bk_init bk_cli lwip_intf_v2_1)
+list(APPEND priv_req_list bk_init bk_cli lwip_intf_v2_1 ota)
 
 armino_component_register(
 	SRCS "${srcs}"

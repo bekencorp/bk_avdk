@@ -16,6 +16,7 @@
 #include "dm_gatt.h"
 #include "bluetooth_storage.h"
 #include "dm_gap_utils.h"
+#include "wifi_boarding_demo_service.h"
 
 typedef int32_t (* dm_ble_gap_app_cb)(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t *param);
 
@@ -155,6 +156,7 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
     {
     case BK_BLE_GAP_CONNECT_COMPLETE_EVT:
     {
+        ble_ota_stop_timer();
         struct ble_connect_complete_param *evt = (typeof(evt))param;
 
         gatt_logi("BK_BLE_GAP_CONNECT_COMPLETE_EVT %02x:%02x:%02x:%02x:%02x:%02x status 0x%x role %d hci_handle 0x%x",
@@ -192,7 +194,7 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
                   evt->reason,
                   evt->hci_handle
                  );
-
+        ble_ota_start_timer();
         dm_ble_del_app_env_by_addr(evt->remote_bda);
 
         if (evt->reason == BK_BT_STATUS_TERMINATED_MIC_FAILURE)

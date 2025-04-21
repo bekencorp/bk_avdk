@@ -14,7 +14,7 @@ enum
     BOARDING_DEBUG_LEVEL_VERBOSE,
 };
 
-#define BOARDING_DEBUG_LEVEL BOARDING_DEBUG_LEVEL_INFO
+#define BOARDING_DEBUG_LEVEL BOARDING_DEBUG_LEVEL_WARNING
 
 #define wboard_loge(format, ...) do{if(BOARDING_DEBUG_LEVEL >= BOARDING_DEBUG_LEVEL_ERROR)   BK_LOGE("app_board", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 #define wboard_logw(format, ...) do{if(BOARDING_DEBUG_LEVEL >= BOARDING_DEBUG_LEVEL_WARNING) BK_LOGW("app_board", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)

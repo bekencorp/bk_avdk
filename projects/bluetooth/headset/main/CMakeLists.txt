@@ -34,6 +34,8 @@ endif()
 if(CONFIG_BLE)
     list(APPEND incs
         ../../central/main/gatt
+        ../../central/main/wifi_boarding
+        ../../central/main/ble_ota
     )
 
     list(APPEND srcs
@@ -86,7 +88,7 @@ endif()
 armino_component_register(
 	SRCS "${srcs}"
 	INCLUDE_DIRS "${incs}"
-	PRIV_REQUIRES bk_init bk_cli media_service multimedia aac_decoder audio_play audio_record lwip_intf_v2_1
+	PRIV_REQUIRES bk_init bk_cli media_service multimedia aac_decoder audio_play audio_record lwip_intf_v2_1 ota
 )
 
 get_filename_component(config_component_name ${CMAKE_CURRENT_LIST_DIR} NAME)

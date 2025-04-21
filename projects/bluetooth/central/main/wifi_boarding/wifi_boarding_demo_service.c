@@ -12,11 +12,45 @@
 #include <os/mem.h>
 #include <os/str.h>
 #include <os/os.h>
+#include "ble_ota.h"
 
 static beken_thread_t s_boarding_thd = NULL;
 static beken_queue_t s_boarding_queue = NULL;
 
 static bk_boarding_info_t *bk_boarding_info = NULL;
+
+static f_ota_t *s_ble_ota = NULL;
+static uint8_t *s_ota_data_ptr = NULL;
+static beken2_timer_t s_ble_ota_tmr;
+
+static void ble_ota_timer_hdl(void *param1, void *param2)
+{
+    OTA_FREE(s_ble_ota->magic_code);
+    f_ota_fun_ptr->deinit(s_ble_ota);
+    OTA_FREE(s_ota_data_ptr);
+    wboard_logw("ble disconnect need reboot  !\r\n");
+    bk_reboot();   //need do reboot.
+}
+
+void ble_ota_start_timer(void)
+{
+    rtos_init_oneshot_timer(&s_ble_ota_tmr, CONFIG_BLE_OTA_WAIT_TIMEOUT, ble_ota_timer_hdl, 0, 0);
+    rtos_start_oneshot_timer(&s_ble_ota_tmr);
+
+    return ;
+}
+
+void ble_ota_stop_timer(void)
+{
+    if (rtos_is_oneshot_timer_init(&s_ble_ota_tmr))
+    {
+        if (rtos_is_oneshot_timer_running(&s_ble_ota_tmr))
+            rtos_stop_oneshot_timer(&s_ble_ota_tmr);
+        rtos_deinit_oneshot_timer(&s_ble_ota_tmr);
+    }
+
+    return;
+}
 
 void bk_boarding_event_notify(uint16_t opcode, int status)
 {
@@ -78,7 +112,7 @@ bk_err_t boarding_send_msg(boarding_msg_t *msg)
     return ret;
 }
 
-static void bk_boarding_operation_handle(uint16_t opcode, uint16_t length, uint8_t *data)
+void bk_boarding_operation_handle(uint16_t opcode, uint16_t length, uint8_t *data)
 {
     wboard_logw("opcode: %04X, length: %u", opcode, length);
 
@@ -120,6 +154,47 @@ static void bk_boarding_operation_handle(uint16_t opcode, uint16_t length, uint8
 
         wboard_logi("BOARDING_OP_SET_WIFI_CHANNEL: %u", bk_boarding_info->channel);
 
+    }
+    break;
+
+    case BOARDING_OP_OTA_START_DOWNLOAD:
+    {
+        boarding_msg_t msg;
+
+        msg.event = DBEVT_OTA_START_DOWNLOAD;
+        msg.length = length;
+
+        OTA_MALLOC_WITHOUT_RETURN(s_ota_data_ptr, length);
+        os_memcpy(s_ota_data_ptr, data, length);
+        msg.param = (uint32_t)(s_ota_data_ptr);
+        boarding_send_msg(&msg);
+    }
+    break;
+
+    case BOARDING_OP_OTA_DO_DOWNLOADING:
+    {
+        boarding_msg_t msg;
+        msg.event = DBEVT_OTA_DO_DOWNLOADING;
+        msg.length = length;
+
+        OTA_MALLOC_WITHOUT_RETURN(s_ota_data_ptr, length);
+        os_memcpy(s_ota_data_ptr, data, length);
+        msg.param = (uint32_t)(s_ota_data_ptr);
+        boarding_send_msg(&msg);
+
+    }
+    break;
+
+    case BOARDING_OP_OTA_COMPLETE_DOWNLOAD:
+    {
+        boarding_msg_t msg;
+        msg.event = DBEVT_OTA_COMPLETE_DOWNLOAD;
+        msg.length = length;
+
+        OTA_MALLOC_WITHOUT_RETURN(s_ota_data_ptr, length);
+        os_memcpy(s_ota_data_ptr, data, length);
+        msg.param = (uint32_t)(s_ota_data_ptr);
+        boarding_send_msg(&msg);
     }
     break;
 
@@ -213,6 +288,112 @@ static void boarding_message_handle(void)
                 bk_bluetooth_deinit();
                 wboard_logi("close bluetooth finish!\r\n");
 #endif
+            }
+            break;
+
+            case DBEVT_OTA_START_DOWNLOAD:
+            {
+                wboard_logw("start ota dl!\r\n");
+                OTA_MALLOC_WITHOUT_RETURN(s_ble_ota, sizeof(f_ota_t));
+                OTA_MALLOC_WITHOUT_RETURN(s_ble_ota->magic_code, OTA_START_MAGIC_LENGTH);
+                if(msg.length == (OTA_START_MAGIC_LENGTH + OTA_STORE_ENTIRE_IMAGE_SIZE))
+                {
+                    os_memcpy(s_ble_ota->magic_code, (uint8_t *)(msg.param) , OTA_START_MAGIC_LENGTH);
+                    if(os_memcmp(s_ble_ota->magic_code, OTA_START_MAGIC, OTA_START_MAGIC_LENGTH) == 0)
+                    {
+                        os_memcpy(&(s_ble_ota->image_size), (uint8_t *)(msg.param + OTA_START_MAGIC_LENGTH) , OTA_STORE_ENTIRE_IMAGE_SIZE);
+                        wboard_logw("ota_image_size :0x%x!\r\n", s_ble_ota->image_size);
+                        if(f_ota_fun_ptr->init(s_ble_ota) == BK_OK)
+                        {
+                            bk_boarding_event_notify(BOARDING_OP_OTA_START_DOWNLOAD, F_OTA_COMM_OK);
+                        }
+                        else
+                        {
+                            bk_boarding_event_notify(BOARDING_OP_OTA_START_DOWNLOAD, F_OTA_COMM_DATA_ERROR);
+                        }
+                    }
+                    else
+                    {
+                        wboard_loge("magic is error!\r\n");
+                        bk_boarding_event_notify(BOARDING_OP_OTA_START_DOWNLOAD, F_OTA_START_MAGIC_ERROR);
+                    }
+                }
+                else
+                {
+                    wboard_loge("length is error!\r\n");
+                    bk_boarding_event_notify(BOARDING_OP_OTA_START_DOWNLOAD, F_OTA_COMM_LENGTH_ERROR);
+                }
+                wboard_logi("s_ble_ota->sequence_number :%d !\r\n",s_ble_ota->curr_sequence_number);
+                OTA_FREE(s_ble_ota->magic_code);
+                OTA_FREE(s_ota_data_ptr);
+            }
+            break;
+
+            case DBEVT_OTA_DO_DOWNLOADING:
+            {
+                wboard_logi("start ota dling!\r\n");
+                if(msg.length > 0)
+                {
+                    os_memcpy(&(s_ble_ota->new_sequence_number), (uint8_t *)msg.param, OTA_SEQUENCE_NUMBER);
+
+                    os_memcpy(s_ble_ota->wr_tmp_buf, (uint8_t *)(msg.param + OTA_SEQUENCE_NUMBER), (msg.length - OTA_SEQUENCE_NUMBER));
+
+                    if(f_ota_fun_ptr->data_process(s_ble_ota, (msg.length - OTA_SEQUENCE_NUMBER)) == BK_OK)
+                    {
+                        bk_boarding_event_notify_with_data(BOARDING_OP_OTA_DO_DOWNLOADING, F_OTA_COMM_OK, (char*)&s_ble_ota->curr_sequence_number, msg.length);
+                    }
+                    else
+                    {
+                        bk_boarding_event_notify_with_data(BOARDING_OP_OTA_DO_DOWNLOADING, F_OTA_COMM_DATA_ERROR, (char*)&s_ble_ota->new_sequence_number, msg.length);
+                    }
+                }
+                else
+                {
+                    wboard_loge("dling length is error !\r\n");
+                    bk_boarding_event_notify_with_data(BOARDING_OP_OTA_DO_DOWNLOADING, F_OTA_COMM_LENGTH_ERROR, (char*)&s_ble_ota->new_sequence_number, msg.length);
+                }
+
+                OTA_FREE(s_ota_data_ptr);
+            }
+            break;
+
+            case DBEVT_OTA_COMPLETE_DOWNLOAD:
+            {
+                wboard_logw("complete ota dled!\r\n");
+                uint32_t in_crc = 0;
+
+                OTA_MALLOC_WITHOUT_RETURN(s_ble_ota->magic_code, OTA_COMPLETE_MAGIC_LENGTH);
+                if(msg.length == (OTA_COMPLETE_MAGIC_LENGTH + OTA_CHECK_CRC_LENGTH))
+                {
+                    os_memcpy(s_ble_ota->magic_code, (uint8_t *)(msg.param) , OTA_COMPLETE_MAGIC_LENGTH);
+                    os_memcpy(&in_crc, (uint8_t *)(msg.param + OTA_COMPLETE_MAGIC_LENGTH) , OTA_CHECK_CRC_LENGTH);
+                    if(os_memcmp(s_ble_ota->magic_code, OTA_COMPLETE_MAGIC, OTA_COMPLETE_MAGIC_LENGTH) == 0)
+                    {
+                        if(f_ota_fun_ptr->crc(s_ble_ota, in_crc) != BK_OK)
+                        {
+                            bk_boarding_event_notify(BOARDING_OP_OTA_COMPLETE_DOWNLOAD, F_OTA_COMM_CRC_ERROR);
+                            break;
+                        }
+                        OTA_FREE(s_ble_ota->magic_code);
+                        f_ota_fun_ptr->deinit(s_ble_ota);
+                        OTA_FREE(s_ota_data_ptr);
+                        bk_boarding_event_notify(BOARDING_OP_OTA_COMPLETE_DOWNLOAD, F_OTA_COMM_OK);
+                        wboard_logw("ota success !\r\n");
+                        bk_reboot();   //success need do reboot.
+                    }
+                    else
+                    {
+                        wboard_loge("finish magic is error !\r\n");
+                        bk_boarding_event_notify(BOARDING_OP_OTA_COMPLETE_DOWNLOAD, F_OTA_START_MAGIC_ERROR);
+                    }
+                }
+                else
+                {
+                    wboard_loge("length is error !\r\n");
+                    bk_boarding_event_notify(BOARDING_OP_OTA_COMPLETE_DOWNLOAD, F_OTA_COMM_LENGTH_ERROR);
+                }
+                OTA_FREE(s_ble_ota->magic_code);
+                OTA_FREE(s_ota_data_ptr);
             }
             break;
 

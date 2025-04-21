@@ -23,6 +23,9 @@ typedef enum
     BOARDING_OP_NET_PAN_START = 14,
     BOARDING_OP_NETWORK_PROVISIONING_FIRST_TIME = 15,
     BOARDING_OP_START_AGENT_FROM_DEV = 16,
+    BOARDING_OP_OTA_START_DOWNLOAD = 20,
+    BOARDING_OP_OTA_DO_DOWNLOADING = 21,
+    BOARDING_OP_OTA_COMPLETE_DOWNLOAD = 22,
 } boarding_opcode_t;
 
 typedef void (*ble_boarding_op_cb_t)(uint16_t opcode, uint16_t length, uint8_t *data);
@@ -55,6 +58,9 @@ typedef enum
     DBEVT_WIFI_SOFT_AP_TURNING_ON,
 
     DBEVT_BLE_DISABLE,
+    DBEVT_OTA_START_DOWNLOAD,
+    DBEVT_OTA_DO_DOWNLOADING,
+    DBEVT_OTA_COMPLETE_DOWNLOAD,
     DBEVT_EXIT,
 } dbevt_t;
 
@@ -62,7 +68,10 @@ typedef struct
 {
     uint32_t event;
     uint32_t param;
+    uint16_t length;
 } boarding_msg_t;
 
 bk_err_t boarding_send_msg(boarding_msg_t *msg);
 int32_t wifi_boarding_demo_service_main(void);
+void ble_ota_start_timer(void);
+void ble_ota_stop_timer(void);
