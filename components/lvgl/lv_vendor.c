@@ -42,13 +42,13 @@ void lv_vendor_disp_unlock(void)
     rtos_unlock_mutex(&g_disp_mutex);
 }
 
-void lv_vendor_init(lv_vnd_config_t *config)
+bk_err_t lv_vendor_init(lv_vnd_config_t *config)
 {
-    bk_err_t ret;
+    bk_err_t ret = BK_OK;
 
     if (lv_vendor_initialized) {
         LOGI("%s already init\n", __func__);
-        return;
+        return ret;
     }
 
     os_memcpy(&vendor_config, config, sizeof(lv_vnd_config_t));
@@ -58,7 +58,7 @@ void lv_vendor_init(lv_vnd_config_t *config)
     ret = lv_port_disp_init();
     if (ret != BK_OK) {
         LOGE("%s lv_port_disp_init failed\n", __func__);
-        return;
+        return ret;
     }
 
     lv_port_indev_init();
@@ -66,14 +66,14 @@ void lv_vendor_init(lv_vnd_config_t *config)
     ret = rtos_init_mutex(&g_disp_mutex);
     if (BK_OK != ret) {
         LOGE("%s g_disp_mutex init failed\n", __func__);
-        return;
+        return ret;
     }
 
     ret = rtos_init_semaphore_ex(&lvgl_sem, 1, 0);
     if (BK_OK != ret) {
         LOGE("%s lvgl_sem init failed\n", __func__);
         rtos_deinit_mutex(&g_disp_mutex);
-        return;
+        return ret;
     }
 
 #if (CONFIG_VFS)
@@ -82,7 +82,7 @@ void lv_vendor_init(lv_vnd_config_t *config)
         LOGE("%s lv_vfs_init failed\n", __func__);
         rtos_deinit_mutex(&g_disp_mutex);
         rtos_deinit_semaphore(&lvgl_sem);
-        return;
+        return ret;
     }
 #else
     #if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
@@ -93,13 +93,17 @@ void lv_vendor_init(lv_vnd_config_t *config)
     lv_vendor_initialized = true;
 
     LOGI("%s complete\n", __func__);
+
+    return ret;
 }
 
-void lv_vendor_deinit(void)
+bk_err_t lv_vendor_deinit(void)
 {
+    bk_err_t ret = BK_OK;
+
     if (lv_vendor_initialized == false) {
         LOGI("%s already deinit\n", __func__);
-        return;
+        return ret;
     }
 
     lv_port_disp_deinit();
@@ -107,10 +111,10 @@ void lv_vendor_deinit(void)
     lv_port_indev_deinit();
 
 #if (CONFIG_VFS)
-    bk_err_t ret = lv_vfs_deinit();
+    ret = lv_vfs_deinit();
     if (ret != BK_OK) {
         LOGE("%s lv_vfs_deinit fail\n", __func__);
-        return;
+        return ret;
     }
 #else
     #if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
@@ -127,6 +131,8 @@ void lv_vendor_deinit(void)
     lv_vendor_initialized = false;
 
     LOGI("%s complete\n", __func__);
+
+    return ret;
 }
 
 static void lv_tast_entry(void *arg)

@@ -34,8 +34,8 @@ typedef struct {
 } lv_vnd_config_t;
 
 
-void lv_vendor_init(lv_vnd_config_t *config);
-void lv_vendor_deinit(void);
+bk_err_t lv_vendor_init(lv_vnd_config_t *config);
+bk_err_t lv_vendor_deinit(void);
 void lv_vendor_start(void);
 void lv_vendor_stop(void);
 void lv_vendor_disp_lock(void);
