@@ -136,6 +136,8 @@ const lv_img_dsc_t * ui_imgset_anime_line[1] = {&ui_img_anime_line1_png};
 const lv_img_dsc_t * ui_imgset_arrow[1] = {&ui_img_arrow1_png};
 const lv_img_dsc_t * ui_imgset_cloud[1] = {&ui_img_cloud1_png};
 const lv_img_dsc_t * ui_imgset_common_switch[1] = {&ui_img_common_switch1_png};
+static bool ui_Ui2Panel2Status = false;
+static bool ui_Ui2Panel4Status = false;
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
 #if LV_COLOR_DEPTH != 16
@@ -237,29 +239,48 @@ void ui_event_Ui2Panel2(lv_event_t * e)
     lv_obj_t * target = lv_event_get_target(e);
     if(event_code == LV_EVENT_CLICKED) {
         _ui_state_modify(ui_Ui2Panel2Img, LV_STATE_CHECKED, _UI_MODIFY_STATE_TOGGLE);
-    }
-    if(event_code == LV_EVENT_VALUE_CHANGED &&  lv_obj_has_state(target, LV_STATE_CHECKED)) {
+        if (ui_Ui2Panel2Status == true) {
+            ui_Ui2Panel2Status = false;
 #if CONFIG_86BOX_SMART_PANEL_VERSION_CN
-        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "开");
+            _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "关");
 #endif
 #if CONFIG_86BOX_SMART_PANEL_VERSION_EN
-        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "open");
+            _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "close");
 #endif
-    }
-    if(event_code == LV_EVENT_VALUE_CHANGED &&	!lv_obj_has_state(target, LV_STATE_CHECKED)) {
+        } else {
+            ui_Ui2Panel2Status = true;
 #if CONFIG_86BOX_SMART_PANEL_VERSION_CN
-        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "关");
+            _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "开");
 #endif
 #if CONFIG_86BOX_SMART_PANEL_VERSION_EN
-        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "close");
+            _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "open");
 #endif
+        }
     }
+//    if(event_code == LV_EVENT_VALUE_CHANGED &&  lv_obj_has_state(target, LV_STATE_CHECKED)) {
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_CN
+//        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "开");
+//#endif
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_EN
+//        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "open");
+//#endif
+//    }
+//    if(event_code == LV_EVENT_VALUE_CHANGED &&	!lv_obj_has_state(target, LV_STATE_CHECKED)) {
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_CN
+//        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "关");
+//#endif
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_EN
+//        _ui_label_set_property(ui_Ui2Panel2Value, _UI_LABEL_PROPERTY_TEXT, "close");
+//#endif
+//    }
 }
 void ui_event_Ui2Panel1(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
     lv_obj_t * target = lv_event_get_target(e);
     if(event_code == LV_EVENT_CLICKED) {
+        ui_Ui2Panel2Status = true;
+        ui_Ui2Panel4Status = true;
         _ui_state_modify(ui_Ui2Panel2Img, LV_STATE_CHECKED, _UI_MODIFY_STATE_ADD);
 #if CONFIG_86BOX_SMART_PANEL_VERSION_CN
         _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "开");
@@ -278,29 +299,48 @@ void ui_event_Ui2Panel4(lv_event_t * e)
     lv_obj_t * target = lv_event_get_target(e);
     if(event_code == LV_EVENT_CLICKED) {
         _ui_state_modify(ui_Ui2Panel4Img, LV_STATE_CHECKED, _UI_MODIFY_STATE_TOGGLE);
-    }
-    if(event_code == LV_EVENT_VALUE_CHANGED &&  lv_obj_has_state(target, LV_STATE_CHECKED)) {
+        if (ui_Ui2Panel4Status == true) {
+            ui_Ui2Panel4Status = false;
 #if CONFIG_86BOX_SMART_PANEL_VERSION_CN
-        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "开");
+            _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "关");
 #endif
 #if CONFIG_86BOX_SMART_PANEL_VERSION_EN
-        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "open");
+            _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "close");
 #endif
-    }
-    if(event_code == LV_EVENT_VALUE_CHANGED &&	!lv_obj_has_state(target, LV_STATE_CHECKED)) {
+        } else {
+            ui_Ui2Panel4Status = true;
 #if CONFIG_86BOX_SMART_PANEL_VERSION_CN
-        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "关");
+            _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "开");
 #endif
 #if CONFIG_86BOX_SMART_PANEL_VERSION_EN
-        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "close");
+            _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "open");
 #endif
+        }
     }
+//    if(event_code == LV_EVENT_VALUE_CHANGED &&  lv_obj_has_state(target, LV_STATE_CHECKED)) {
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_CN
+//        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "开");
+//#endif
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_EN
+//        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "open");
+//#endif
+//    }
+//    if(event_code == LV_EVENT_VALUE_CHANGED &&	!lv_obj_has_state(target, LV_STATE_CHECKED)) {
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_CN
+//        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "关");
+//#endif
+//#if CONFIG_86BOX_SMART_PANEL_VERSION_EN
+//        _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "close");
+//#endif
+//    }
 }
 void ui_event_Ui2Panel3(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
     lv_obj_t * target = lv_event_get_target(e);
     if(event_code == LV_EVENT_CLICKED) {
+        ui_Ui2Panel2Status = false;
+        ui_Ui2Panel4Status = false;
         _ui_state_modify(ui_Ui2Panel2Img, LV_STATE_CHECKED, _UI_MODIFY_STATE_REMOVE);
 #if CONFIG_86BOX_SMART_PANEL_VERSION_CN
         _ui_label_set_property(ui_Ui2Panel4Value, _UI_LABEL_PROPERTY_TEXT, "关");
