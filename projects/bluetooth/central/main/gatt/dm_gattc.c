@@ -75,8 +75,27 @@ enum
 
 static bk_gatt_if_t s_gattc_if;
 static beken_semaphore_t s_ble_sema = NULL;
-
+static beken_semaphore_t s_ble_data_sem = NULL;
+static beken_semaphore_t s_ble_connect_sem = NULL;
+static uint8_t s_dm_gattc_is_init;
 static uint8_t s_dm_gattc_local_addr_is_public = 0;
+static uint8_t s_is_connect_pending;
+static dm_ble_gattc_app_cb s_gattc_cb_list[2];
+
+static int32_t dm_ble_gattc_private_cb(bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk_ble_gattc_cb_param_t *param)
+{
+    int32_t ret;
+
+    for (int i = 0; i < sizeof(s_gattc_cb_list) / sizeof(s_gattc_cb_list[0]); ++i)
+    {
+        if (s_gattc_cb_list[i])
+        {
+            ret = s_gattc_cb_list[i](event, gattc_if, param);
+        }
+    }
+
+    return 0;
+}
 
 static int32_t dm_ble_gap_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t *param)
 {
@@ -99,6 +118,65 @@ static int32_t dm_ble_gap_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_param_t 
         }
     }
     break;
+
+    case BK_BLE_GAP_CONNECT_COMPLETE_EVT:
+    {
+        struct ble_connect_complete_param *evt = (typeof(evt))param;
+
+        gatt_logi("BK_BLE_GAP_CONNECT_COMPLETE_EVT %02x:%02x:%02x:%02x:%02x:%02x status 0x%x role %d hci_handle 0x%x",
+                  evt->remote_bda[5],
+                  evt->remote_bda[4],
+                  evt->remote_bda[3],
+                  evt->remote_bda[2],
+                  evt->remote_bda[1],
+                  evt->remote_bda[0],
+                  evt->status,
+                  evt->link_role,
+                  evt->hci_handle
+                 );
+
+        s_is_connect_pending = 0;
+    }
+    break;
+
+    case BK_BLE_GAP_CONNECT_CANCEL_EVT:
+    {
+        struct ble_connect_cancel_param  *pm = (typeof(pm))param;
+
+        if (pm->status)
+        {
+            gatt_loge("cancel connect err %d", pm->status);
+        }
+
+        s_is_connect_pending = 0;
+
+        if (s_ble_sema != NULL)
+        {
+            rtos_set_semaphore( &s_ble_sema );
+        }
+    }
+    break;
+
+    //    case BK_BLE_GAP_DISCONNECT_COMPLETE_EVT:
+    //    {
+    //        struct ble_disconnect_complete_param *evt = (typeof(evt))param;
+    //
+    //        gatt_logi("BK_BLE_GAP_DISCONNECT_COMPLETE_EVT %02x:%02x:%02x:%02x:%02x:%02x %d status 0x%x reason 0x%x hci_handle 0x%x",
+    //                  evt->remote_bda[5],
+    //                  evt->remote_bda[4],
+    //                  evt->remote_bda[3],
+    //                  evt->remote_bda[2],
+    //                  evt->remote_bda[1],
+    //                  evt->remote_bda[0],
+    //                  evt->remote_bda_type,
+    //                  evt->status,
+    //                  evt->reason,
+    //                  evt->hci_handle
+    //                 );
+    //
+    //        s_is_connect_pending = 0;
+    //    }
+    //    break;
 
     default:
         return DM_BLE_GAP_APP_CB_RET_NO_INTERESTING;
@@ -131,7 +209,17 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             rtos_set_semaphore( &s_ble_sema );
         }
     }
+    break;
 
+    case BK_GATTC_UNREG_EVT:
+    {
+        gatt_logi("BK_GATTC_UNREG_EVT");
+
+        if (s_ble_sema != NULL)
+        {
+            rtos_set_semaphore( &s_ble_sema );
+        }
+    }
     break;
 
     case BK_GATTC_DIS_SRVC_CMPL_EVT:
@@ -184,7 +272,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     case BK_GATTC_DIS_RES_SERVICE_EVT:
     {
         struct gattc_dis_res_service_evt_param *param = (typeof(param))comm_param;
-        uint16_t short_uuid = 0;
+        uint32_t short_uuid = 0;
 
         gatt_logi("BK_GATTC_DIS_RES_SERVICE_EVT count %d", param->count);
 
@@ -205,7 +293,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             break;
             }
 
-            gatt_logi("0x%04x %d~%d", short_uuid, param->array[i].start_handle, param->array[i].end_handle);
+            gatt_logi("0x%04x uuid len %d %d~%d", short_uuid, param->array[i].srvc_id.uuid.len, param->array[i].start_handle, param->array[i].end_handle);
 
             common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
 
@@ -244,7 +332,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     case BK_GATTC_DIS_RES_CHAR_EVT:
     {
         struct gattc_dis_res_char_evt_param *param = (typeof(param))comm_param;
-        uint16_t short_uuid = 0;
+        uint32_t short_uuid = 0;
 
         gatt_logi("BK_GATTC_DIS_RES_CHAR_EVT count %d", param->count);
 
@@ -265,7 +353,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             break;
             }
 
-            gatt_logi("0x%04x %d~%d char_value_handle %d", short_uuid, param->array[i].start_handle, param->array[i].end_handle, param->array[i].char_value_handle);
+            gatt_logi("0x%04x uuid len %d %d~%d char_value_handle %d", short_uuid, param->array[i].uuid.uuid.len, param->array[i].start_handle, param->array[i].end_handle, param->array[i].char_value_handle);
 
             common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
 
@@ -316,7 +404,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     case BK_GATTC_DIS_RES_CHAR_DESC_EVT:
     {
         struct gattc_dis_res_char_desc_evt_param *param = (typeof(param))comm_param;
-        uint16_t short_uuid = 0;
+        uint32_t short_uuid = 0;
 
         gatt_logi("BK_GATTC_DIS_RES_CHAR_DESC_EVT count %d", param->count);
 
@@ -341,7 +429,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 break;
             }
 
-            gatt_logi("0x%04x char_handle %d desc_handle %d", short_uuid, param->array[i].char_handle, param->array[i].desc_handle);
+            gatt_logi("0x%04x uuid len %d char_handle %d desc_handle %d", short_uuid, param->array[i].uuid.uuid.len, param->array[i].char_handle, param->array[i].desc_handle);
 
             common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
 
@@ -394,7 +482,31 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 app_env_tmp->job_status = GATTC_STATUS_READ_CHAR_DESC;
             }
         }
+
 #endif
+
+        if (s_ble_data_sem)
+        {
+            app_env_tmp->write_read_status = param->status;
+
+            if (!param->status)
+            {
+                app_env_tmp->read_buff = os_malloc(param->value_len);
+
+                if (!app_env_tmp->read_buff)
+                {
+                    gatt_loge("alloc read buffer err");
+                    param->status = BK_GATT_INSUF_RESOURCE;
+                }
+                else
+                {
+                    app_env_tmp->read_buff_len = param->value_len;
+                    os_memcpy(app_env_tmp->read_buff, param->value, param->value_len);
+                }
+            }
+
+            rtos_set_semaphore(&s_ble_data_sem);
+        }
     }
     break;
 
@@ -441,6 +553,28 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             }
         }
 #endif
+
+        if (s_ble_data_sem)
+        {
+            app_env_tmp->write_read_status = param->status;
+
+            if (!param->status)
+            {
+                app_env_tmp->read_buff = os_malloc(param->value_len);
+
+                if (!app_env_tmp->read_buff)
+                {
+                    gatt_loge("alloc read buffer err");
+                    param->status = BK_GATT_INSUF_RESOURCE;
+                }
+                else
+                {
+                    os_memcpy(app_env_tmp->read_buff, param->value, param->value_len);
+                }
+            }
+
+            rtos_set_semaphore(&s_ble_data_sem);
+        }
     }
     break;
 
@@ -519,6 +653,22 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             //we need create bond
             gatt_logw("status insufficient authentication, need bond !!!");
         }
+
+        common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
+
+        if (!common_env_tmp || !common_env_tmp->data)
+        {
+            gatt_loge("conn_id %d not found %d %p", param->conn_id, common_env_tmp->data);
+            break;
+        }
+
+        app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
+        if (s_ble_data_sem)
+        {
+            app_env_tmp->write_read_status = param->status;
+            rtos_set_semaphore(&s_ble_data_sem);
+        }
     }
     break;
 
@@ -570,6 +720,12 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             }
         }
 #endif
+
+        if (s_ble_data_sem)
+        {
+            app_env_tmp->write_read_status = param->status;
+            rtos_set_semaphore(&s_ble_data_sem);
+        }
     }
     break;
 
@@ -615,6 +771,11 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             }
         }
 #endif
+
+        if (s_ble_data_sem)
+        {
+            rtos_set_semaphore(&s_ble_data_sem);
+        }
     }
     break;
 
@@ -721,7 +882,27 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     {
         struct gattc_cfg_mtu_evt_param *param = (typeof(param))comm_param;
 
-        gatt_logi("BK_GATTC_CFG_MTU_EVT status %d %d %d", param->status, param->conn_id, param->mtu);
+        gatt_logi("BK_GATTC_CFG_MTU_EVT status 0x%x %d %d", param->status, param->conn_id, param->mtu);
+
+        common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
+
+        if (!common_env_tmp || !common_env_tmp->data)
+        {
+            gatt_loge("conn_id %d not found %d %p", param->conn_id, common_env_tmp->data);
+        }
+        else
+        {
+            app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
+            if (!app_env_tmp)
+            {
+                gatt_loge("app_env_tmp not fond");
+            }
+            else
+            {
+                app_env_tmp->client_mtu = param->mtu;
+            }
+        }
 
         if (0 != bk_ble_gattc_discover(s_gattc_if, param->conn_id, auth_req))
         {
@@ -737,7 +918,6 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
         ble_err_t ret = bk_ble_get_hci_handle_from_gatt_conn_id(param->conn_id, &hci_handle);
 
         gatt_logi("BK_GATTC_CONNECT_EVT role %d %02X:%02X:%02X:%02X:%02X:%02X conn_id %d hci_handle 0x%x",
-                  param->conn_id,
                   param->link_role,
                   param->remote_bda[5],
                   param->remote_bda[4],
@@ -796,6 +976,11 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
                 gatt_loge("bk_ble_gattc_discover err");
             }
         }
+
+        if (s_ble_connect_sem)
+        {
+            rtos_set_semaphore(&s_ble_connect_sem);
+        }
     }
     break;
 
@@ -821,7 +1006,20 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
             break;
         }
 
+        app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
+        if (app_env_tmp->read_buff)
+        {
+            os_free(app_env_tmp->read_buff);
+            app_env_tmp->read_buff = NULL;
+        }
+
         dm_ble_del_app_env_by_addr(param->remote_bda);
+
+        if (s_ble_connect_sem)
+        {
+            rtos_set_semaphore(&s_ble_connect_sem);
+        }
     }
     break;
 
@@ -832,7 +1030,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     return ret;
 }
 
-int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type)
+int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type, uint32_t s_timeout)
 {
     dm_gatt_app_env_t *common_env_tmp = NULL;
     int32_t err = 0;
@@ -850,6 +1048,12 @@ int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type)
     {
         gatt_loge("gattc not init");
 
+        return -1;
+    }
+
+    if (s_is_connect_pending)
+    {
+        gatt_loge("connect pending !!!");
         return -1;
     }
 
@@ -886,8 +1090,16 @@ int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type)
         os_memcpy(param.peer_addr, addr, sizeof(param.peer_addr));
         param.peer_addr_type = addr_type;
     }
+    else if (!dm_gatt_find_id_info_by_nominal_info(addr, addr_type, peer_id_addr, &peer_id_addr_type))
+    {
+        gatt_logi("peer use rpa, so we need use rpa to connect");
+        param.local_addr_type = (s_dm_gattc_local_addr_is_public ? BLE_ADDR_TYPE_RPA_PUBLIC : BLE_ADDR_TYPE_RPA_RANDOM);
+        os_memcpy(param.peer_addr, addr, sizeof(param.peer_addr));
+        param.peer_addr_type = addr_type;
+    }
     else
     {
+        gatt_logi("don't use rpa");
         param.local_addr_type = (s_dm_gattc_local_addr_is_public ? BLE_ADDR_TYPE_PUBLIC : BLE_ADDR_TYPE_RANDOM);
         os_memcpy(param.peer_addr, addr, sizeof(param.peer_addr));
         param.peer_addr_type = addr_type;
@@ -896,7 +1108,7 @@ int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type)
     param.conn_interval_min = 0x20;
     param.conn_interval_max = 0x20;
     param.conn_latency = 0;
-    param.supervision_timeout = 500;
+    param.supervision_timeout = s_timeout;
     param.min_ce = 0;
     param.max_ce = 0;
 
@@ -910,6 +1122,7 @@ int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type)
     {
         os_memcpy(common_env_tmp->addr, addr, sizeof(common_env_tmp->addr));
         common_env_tmp->status = GAP_CONNECT_STATUS_CONNECTING;
+        s_is_connect_pending = 1;
     }
 
     return err;
@@ -949,6 +1162,18 @@ int32_t dm_gattc_disconnect(uint8_t *addr)
         return -1;
     }
 
+    if (!s_ble_connect_sem)
+    {
+        err = rtos_init_semaphore(&s_ble_connect_sem, 1);
+
+        if (err)
+        {
+            gatt_loge("init sem err %d", err);
+            err = -1;
+            goto end;
+        }
+    }
+
     bk_bd_addr_t peer_addr;
     os_memcpy(peer_addr, addr, sizeof(peer_addr));
 
@@ -961,6 +1186,27 @@ int32_t dm_gattc_disconnect(uint8_t *addr)
     else
     {
         common_env_tmp->status = GAP_CONNECT_STATUS_DISCONNECTING;
+    }
+
+    err = rtos_get_semaphore(&s_ble_connect_sem, SYNC_CMD_TIMEOUT_MS);
+
+    if (err)
+    {
+        gatt_loge("rtos_get_semaphore disconnect err %d", err);
+        err = -1;
+        goto end;
+    }
+
+end:;
+
+    if (s_ble_connect_sem)
+    {
+        if (rtos_deinit_semaphore(&s_ble_connect_sem))
+        {
+            gatt_loge("rtos_deinit_semaphore s_ble_data_sem err %d", err);
+        }
+
+        s_ble_connect_sem = NULL;
     }
 
     return err;
@@ -977,11 +1223,49 @@ int32_t dm_gattc_connect_cancel(void)
         return -1;
     }
 
+    if (!s_is_connect_pending)
+    {
+        gatt_loge("no need cancel");
+        return 0;
+    }
+
+    if (!s_ble_connect_sem)
+    {
+        err = rtos_init_semaphore(&s_ble_connect_sem, 1);
+
+        if (err)
+        {
+            gatt_loge("init sem err %d", err);
+            err = -1;
+            goto end;
+        }
+    }
+
     err = bk_ble_gap_cancel_connect();
 
     if (err)
     {
         gatt_loge("cancel fail %d", err);
+    }
+
+    err = rtos_get_semaphore(&s_ble_connect_sem, SYNC_CMD_TIMEOUT_MS);
+
+    if (err )
+    {
+        gatt_loge("rtos_get_semaphore cancel connect err %d", err);
+        return -1;
+    }
+
+end:;
+
+    if (s_ble_connect_sem)
+    {
+        if (rtos_deinit_semaphore(&s_ble_connect_sem))
+        {
+            gatt_loge("rtos_deinit_semaphore s_ble_data_sem err %d", err);
+        }
+
+        s_ble_connect_sem = NULL;
     }
 
     return err;
@@ -1022,6 +1306,193 @@ int32_t dm_gattc_write(uint16_t conn_id, uint16_t attr_handle, uint8_t *data, ui
     return 0;
 }
 
+int32_t dm_gattc_write_ext(uint16_t gatt_conn_id, uint16_t attr_handle, uint8_t *data, uint32_t len, uint8_t write_req)
+{
+    int32_t ret = 0;
+    dm_gattc_app_env_t *app_env_tmp = NULL;
+    dm_gatt_app_env_t *common_env_tmp = NULL;
+
+    if (!s_gattc_if)
+    {
+        gatt_loge("gattc not init");
+
+        return -1;
+    }
+
+    common_env_tmp = dm_ble_find_app_env_by_conn_id(gatt_conn_id);
+
+    if (!common_env_tmp || !common_env_tmp->data)
+    {
+        gatt_loge("conn_id %d not found %d %p", gatt_conn_id, common_env_tmp->data);
+        ret = -1;
+        goto end;
+    }
+
+    app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
+    if (!s_ble_data_sem)
+    {
+        ret = rtos_init_semaphore(&s_ble_data_sem, 1);
+
+        if (ret)
+        {
+            gatt_loge("init sem err %d", ret);
+            ret = -1;
+            goto end;
+        }
+    }
+
+    ret = bk_ble_gattc_write_char(s_gattc_if, gatt_conn_id, attr_handle, len, data, write_req ? BK_GATT_WRITE_TYPE_RSP : BK_GATT_WRITE_TYPE_NO_RSP, BK_GATT_AUTH_REQ_NONE);
+
+    if (ret)
+    {
+        gatt_loge("write err %d", ret);
+        ret = -1;
+        goto end;
+    }
+
+    ret = rtos_get_semaphore(&s_ble_data_sem, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret)
+    {
+        gatt_loge("wait write err %d", ret);
+        ret = -1;
+        goto end;
+    }
+
+end:;
+
+    ret = app_env_tmp->write_read_status;
+    app_env_tmp->write_read_status = 0;
+
+    if (s_ble_data_sem)
+    {
+        if (rtos_deinit_semaphore(&s_ble_data_sem))
+        {
+            gatt_loge("rtos_deinit_semaphore s_ble_data_sem err %d", ret);
+        }
+
+        s_ble_data_sem = NULL;
+    }
+
+    return ret;
+}
+
+int32_t dm_gattc_read(uint16_t gatt_conn_id, uint16_t attr_handle, uint8_t *data, uint32_t len)
+{
+    int32_t ret = 0;
+    dm_gattc_app_env_t *app_env_tmp = NULL;
+    dm_gatt_app_env_t *common_env_tmp = NULL;
+
+    if (!s_gattc_if)
+    {
+        gatt_loge("gattc not init");
+
+        return -1;
+    }
+
+    common_env_tmp = dm_ble_find_app_env_by_conn_id(gatt_conn_id);
+
+    if (!common_env_tmp || !common_env_tmp->data)
+    {
+        gatt_loge("conn_id %d not found %d %p", gatt_conn_id, common_env_tmp->data);
+        ret = -1;
+        goto end;
+    }
+
+    app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
+    if (!s_ble_data_sem)
+    {
+        ret = rtos_init_semaphore(&s_ble_data_sem, 1);
+
+        if (ret)
+        {
+            gatt_loge("init sem err %d", ret);
+            ret = -1;
+            goto end;
+        }
+    }
+
+    ret = bk_ble_gattc_read_char(s_gattc_if, gatt_conn_id, attr_handle, BK_GATT_AUTH_REQ_NONE);
+
+    if (ret)
+    {
+        gatt_loge("read err %d", ret);
+        ret = -1;
+        goto end;
+    }
+
+    ret = rtos_get_semaphore(&s_ble_data_sem, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret)
+    {
+        gatt_loge("wait read err %d", ret);
+        ret = -1;
+        goto end;
+    }
+
+end:;
+
+    if (!app_env_tmp->write_read_status)
+    {
+        os_memcpy(data, app_env_tmp->read_buff, MIN_VALUE(len, app_env_tmp->read_buff_len));
+
+        if (MIN_VALUE(len, app_env_tmp->read_buff_len) != app_env_tmp->read_buff_len)
+        {
+            gatt_logw("read len %d api len %d", app_env_tmp->read_buff_len, len);
+        }
+    }
+    else
+    {
+        ret = app_env_tmp->write_read_status;
+    }
+
+    app_env_tmp->write_read_status = 0;
+
+    if (app_env_tmp->read_buff)
+    {
+        os_free(app_env_tmp->read_buff);
+        app_env_tmp->read_buff_len = 0;
+        app_env_tmp->read_buff = NULL;
+        app_env_tmp->write_read_status = 0;
+    }
+
+    if (s_ble_data_sem)
+    {
+        if (rtos_deinit_semaphore(&s_ble_data_sem))
+        {
+            gatt_loge("rtos_deinit_semaphore s_ble_data_sem err %d", ret);
+        }
+
+        s_ble_data_sem = NULL;
+    }
+
+    return ret;
+}
+
+int dm_gattc_add_gattc_callback(void *param)
+{
+    dm_ble_gattc_app_cb cb = (typeof(cb))param;
+
+    if (!cb)
+    {
+        return -1;
+    }
+
+    for (int i = 0; i < sizeof(s_gattc_cb_list) / sizeof(s_gattc_cb_list[0]); ++i)
+    {
+        if (!s_gattc_cb_list[i])
+        {
+            s_gattc_cb_list[i] = cb;
+            return 0;
+        }
+    }
+
+    gatt_loge("full !!!");
+    return -1;
+}
+
 int dm_gattc_main(cli_gatt_param_t *param)
 {
     ble_err_t ret = 0;
@@ -1043,7 +1514,9 @@ int dm_gattc_main(cli_gatt_param_t *param)
     }
 
     dm_gatt_add_gap_callback(dm_ble_gap_cb);
-    bk_ble_gattc_register_callback(bk_gattc_cb);
+
+    bk_ble_gattc_register_callback(dm_ble_gattc_private_cb);
+    dm_gattc_add_gattc_callback(bk_gattc_cb);
 
     bk_bd_addr_t current_addr = {0}, identity_addr = {0};
     char dev_name[64] = {0};
@@ -1078,6 +1551,7 @@ int dm_gattc_main(cli_gatt_param_t *param)
         return -1;
     }
 
+#if AUTO_GATTC_TEST
     uint8_t need_set_random_addr = 0;
 
     if (g_dm_gap_use_rpa && dm_ble_gap_get_rpa(current_addr) == 0)
@@ -1117,8 +1591,63 @@ int dm_gattc_main(cli_gatt_param_t *param)
         }
     }
 
+#endif
+    s_dm_gattc_is_init = 1;
     return 0;
 
 error:;
     return -1;
+}
+
+int dm_gattc_deinit()
+{
+    int32_t ret = 0;
+
+    if (!s_dm_gattc_is_init)
+    {
+        gatt_loge("already deinit");
+        return -1;
+    }
+
+    ret = bk_ble_gattc_app_unregister(s_gattc_if);
+
+    if (ret)
+    {
+        gatt_loge("unreg err %d", ret);
+    }
+
+    ret = rtos_get_semaphore(&s_ble_sema, SYNC_CMD_TIMEOUT_MS);
+
+    if (ret != kNoErr)
+    {
+        gatt_loge("rtos_get_semaphore unreg err %d", ret);
+    }
+
+    if (s_ble_sema)
+    {
+        rtos_deinit_semaphore(&s_ble_sema);
+        s_ble_sema = NULL;
+    }
+
+    if (s_ble_data_sem)
+    {
+        rtos_deinit_semaphore(&s_ble_data_sem);
+        s_ble_data_sem = NULL;
+    }
+
+    if (s_ble_connect_sem)
+    {
+        rtos_deinit_semaphore(&s_ble_connect_sem);
+        s_ble_connect_sem = NULL;
+    }
+
+    bk_ble_gattc_register_callback(NULL);
+
+    s_gattc_if = 0;
+    s_dm_gattc_local_addr_is_public = 0;
+    s_is_connect_pending = 0;
+    os_memset(s_gattc_cb_list, 0, sizeof(s_gattc_cb_list));
+
+    s_dm_gattc_is_init = 0;
+    return 0;
 }

@@ -30,11 +30,19 @@ typedef struct
 {
     //for server
     uint8_t notify_status; //0 disable; 1 notify; 2 indicate
+    uint16_t server_mtu;
+    uint16_t send_notify_status;
 
     //for client
     uint8_t job_status; //see GATTC_STATUS_IDLE
+    uint16_t client_mtu;
     uint8_t noti_indica_switch;
     uint8_t noti_indicate_recv_count;
+    uint16_t write_read_status;
+
+    uint8_t *read_buff;
+    uint32_t read_buff_len;
+    uint32_t read_offset;
 
     uint16_t peer_interest_service_start_handle; //interest
     uint16_t peer_interest_service_end_handle;
@@ -43,12 +51,14 @@ typedef struct
 
     uint16_t peer_gap_service_start_handle;
     uint16_t peer_gap_service_end_handle;
-
 } dm_gatt_demo_app_env_t;
 
+int32_t dm_ble_app_env_init();
+int32_t dm_ble_app_env_deinit();
 dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len);
 dm_gatt_app_env_t *dm_ble_find_app_env_by_addr(uint8_t *addr);
 dm_gatt_app_env_t *dm_ble_find_app_env_by_conn_id(uint16_t conn_id);
 uint8_t dm_ble_del_app_env_by_addr(uint8_t *addr);
+uint8_t dm_ble_free_all_app_env();
 dm_gatt_app_env_t *dm_ble_alloc_addition_data_by_addr(uint8_t *addr, uint32_t data_len);
 uint8_t dm_ble_app_env_foreach( int32_t (*func) (dm_gatt_app_env_t *env, void *arg), void *arg );

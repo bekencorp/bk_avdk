@@ -20,6 +20,23 @@
 #include "hogpd_demo.h"
 #include <stdint.h>
 
+enum
+{
+    HOGPD_DEBUG_LEVEL_ERROR,
+    HOGPD_DEBUG_LEVEL_WARNING,
+    HOGPD_DEBUG_LEVEL_INFO,
+    HOGPD_DEBUG_LEVEL_DEBUG,
+    HOGPD_DEBUG_LEVEL_VERBOSE,
+};
+
+#define HOGPD_DEBUG_LEVEL HOGPD_DEBUG_LEVEL_INFO
+
+#define hogpd_loge(format, ...) do{if(HOGPD_DEBUG_LEVEL_INFO >= HOGPD_DEBUG_LEVEL_ERROR)   BK_LOGE("app_hogpd", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
+#define hogpd_logw(format, ...) do{if(HOGPD_DEBUG_LEVEL_INFO >= HOGPD_DEBUG_LEVEL_WARNING) BK_LOGW("app_hogpd", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
+#define hogpd_logi(format, ...) do{if(HOGPD_DEBUG_LEVEL_INFO >= HOGPD_DEBUG_LEVEL_INFO)    BK_LOGI("app_hogpd", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
+#define hogpd_logd(format, ...) do{if(HOGPD_DEBUG_LEVEL_INFO >= HOGPD_DEBUG_LEVEL_DEBUG)   BK_LOGI("app_hogpd", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
+#define hogpd_logv(format, ...) do{if(HOGPD_DEBUG_LEVEL_INFO >= HOGPD_DEBUG_LEVEL_VERBOSE) BK_LOGI("app_hogpd", "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
+
 #if HOGPD_DEMO_ENABLE
 
 
@@ -32,6 +49,7 @@ typedef struct
 
 static uint8_t s_hogpd_is_init;
 static uint8_t s_protpcol_mode = 1;
+static uint8_t s_db_init;
 
 static const uint8_t s_hid_rprtmap[] =
 {
@@ -426,13 +444,15 @@ static int32_t hogpd_demo_reg_db(void)
     int32_t ret = dm_gatts_reg_db((bk_gatts_attr_db_t *)s_gatts_attr_db_service_hidd,
                                   sizeof(s_gatts_attr_db_service_hidd) / sizeof(s_gatts_attr_db_service_hidd[0]),
                                   s_hogpd_attr_handle_list,
-                                  hogpd_demo_gatts_cb);
+                                  hogpd_demo_gatts_cb, s_db_init ? 0 : 1);
 
     if (ret)
     {
         hogpd_loge("reg db err");
         return ret;
     }
+
+    s_db_init = 1;
 
     return ret;
 }
@@ -466,3 +486,33 @@ int32_t hogpd_demo_init(void)
     return 0;
 }
 
+int32_t hogpd_demo_deinit(uint8_t deinit_bluetooth_future)
+{
+#if HOGPD_DEMO_ENABLE
+
+    if (!s_hogpd_is_init)
+    {
+        hogpd_loge("already deinit");
+        return -1;
+    }
+
+    hogpd_logw("sdk can't del db service now !!!");
+
+    dm_gatts_unreg_db((bk_gatts_attr_db_t *)s_gatts_attr_db_service_hidd);
+
+    if (deinit_bluetooth_future)
+    {
+        s_db_init = 0;
+    }
+
+    s_hogpd_is_init = 0;
+#endif
+    return 0;
+}
+
+int32_t hogpd_demo_deinit_because_bluetooth_deinit_future()
+{
+    s_db_init = 0;
+
+    return 0;
+}

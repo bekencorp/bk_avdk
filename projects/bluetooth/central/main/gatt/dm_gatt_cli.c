@@ -23,6 +23,7 @@ enum
     LONG_OPT_ENUM_RSP_KEY_DISTR,
     LONG_OPT_ENUM_PUBLIC_ADDR,
     LONG_OPT_ENUM_IOCAP,
+    LONG_OPT_ENUM_LOCAL_REMOTE_KEY_DISTR,
 } LONG_OPT_ENUM;
 
 typedef struct
@@ -43,6 +44,7 @@ static const my_option_t s_gatt_cli_options[] =
     {NULL,    .l_opt = {"ikd",    required_argument,  NULL, LONG_OPT_ENUM_INIT_KEY_DISTR},  "0xXX",     "set initiator key distr"},
     {NULL,    .l_opt = {"rkd",    required_argument,  NULL, LONG_OPT_ENUM_RSP_KEY_DISTR},   "0xXX",     "set responder key distr"},
     {"p:",    .l_opt = {"public-addr",     required_argument,  NULL, LONG_OPT_ENUM_PUBLIC_ADDR},     "<0|1>",    "use public addr."},
+    {NULL,    .l_opt = {"lrkd",     required_argument,  NULL, LONG_OPT_ENUM_LOCAL_REMOTE_KEY_DISTR},     "<0xXX>",    "set local/remote key distr"},
 };
 
 static cli_gatt_param_t s_cli_gatt_param;
@@ -197,6 +199,19 @@ static int32_t cmd_opt_parse(int argc, char **argv)
 
             s_cli_gatt_param.iocap = (typeof(s_cli_gatt_param.iocap))tmp_hex;
             s_cli_gatt_param.p_iocap = &s_cli_gatt_param.iocap;
+            break;
+
+        case LONG_OPT_ENUM_LOCAL_REMOTE_KEY_DISTR:
+            ret = sscanf(optarg, "%x", &tmp_hex);
+
+            if (ret != 1)
+            {
+                CLI_LOGE("invalid param\n");
+                ret = -1;
+                goto __error;
+            }
+
+            s_cli_gatt_param.lrkd = (typeof(s_cli_gatt_param.lrkd))tmp_hex;
             break;
 
         default:
@@ -456,7 +471,7 @@ static void cmd_ble_gatt_demo(char *pcWriteBuffer, int xWriteBufferLen, int argc
                 }
             }
 
-            ret = dm_gattc_connect(mac_final, addr_type);
+            ret = dm_gattc_connect(mac_final, addr_type, 500);
         }
         else if (os_strcmp(argv[2], "disconnect") == 0 && argc >= 4)
         {

@@ -35,6 +35,7 @@ static uint16_t s_prop_cli_config;
 static uint8_t s_ssid[64];
 static uint8_t s_password[64];
 static uint8_t s_wifi_boarding_is_init;
+static uint8_t s_db_init;
 
 enum
 {
@@ -420,7 +421,7 @@ static int32_t wifi_boarding_demo_reg_db(void)
     int32_t ret = dm_gatts_reg_db((bk_gatts_attr_db_t *)s_gatts_attr_db_service_boarding,
                                   sizeof(s_gatts_attr_db_service_boarding) / sizeof(s_gatts_attr_db_service_boarding[0]),
                                   s_boarding_attr_handle_list,
-                                  wifi_boarding_gatts_cb);
+                                  wifi_boarding_gatts_cb, s_db_init ? 0 : 1);
 
     if (ret)
     {
@@ -463,5 +464,35 @@ int32_t wifi_boarding_demo_main(ble_boarding_info_t *info)
 #else
     wboard_loge("wifi boarding demo not enable");
 #endif
+    return 0;
+}
+
+int32_t wifi_boarding_demo_deinit(uint8_t deinit_bluetooth_future)
+{
+#if WIFI_BOARDING_DEMO_ENABLE
+
+    if (!s_wifi_boarding_is_init)
+    {
+        wboard_loge("already deinit");
+        return -1;
+    }
+
+    wboard_logw("sdk can't del db service now !!!");
+    dm_gatts_unreg_db((bk_gatts_attr_db_t *)s_gatts_attr_db_service_boarding);
+
+    if (deinit_bluetooth_future)
+    {
+        s_db_init = 0;
+    }
+
+    s_wifi_boarding_is_init = 0;
+#endif
+    return 0;
+}
+
+int32_t wifi_boarding_demo_deinit_because_bluetooth_deinit_future()
+{
+    s_db_init = 0;
+
     return 0;
 }

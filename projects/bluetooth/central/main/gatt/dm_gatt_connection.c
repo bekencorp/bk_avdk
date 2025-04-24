@@ -16,6 +16,20 @@
 
 static dm_gatt_app_env_t s_dm_gatt_env_array[GATT_MAX_CONNECTION_COUNT];
 
+int32_t dm_ble_app_env_init()
+{
+    os_memset(s_dm_gatt_env_array, 0, sizeof(s_dm_gatt_env_array));
+
+    return 0;
+}
+
+int32_t dm_ble_app_env_deinit()
+{
+    dm_ble_free_all_app_env();
+    os_memset(s_dm_gatt_env_array, 0, sizeof(s_dm_gatt_env_array));
+
+    return 0;
+}
 dm_gatt_app_env_t *dm_ble_find_app_env_by_addr(uint8_t *addr)
 {
     if (!dm_gap_is_addr_valid(addr))
@@ -54,6 +68,14 @@ uint8_t dm_ble_del_app_env_by_addr(uint8_t *addr)
         return 1;
     }
 
+    gatt_logi("%02x:%02x:%02x:%02x:%02x:%02x",
+                    addr[5],
+                    addr[4],
+                    addr[3],
+                    addr[2],
+                    addr[1],
+                    addr[0]);
+
     for (int i = 0; i < sizeof(s_dm_gatt_env_array) / sizeof(s_dm_gatt_env_array[0]); ++i)
     {
         if (!os_memcmp(s_dm_gatt_env_array[i].addr, addr, BK_BD_ADDR_LEN))
@@ -76,6 +98,25 @@ uint8_t dm_ble_del_app_env_by_addr(uint8_t *addr)
     return 1;
 }
 
+uint8_t dm_ble_free_all_app_env()
+{
+    for (int i = 0; i < sizeof(s_dm_gatt_env_array) / sizeof(s_dm_gatt_env_array[0]); ++i)
+    {
+        if (s_dm_gatt_env_array[i].data)
+        {
+            os_free(s_dm_gatt_env_array[i].data);
+        }
+
+        if (s_dm_gatt_env_array[i].addition_data)
+        {
+            os_free(s_dm_gatt_env_array[i].addition_data);
+        }
+
+        os_memset(&s_dm_gatt_env_array[i], 0, sizeof(s_dm_gatt_env_array[i]));
+    }
+
+    return 0;
+}
 
 dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len)
 {

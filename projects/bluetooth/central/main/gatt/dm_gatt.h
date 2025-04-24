@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dm_gatt_connection.h"
+#include "components/bluetooth/bk_dm_gap_ble_types.h"
 #include <stdint.h>
 
 #define BLE_USE_STORAGE 1
@@ -52,7 +53,9 @@ enum
                 type rkd;           \
                 type *p_rkd;        \
                 type pa;            \
-                type *p_pa;
+                type *p_pa;         \
+                type lrkd;          \
+                type *p_lrkd;
 
 typedef struct
 {
@@ -61,6 +64,7 @@ typedef struct
 
 
 int dm_gatt_main(cli_gatt_param_t *param);
+int dm_gatt_deinit();
 int dm_gatt_add_gap_callback(void * cb);
 int32_t dm_gatt_get_authen_status(uint8_t *nominal_addr, uint8_t *nominal_addr_type, uint8_t *identity_addr, uint8_t *identity_addr_type);
 int32_t dm_gatt_find_id_info_by_nominal_info(uint8_t *nominal_addr, uint8_t nominal_addr_type, uint8_t *identity_addr, uint8_t *identity_addr_type);
@@ -69,12 +73,18 @@ int dm_gatt_set_security_method(uint8_t iocap, uint8_t auth_req, uint8_t key_dis
 bool dm_gatt_is_linkkey_distr_from_ltk(void);
 int dm_ble_gap_create_bond(uint8_t *addr);
 int dm_ble_gap_remove_bond(uint8_t *addr);
+uint32_t dm_ble_gap_get_bonded_count(void);
 int32_t dm_ble_gap_clean_bond(void);
 int32_t dm_ble_gap_show_bond_list(void);
+bk_ble_bond_dev_t* dm_ble_gap_get_bond_info_by_addr(uint8_t *addr);
+uint8_t dm_ble_gap_bond_info_foreach(int32_t (*func) (bk_ble_bond_dev_t *info, void *arg), void *arg);
 int32_t dm_ble_gap_clean_local_key(void);
 int dm_ble_gap_update_param(uint8_t *addr, uint16_t interval, uint16_t tout);
 int32_t dm_ble_gap_get_rpa(uint8_t *rpa);
 void dm_ble_gap_get_identity_addr(uint8_t *addr);
 int16_t dm_ble_gap_get_current_conn_id(void);
+int dm_ble_gap_set_auto_accept_pair_req(uint8_t accpet);
+int32_t dm_gatt_disconnect(uint8_t *addr);
+int32_t dm_gatt_connect_cancel(void);
 
 extern uint8_t g_dm_gap_use_rpa;

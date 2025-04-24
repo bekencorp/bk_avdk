@@ -70,13 +70,19 @@
 
 
 typedef int32_t (* dm_ble_gatts_db_cb)(bk_gatts_cb_event_t event, bk_gatt_if_t gatts_if, bk_ble_gatts_cb_param_t *param);
+typedef int32_t (* dm_ble_gatts_app_cb)(bk_gatts_cb_event_t event, bk_gatt_if_t gatts_if, bk_ble_gatts_cb_param_t *comm_param);
 
 int32_t dm_gatts_is_init(void);
 int dm_gatts_main(cli_gatt_param_t *param);
+int dm_gatts_deinit();
+int32_t dm_gatts_deinit_because_bluetooth_deinit_future();
 int32_t dm_gatts_disconnect(uint8_t *addr);
 int32_t dm_gatts_enable_adv(uint8_t enable);
 int32_t dm_gatts_enable_service(uint32_t index, uint8_t enable);
-int32_t dm_gatts_reg_db(bk_gatts_attr_db_t *list, uint32_t count, uint16_t *attr_handle_list, dm_ble_gatts_db_cb cb);
+int32_t dm_gatts_reg_db(bk_gatts_attr_db_t *list, uint32_t count, uint16_t *attr_handle_list, dm_ble_gatts_db_cb cb, uint8_t need_create_tab);
+int32_t dm_gatts_unreg_db(bk_gatts_attr_db_t *list);
 int32_t dm_gatts_get_buff_from_attr_handle(bk_gatts_attr_db_t *attr_list, uint16_t *attr_handle_list, uint32_t size, uint16_t attr_handle, uint32_t *output_index, uint8_t **output_buff, uint32_t *output_size);
 bk_gatt_if_t dm_gatts_get_current_if(void);
-
+int dm_gatts_add_gatts_callback(void *param);
+int32_t dm_gatts_send_service_change_indicate(uint16_t conn_id, uint8_t all_connected);
+int32_t dm_gatts_send_notify(uint16_t gatt_conn_id, uint16_t attr_handle, uint8_t *data, uint32_t len, uint8_t is_notify);
