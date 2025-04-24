@@ -25,6 +25,9 @@ static beken2_timer_t s_ble_ota_tmr;
 
 static void ble_ota_timer_hdl(void *param1, void *param2)
 {
+    if(s_ble_ota == NULL){
+        return ;
+    }
     OTA_FREE(s_ble_ota->magic_code);
     f_ota_fun_ptr->deinit(s_ble_ota);
     OTA_FREE(s_ota_data_ptr);
