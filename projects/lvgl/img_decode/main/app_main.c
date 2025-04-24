@@ -138,6 +138,8 @@ lv_img_dsc_t img_dsc1 = {0};
 static int media_ipc_lvgl_callback(uint8_t *data, uint32_t size, void *param)
 {
 #if (CONFIG_SYS_CPU1)
+    bk_err_t ret = BK_OK;
+
     lv_vnd_config_t lv_vnd_config = {0};
     lcd_open_t *lcd_open = (lcd_open_t *)data;
 
@@ -165,7 +167,15 @@ static int media_ipc_lvgl_callback(uint8_t *data, uint32_t size, void *param)
     drv_tp_open(ppi_to_pixel_x(lcd_open->device_ppi), ppi_to_pixel_y(lcd_open->device_ppi), TP_MIRROR_X_Y_COORD);
 #endif
 
-    lv_vendor_init(&lv_vnd_config);
+    ret = lv_vendor_init(&lv_vnd_config);
+    if (ret != BK_OK) {
+        os_printf("lv_vendor_init failed\r\n");
+#if (!CONFIG_LVGL_USE_PSRAM)
+        os_free(lv_vnd_config.draw_buf_2_1);
+        lv_vnd_config.draw_buf_2_1 = NULL;
+#endif
+        return ret;
+    }
 
     lv_vendor_disp_lock();
     lv_jpeg_img_load_with_sw_dec("/img/bg.jpg", &img_dsc1);
