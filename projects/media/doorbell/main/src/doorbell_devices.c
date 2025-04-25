@@ -458,7 +458,7 @@ int doorbell_camera_turn_off(void)
 		return EVT_STATUS_ALREADY;
 	}
 
-	if (db_device_info->pipeline_enable)
+	//if (db_device_info->pipeline_enable)
 	{
 		media_app_pipeline_h264_close();
 		LOGI("%s h264_pipeline close\n", __func__);
