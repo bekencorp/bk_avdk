@@ -782,7 +782,8 @@ int doorbell_audio_turn_on(audio_parameters_t *parameters)
 
 	return EVT_STATUS_OK;
 error:
-	bk_aud_intf_set_mode(AUD_INTF_WORK_MODE_NULL);
+	aud_work_mode = AUD_INTF_WORK_MODE_NULL;
+	bk_aud_intf_set_mode(aud_work_mode);
 	bk_aud_intf_drv_deinit();
 
 	return EVT_STATUS_ERROR;

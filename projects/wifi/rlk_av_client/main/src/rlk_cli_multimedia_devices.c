@@ -489,6 +489,8 @@ int mm_audio_turn_on(audio_parameters_t *parameters)
 
     return BK_OK;
 error:
+    aud_work_mode = AUD_INTF_WORK_MODE_NULL;
+    bk_aud_intf_set_mode(aud_work_mode);
     bk_aud_intf_drv_deinit();
 
     return BK_FAIL;
