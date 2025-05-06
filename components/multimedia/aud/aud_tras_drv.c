@@ -2867,7 +2867,7 @@ bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg)
 		LOGD("%s, %d, create audio transfer driver internal message queue complete \n", __func__, __LINE__);
 
 		//create audio transfer driver task
-		ret = rtos_create_thread(&aud_trs_drv_thread_hdl,
+		ret = rtos_create_sram_thread(&aud_trs_drv_thread_hdl,
 							 setup_cfg->setup.task_config.priority,
 							 "aud_tras_drv",
 							 (beken_thread_function_t)aud_tras_drv_main,

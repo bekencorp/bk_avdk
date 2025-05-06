@@ -289,7 +289,7 @@ bk_err_t media_ui_task_init(void)
 			goto error;
 		}
 
-		ret = rtos_create_thread(&media_ui_task,
+		ret = rtos_create_sram_thread(&media_ui_task,
 								BEKEN_DEFAULT_WORKER_PRIORITY,
 								"media_ui_task",
 								(beken_thread_function_t)media_ui_task_main,

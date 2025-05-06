@@ -872,7 +872,7 @@ bk_err_t media_major_mailbox_init(void)
 		goto exit;
 	}
 
-	ret = rtos_create_thread(&media_major_mailbox_th_hd,
+	ret = rtos_create_sram_thread(&media_major_mailbox_th_hd,
 							 4,
 							 "media_major_mailbox_thread",
 							 (beken_thread_function_t)media_major_mailbox_message_handle,

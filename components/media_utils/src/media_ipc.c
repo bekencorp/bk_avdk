@@ -679,7 +679,7 @@ int media_ipc_init(void)
 	mb_chnl_ctrl(MB_CHNL_MIPC_SYNC, MB_CHNL_SET_TX_CMPL_ISR, media_ipc_mailbox_tx_cmpl_isr);
 #endif
 
-	ret = rtos_create_thread(&media_ipc_info->thread,
+	ret = rtos_create_sram_thread(&media_ipc_info->thread,
 								4,
 								"ipc thread",
 								(beken_thread_function_t)media_ipc_thread_entry,
