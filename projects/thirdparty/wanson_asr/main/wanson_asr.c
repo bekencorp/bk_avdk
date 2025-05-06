@@ -1,13 +1,9 @@
 #include <common/bk_include.h>
 #include <modules/pm.h>
 #include <os/os.h>
-#include "FreeRTOS.h"
-#include "task.h"
-#include "audio_pipeline.h"
-#include "audio_mem.h"
-#include "raw_stream.h"
-#include "onboard_mic_stream.h"
-
+#include <os/mem.h>
+#include <os/str.h>
+#include "audio_record.h"
 #include "wanson_asr.h"
 #include "asr.h"
 
@@ -29,11 +25,9 @@
 		}\
 	} while(0)
 
-static audio_element_handle_t onboard_mic = NULL, raw_read = NULL;
-static audio_pipeline_handle_t record_pipeline = NULL;
-
 static beken_thread_t wanson_asr_task_hdl = NULL;
 static beken_queue_t wanson_asr_msg_que = NULL;
+static audio_record_t *audio_record = NULL;
 
 //#define ASR_BUFF_SIZE 8000  //>960*2
 
@@ -49,94 +43,6 @@ static char result3[13] = {0xE7,0x94,0xA8,0xE9,0xA4,0x90,0xE6,0xA8,0xA1,0xE5,0xB
 static char resulta[13] = {0xE7,0xA6,0xBB,0xE5,0xBC,0x80,0xE6,0xA8,0xA1,0xE5,0xBC,0x8F,0x00};//离开模式
 static char resultc[13] = {0xE5,0x9B,0x9E,0xE5,0xAE,0xB6,0xE6,0xA8,0xA1,0xE5,0xBC,0x8F,0x00};//回家模式
 
-
-static bk_err_t record_pipeline_open(void)
-{
-	BK_LOGI(TAG, "--------- step1: record pipeline init ----------\n");
-	audio_pipeline_cfg_t record_pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
-	record_pipeline_cfg.rb_size = 320;
-	record_pipeline = audio_pipeline_init(&record_pipeline_cfg);
-	TEST_CHECK_NULL(record_pipeline);
-
-	BK_LOGI(TAG, "--------- step2: init elements ----------\n");
-	onboard_mic_stream_cfg_t onboard_mic_cfg = ONBOARD_MIC_ADC_STREAM_CFG_DEFAULT();
-	onboard_mic_cfg.adc_cfg.samp_rate = 16000;
-	onboard_mic_cfg.task_stack = 1024;
-	onboard_mic = onboard_mic_stream_init(&onboard_mic_cfg);
-	TEST_CHECK_NULL(onboard_mic);
-
-	raw_stream_cfg_t raw_read_cfg = RAW_STREAM_CFG_DEFAULT();
-	raw_read_cfg.type = AUDIO_STREAM_READER;
-	raw_read_cfg.out_rb_size = RAW_READ_SIZE*2;
-	raw_read = raw_stream_init(&raw_read_cfg);
-	TEST_CHECK_NULL(raw_read);
-
-
-	BK_LOGI(TAG, "--------- step3: pipeline register ----------\n");
-	if (BK_OK != audio_pipeline_register(record_pipeline, onboard_mic, "onboard_mic")) {
-		BK_LOGE(TAG, "register element fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
-	if (BK_OK != audio_pipeline_register(record_pipeline, raw_read, "raw_read")) {
-		BK_LOGE(TAG, "register element fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
-
-	BK_LOGI(TAG, "--------- step4: pipeline link ----------\n");
-	/* pipeline record */
-	if (BK_OK != audio_pipeline_link(record_pipeline, (const char *[]) {"onboard_mic", "raw_read"}, 2)) {
-		BK_LOGE(TAG, "pipeline link fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
-
-	return BK_OK;
-}
-
-static bk_err_t record_pipeline_close(void)
-{
-	BK_LOGI(TAG, "%s \n", __func__);
-
-	BK_LOGI(TAG, "%s, terminate record pipeline \n", __func__);
-	if (BK_OK != audio_pipeline_terminate(record_pipeline)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
-	if (BK_OK != audio_pipeline_unregister(record_pipeline, onboard_mic)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
-
-	if (BK_OK != audio_pipeline_unregister(record_pipeline, raw_read)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
-
-	if (BK_OK != audio_pipeline_deinit(record_pipeline)) {
-		BK_LOGE(TAG, "pipeline terminate fail, %d \n", __LINE__);
-		return BK_FAIL;
-	} else {
-		record_pipeline = NULL;
-	}
-	if (BK_OK != audio_element_deinit(onboard_mic)) {
-		BK_LOGE(TAG, "element deinit fail, %d \n", __LINE__);
-		return BK_FAIL;
-	} else {
-		onboard_mic = NULL;
-	}
-	if (BK_OK != audio_element_deinit(raw_read)) {
-		BK_LOGE(TAG, "element deinit fail, %d \n", __LINE__);
-		return BK_FAIL;
-	} else {
-		raw_read = NULL;
-	}
-
-	return BK_OK;
-}
-
-static bk_err_t wanson_read_mic_data(char *buffer, uint32_t size)
-{
-	return raw_stream_read(raw_read, buffer, size);
-}
 
 static bk_err_t send_mic_data_send_msg(wanson_asr_op_t op, void *param)
 {
@@ -208,31 +114,28 @@ static void wanson_asr_task_main(beken_thread_arg_t param_data)
 
 		/* read mic data and send */
 		if (task_state == WANSON_ASR_START) {
-//			GPIO_UP(6);
-			read_size = wanson_read_mic_data((char *)aud_temp_data, RAW_READ_SIZE);
+			read_size = audio_record_read_data(audio_record, (char *)aud_temp_data, RAW_READ_SIZE);
 			if (read_size == RAW_READ_SIZE) {
-//				GPIO_UP(44);
 				rs = Wanson_ASR_Recog((short*)aud_temp_data, 480, &text, &score);
-//				GPIO_DOWN(44);
 				if (rs == 1) {
-					os_printf(" ASR Result: \n");	 //识别结果打印
+					os_printf(" ASR Result: \n");                       //识别结果打印
 					for (uint8_t n = 0; n >= 0; n++) {
 						os_printf("0x%02x \n", (uint8_t)text[n]);
 						if (text[n] == 0x00) {
 							break;
 						}
 					}
-					if (os_strcmp(text, result0) == 0) {	//识别出唤醒词 小蜂管家
+					if (os_strcmp(text, result0) == 0) {                //识别出唤醒词 小蜂管家
 						BK_LOGI(TAG, "%s \n", "xiao feng guan jia ");
-					} else if (os_strcmp(text, result1) == 0) {    //识别出唤醒词 阿尔米诺
+					} else if (os_strcmp(text, result1) == 0) {         //识别出唤醒词 阿尔米诺
 						BK_LOGI(TAG, "%s \n", "a er mi nuo ");
-					} else if (os_strcmp(text, result2) == 0) {    //识别出 会客模式
+					} else if (os_strcmp(text, result2) == 0) {         //识别出 会客模式
 						BK_LOGI(TAG, "%s \n", "hui ke mo shi ");
-					} else if (os_strcmp(text, result3) == 0) {  //识别出 用餐模式
+					} else if (os_strcmp(text, result3) == 0) {         //识别出 用餐模式
 						BK_LOGI(TAG, "%s \n", "yong can mo shi ");
-					} else if (os_strcmp(text, resulta) == 0) {  //识别出 离开模式
+					} else if (os_strcmp(text, resulta) == 0) {         //识别出 离开模式
 						BK_LOGI(TAG, "%s \n", "li kai mo shi ");
-					} else if (os_strcmp(text, resultc) == 0) {  //识别出 回家模式
+					} else if (os_strcmp(text, resultc) == 0) {         //识别出 回家模式
 						BK_LOGI(TAG, "%s \n", "hui jia mo shi ");
 					} else {
 						//BK_LOGI(TAG, " \n");
@@ -241,7 +144,6 @@ static void wanson_asr_task_main(beken_thread_arg_t param_data)
 			} else {
 				BK_LOGE(TAG, "wanson_read_mic_data fail, read_size: %d \n", read_size);
 			}
-//			GPIO_DOWN(6);
 		}
 
 	}
@@ -308,14 +210,22 @@ static bk_err_t send_mic_data_init(void)
 
 bk_err_t wanson_asr_init(void)
 {
-#if CONFIG_SOC_BK7236XX
 	bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_480M);
-#endif
+
+    audio_record_cfg_t config = DEFAULT_AUDIO_RECORD_CONFIG();
+    config.sampRate = 16000;
+    config.adc_gain = 0x2d;
+    config.frame_size = RAW_READ_SIZE;
+    config.pool_size = config.frame_size * 2;
+    audio_record = audio_record_create(AUDIO_RECORD_ONBOARD_MIC, &config);
+    if (!audio_record)
+    {
+        LOGE("create audio record fail\n");
+        return BK_FAIL;
+    }
 
 	/* init send mic data task */
 	send_mic_data_init();
-
-	record_pipeline_open();
 
 	return BK_OK;
 }
@@ -324,7 +234,8 @@ bk_err_t wanson_asr_deinit(void)
 {
 	send_mic_data_send_msg(WANSON_ASR_EXIT, NULL);
 
-	record_pipeline_close();
+	audio_record_destroy(audio_record);
+    audio_record = NULL;
 
 	bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_DEFAULT);
 
@@ -333,10 +244,7 @@ bk_err_t wanson_asr_deinit(void)
 
 bk_err_t wanson_asr_start(void)
 {
-	if (BK_OK != audio_pipeline_run(record_pipeline)) {
-		BK_LOGE(TAG, "pipeline run fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
+	audio_record_open(audio_record);
 
 	send_mic_data_send_msg(WANSON_ASR_START, NULL);
 
@@ -347,15 +255,7 @@ bk_err_t wanson_asr_stop(void)
 {
 	send_mic_data_send_msg(WANSON_ASR_IDLE, NULL);
 
-	if (BK_OK != audio_pipeline_stop(record_pipeline)) {
-		BK_LOGE(TAG, "pipeline stop fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
-
-	if (BK_OK != audio_pipeline_wait_for_stop(record_pipeline)) {
-		BK_LOGE(TAG, "pipeline wait stop fail, %d \n", __LINE__);
-		return BK_FAIL;
-	}
+	audio_record_close(audio_record);
 
 	return BK_OK;
 }

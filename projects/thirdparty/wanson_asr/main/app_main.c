@@ -10,16 +10,6 @@
 extern void user_app_main(void);
 extern void rtos_set_user_app_entry(beken_thread_function_t entry);
 
-#ifdef CONFIG_CACHE_CUSTOM_SRAM_MAPPING
-const unsigned int g_sram_addr_map[4] =
-{
-	0x38000000,
-	0x30020000,
-	0x38020000,
-	0x30000000
-};
-#endif
-
 
 #if (CONFIG_SYS_CPU0)
 void user_app_main(void)
@@ -44,8 +34,8 @@ int main(void)
 	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_AUDP_AUDIO, PM_POWER_MODULE_STATE_ON);
 #endif
 
-#if ((CONFIG_ASDF_WORK_CPU1 && CONFIG_SYS_CPU1) || (CONFIG_ASDF_WORK_CPU0 && CONFIG_SYS_CPU0))
-	//rtos_delay_milliseconds(5000);
+#if (CONFIG_WANSON_ASR)
+	rtos_delay_milliseconds(2000);
 	wanson_asr_init();
 	wanson_asr_start();
 #endif
