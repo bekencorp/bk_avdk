@@ -24,12 +24,14 @@
 #include "media_evt.h"
 #include <driver/mailbox_channel.h>
 #include "media_mailbox_list_util.h"
-
+#include "media_mailbox_asr_tras.h"
 #include <driver/jpeg_dec.h>
 #include <modules/jpeg_decode_sw.h>
 
 #include "sw_decode.h"
 #include "sw_rotate.h"
+
+#include "aud_intf_types.h"
 
 #include <modules/pm.h>
 
@@ -234,7 +236,7 @@ static bk_err_t media_minor_mailbox_send_msg_to_media_major_mailbox(media_mailbo
 		}
 		else if (send_ack_flag && msg->ack_flag != MAILBOX_MESSAGE_ACK)
 		{
-			if (msg->type == MAILBOX_MSG_TYPE_REQ)
+			if ((msg->type == MAILBOX_MSG_TYPE_REQ)&&(msg->event != EVENT_AUD_ASR_CPU2_TO_CPU0_DATA_REQ))
 			{
 				msg->count++;
 				msg_send_to_media_minor_mailbox_list(msg);
@@ -367,6 +369,23 @@ void media_minor_mailbox_msg_handle(media_mailbox_msg_t *msg)
 					ret = software_rotate_task_open();
 				}
 				break;
+			#if (CONFIG_AUD_ASR)
+				case EVENT_AUD_ASR_CPU1_TO_CPU2_DATA_REQ:
+				{
+					ret = media_mailbox_asr_tras_event_handle(MAJOR_CPU, (void *)msg->param);
+				}
+				break;
+				case EVENT_AUD_ASR_INIT_NOTIFY:
+				{
+					ret = aud_asr_start(NULL);
+				}
+				break;
+				case EVENT_AUD_ASR_DEINIT_NOTIFY:
+				{
+					ret = aud_asr_stop();
+				}
+				break;
+			#endif
 				default:
 					break;
 			}
@@ -374,6 +393,19 @@ void media_minor_mailbox_msg_handle(media_mailbox_msg_t *msg)
 		}
 		else if(msg->type == MAILBOX_MSG_TYPE_RSP) //set semaphore from cpu2 other threads and delete from rsp list
 		{
+			if (msg->sem)
+			{
+				media_mailbox_list_del_node(msg->sem, &media_minor_mailbox_msg_queue_rsp);
+				ret = rtos_set_semaphore(&msg->sem);
+				if (ret != BK_OK)
+				{
+					LOGE("%s semaphore set failed: %d\n", __func__, ret);
+				}
+			}
+			else
+			{
+				media_mailbox_list_del_node_by_event(msg->event, &media_minor_mailbox_msg_queue_rsp);
+			}
 		}
 		else if(msg->type == MAILBOX_MSG_TYPE_ABORT)
 		{
@@ -400,6 +432,34 @@ void media_minor_mailbox_msg_handle(media_mailbox_msg_t *msg)
 		else
 		{
 			LOGE("%s unsupported type %x\n", __func__, msg->type);
+		}
+	}
+	else if (msg->src == APP_MODULE)
+	{
+		LOGD("%s recv app_module data %x, event:%d\n", __func__, msg->type, msg->event);
+		if(msg->type == MAILBOX_MSG_TYPE_REQ) //send req msg to cpu2 other threads
+		{
+			switch (msg->event)
+			{
+			#if (CONFIG_AUD_ASR)
+				case EVENT_AUD_ASR_CPU0_TO_CPU2_DATA_REQ:
+					ret = media_mailbox_asr_tras_event_handle(MONO_CPU, (void *)msg->param);
+					msg_send_rsp_to_media_minor_mailbox(msg, ret, APP_MODULE);
+					break;
+			#endif
+				default:
+					break;
+			}
+		}else if(msg->type == MAILBOX_MSG_TYPE_RSP){
+			if (msg->sem)
+			{
+				media_mailbox_list_del_node(msg->sem, &media_minor_mailbox_msg_queue_rsp);
+				ret = rtos_set_semaphore(&msg->sem);
+				if (ret != BK_OK)
+				{
+					LOGE("%s semaphore set failed: %d\n", __func__, ret);
+				}
+			}
 		}
 	}
 	else
@@ -456,7 +516,11 @@ static void media_minor_mailbox_message_handle(void)
 	LOGI("%s\n", __func__);
 	media_minor_mailbox_inited = 1;
 	rtos_set_semaphore(&media_minor_mailbox_init_sem);
+#if (CONFIG_AUD_ASR)
+	jpeg_dec_to_media_major_msg.event = EVENT_AUD_ASR_INIT_NOTIFY;
+#else
 	jpeg_dec_to_media_major_msg.event = EVENT_JPEG_DEC_INIT_NOTIFY;
+#endif
 	msg_send_notify_to_media_minor_mailbox(&jpeg_dec_to_media_major_msg, MAJOR_MODULE);
 
 	while (1)
@@ -484,6 +548,7 @@ static void media_minor_mailbox_message_handle(void)
 					break;
 
 				case MAJOR_MODULE:
+				case APP_MODULE:
 					media_minor_mailbox_msg_send(node_msg);
 					break;
 
@@ -623,7 +688,7 @@ bk_err_t media_minor_mailbox_init(void)
 							4,
 							"media_minor_mailbox_thread",
 							(beken_thread_function_t)media_minor_mailbox_message_handle,
-							1024,
+							2048,
 							NULL);
 
 	if (ret != BK_OK)

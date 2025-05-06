@@ -67,6 +67,8 @@ bk_err_t msg_send_req_to_media_app_mailbox_sync(uint32_t event, uint32_t in_para
 bk_err_t msg_send_rsp_to_media_app_mailbox(media_mailbox_msg_t *msg, uint32_t result);
 bk_err_t msg_send_notify_to_media_app_mailbox(media_mailbox_msg_t *msg);
 
+bk_err_t msg_send_cp2_req_to_media_app_mailbox_sync(uint32_t event, uint32_t in_param, uint32_t *out_param);
+
 bk_err_t msg_send_req_to_media_major_mailbox_sync(uint32_t event, uint32_t dest, uint32_t in_param, uint32_t *out_param);
 bk_err_t msg_send_rsp_to_media_major_mailbox(media_mailbox_msg_t *msg, uint32_t result, uint32_t dest);
 bk_err_t msg_send_notify_to_media_major_mailbox(media_mailbox_msg_t *msg, uint32_t dest);

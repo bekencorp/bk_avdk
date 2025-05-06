@@ -27,7 +27,6 @@
 #endif
 #include "aud_tras.h"
 
-
 #define AUD_INTF_TAG "aud_intf"
 
 #define LOGI(...) BK_LOGI(AUD_INTF_TAG, ##__VA_ARGS__)
@@ -992,3 +991,21 @@ bk_err_t bk_aud_intf_write_spk_data(uint8_t *dac_buff, uint32_t size)
 	return ret;
 }
 
+#if (CONFIG_AUD_ASR)
+bk_err_t bk_aud_intf_voc_asr_ctrl(bool asr_en)
+{
+	if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
+		return BK_ERR_AUD_INTF_STA;
+	CHECK_AUD_INTF_BUSY_STA();
+	if(asr_en){
+		return mailbox_media_aud_send_msg(EVENT_AUD_VOC_ASR_START_REQ, NULL);
+	}else{
+		return mailbox_media_aud_send_msg(EVENT_AUD_VOC_ASR_STOP_REQ, NULL);
+	}
+}
+
+bk_err_t bk_aud_intf_voc_register_asr_detect_result(aud_asr_recv_result_callback_t asr_ret_callback)
+{
+	return aud_asr_start(asr_ret_callback);
+}
+#endif

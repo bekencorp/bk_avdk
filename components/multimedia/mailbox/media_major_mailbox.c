@@ -26,7 +26,7 @@
 #include "media_evt.h"
 #include <driver/mailbox_channel.h>
 #include "media_mailbox_list_util.h"
-
+#include "media_mailbox_asr_tras.h"
 
 #include "transfer_act.h"
 #include "storage_act.h"
@@ -297,7 +297,7 @@ static bk_err_t media_major_mailbox_send_msg_to_media_minor_mailbox(media_mailbo
 		if(ret != BK_OK)
 		{
 			LOGE("%s %d rtos_get_semaphore error type=%x event=%x\n", __func__, __LINE__, msg->type, msg->event);
-			if (msg->type == MAILBOX_MSG_TYPE_REQ)
+			if ((msg->type == MAILBOX_MSG_TYPE_REQ)&&(msg->event != EVENT_AUD_ASR_CPU0_TO_CPU2_DATA_REQ))
 			{
 				msg->count++;
 				msg_send_to_media_major_mailbox_list(msg);
@@ -494,6 +494,12 @@ void media_major_mailbox_msg_handle(media_mailbox_msg_t *msg)
 					media_send_msg(&media_msg);
 					break;
 
+				case AUD_ASR_TRS_EVENT:
+			#if (CONFIG_AUD_ASR)
+					ret = media_mailbox_asr_tras_event_handle(MONO_CPU, (void *)msg->param);
+					msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
+			#endif
+					break;
 				default:
 					break;
 			}
@@ -590,11 +596,32 @@ void media_major_mailbox_msg_handle(media_mailbox_msg_t *msg)
 #endif
 				}
 				break;
-
+				case EVENT_AUD_ASR_INIT_NOTIFY:
+				{
+				#if CONFIG_AUD_ASR
+					extern void aud_asr_cp2_init_notify(void);
+					aud_asr_cp2_init_notify();
+				#endif
+				}
+				break;
 				default:
 					break;
 			}
-		}
+		}	} 
+	else if(msg->type == MAILBOX_MSG_TYPE_REQ) {
+		switch (msg->event)
+		{
+		#if (CONFIG_AUD_ASR)
+			case EVENT_AUD_ASR_CPU2_TO_CPU1_DATA_REQ:
+			{
+				ret = media_mailbox_asr_tras_event_handle(MINOR_CPU, (void *)msg->param);
+				msg_send_rsp_to_media_major_mailbox(msg, ret, MINOR_MODULE);
+				break;
+			}
+		#endif
+			default:
+				break;
+		}
 	}
 	else
 	{
@@ -629,6 +656,19 @@ void media_major_mailbox_msg_send_to_app(media_mailbox_msg_t *msg)
 		if (ret != BK_OK)
 		{
 			LOGE("%s(%d) FAILED \n", __func__, __LINE__);
+		}else{
+			switch (msg->event)
+			{
+				case EVENT_AUD_ASR_CPU0_TO_CPU2_DATA_REQ:
+				{
+					if(msg->sem){
+						media_mailbox_list_del_node(msg->sem, &media_major_mailbox_msg_queue_rsp);
+					}
+					break;
+				}
+				default:
+				break;
+			}
 		}
 	}
 	else if(msg->type == MAILBOX_MSG_TYPE_RSP) //send rsp msg to cpu0
@@ -666,11 +706,44 @@ void media_major_mailbox_msg_send_to_minor(media_mailbox_msg_t *msg)
 		if (ret != BK_OK)
 		{
 			LOGE("%s(%d) FAILED \n", __func__, __LINE__);
+			switch (msg->event)
+			{
+				//maybe the cpu2 is power down, send fail result to cpu0
+				case EVENT_AUD_ASR_CPU0_TO_CPU2_DATA_REQ:
+				{
+					msg->type = MAILBOX_MSG_TYPE_RSP;
+					msg->result = BK_FAIL;
+					msg->src = MAJOR_MODULE;
+					msg->dest = APP_MODULE;
+					media_major_mailbox_send_msg_to_media_app_mailbox(msg);
+					break;
+				}
+				default:
+					break;
+			}
 		}
 
 	}
 	else if(msg->type == MAILBOX_MSG_TYPE_RSP) //send rsp msg to cpu0
 	{
+		switch (msg->event)
+		{
+			case EVENT_AUD_ASR_CPU2_TO_CPU0_DATA_REQ:
+			{
+				media_major_mailbox_send_msg_to_media_minor_mailbox(msg);
+				if(msg->sem){
+					media_mailbox_list_del_node(msg->sem, &media_major_mailbox_msg_queue_rsp);
+				}
+				break;
+			}
+			case EVENT_AUD_ASR_CPU2_TO_CPU1_DATA_REQ:
+			{
+				media_major_mailbox_send_msg_to_media_minor_mailbox(msg);
+				break;
+			}
+			default:
+				break;
+		}
 	}
 	else if(msg->type == MAILBOX_MSG_TYPE_ABORT)
 	{

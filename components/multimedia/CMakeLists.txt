@@ -163,6 +163,7 @@ endif()
 endif()
 
 
+
 if ((CONFIG_CPU_CNT GREATER 1))
 	list(APPEND incs mailbox)
 	list(APPEND srcs
@@ -178,7 +179,7 @@ endif()#CONFIG_MEDIA_APP
 if (CONFIG_MEDIA_MAJOR)
 	list(APPEND srcs
 		mailbox/media_major_mailbox.c
-        decode/sw_decode.c
+  		decode/sw_decode.c
   		rotate/sw_rotate.c
 	)
 endif()#CONFIG_MEDIA_MAJOR
@@ -190,6 +191,13 @@ if (CONFIG_MEDIA_MINOR)
    		rotate/sw_rotate_cp2.c
 	)
 endif()#CONFIG_MEDIA_MINOR
+
+if (CONFIG_AUD_ASR)
+	list(APPEND srcs
+		mailbox/media_mailbox_asr_tras.c
+	)
+
+endif()
 
 endif()#(CONFIG_CPU_CNT GREATER 1)
 

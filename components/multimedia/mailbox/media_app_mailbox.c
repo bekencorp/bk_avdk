@@ -28,6 +28,7 @@
 #include <driver/mailbox_channel.h>
 #include "transfer_act.h"
 #include "media_mailbox_list_util.h"
+#include "media_mailbox_asr_tras.h"
 #include <modules/pm.h>
 
 #include <driver/pwr_clk.h>
@@ -193,6 +194,94 @@ bk_err_t msg_send_notify_to_media_app_mailbox(media_mailbox_msg_t *msg)
 	return ret;
 }
 
+bk_err_t msg_send_cp2_req_to_media_app_mailbox_sync(uint32_t event, uint32_t in_param, uint32_t *out_param)
+{
+	bk_err_t ret = BK_OK;
+	media_mailbox_msg_t msg = {0};
+
+	if (media_app_mailbox_inited == 0)
+	{
+		return BK_ERR_NOT_INIT;
+	}
+
+	ret = rtos_init_semaphore_ex(&msg.sem, 1, 0);
+
+	if (ret != BK_OK)
+	{
+		LOGE("%s init semaphore failed\n", __func__);
+		goto out;
+	}
+	msg.event = event;
+	msg.param = in_param;
+	msg.src = APP_MODULE;
+	msg.dest = MINOR_MODULE;
+	msg.type = MAILBOX_MSG_TYPE_REQ;
+	msg.count = 0;
+
+	ret = media_app_mailbox_check_cpu1_state();
+	if (ret != BK_OK)
+	{
+		LOGE("%s cpu1 not open\n", __func__);
+		goto out;
+	}
+
+	ret = msg_send_to_media_app_mailbox_list(&msg);
+	if (ret != BK_OK)
+	{
+		LOGE("%s add to list fail\n", __func__);
+		goto out;
+	}
+
+	ret = rtos_get_semaphore(&msg.sem, BEKEN_WAIT_FOREVER);
+
+	if (ret != BK_OK)
+	{
+		LOGE("%s wait semaphore failed\n", __func__);
+		goto out;
+	}
+
+	ret = msg.result;
+	if (ret != BK_OK)
+	{
+		LOGE("%s failed 0x%x\n", __func__, ret);
+		goto out;
+	}
+
+	if (out_param != NULL)
+	{
+		*out_param = msg.param;
+	}
+out:
+	if(msg.sem)
+	{
+		rtos_deinit_semaphore(&msg.sem);
+		msg.sem = NULL;
+	}
+
+	return ret;
+}
+
+bk_err_t msg_send_cp2_rsp_to_media_app_mailbox(media_mailbox_msg_t *msg, uint32_t result)
+{
+	bk_err_t ret = BK_OK;
+	msg->src = APP_MODULE;
+	msg->dest = MINOR_MODULE;
+	msg->type = MAILBOX_MSG_TYPE_RSP;
+	msg->result = result;
+	msg->count = 0;
+	if (media_app_mailbox_inited == 0)
+	{
+		return BK_ERR_NOT_INIT;
+	}
+
+	ret = msg_send_to_media_app_mailbox_list(msg);
+	if (ret != kNoErr)
+	{
+		LOGE("%s add to list fail\n", __func__);
+	}
+	return ret;
+}
+
 static bk_err_t msg_send_back_to_media_app_mailbox(media_mailbox_msg_t *msg, uint32_t result)
 {
 	bk_err_t ret = BK_OK;
@@ -251,7 +340,7 @@ static bk_err_t media_app_mailbox_send_msg_to_media_major_mailbox(media_mailbox_
 		}
 		else if (send_ack_flag && msg->ack_flag != MAILBOX_MESSAGE_ACK)
 		{
-			if (msg->type == MAILBOX_MSG_TYPE_REQ)
+			if ((msg->type == MAILBOX_MSG_TYPE_REQ)&&(msg->event != EVENT_AUD_ASR_CPU0_TO_CPU2_DATA_REQ))
 			{
 				msg->count++;
 				msg_send_to_media_app_mailbox_list(msg);
@@ -532,7 +621,20 @@ static void media_app_mailbox_msg_handle(media_mailbox_msg_t *msg)
 				msg_send_rsp_to_media_app_mailbox(msg, BK_OK);
 			}
 			break;
-
+		#if (CONFIG_AUD_ASR)
+			case EVENT_AUD_ASR_CPU2_TO_CPU0_DATA_REQ:
+			{
+				ret = media_mailbox_asr_tras_event_handle(MINOR_CPU, (void *)msg->param);
+				msg_send_cp2_rsp_to_media_app_mailbox(msg, (uint32_t)ret);
+			}
+			break;
+			case EVENT_AUD_ASR_CPU1_TO_CPU0_DATA_REQ:
+			{
+				ret = media_mailbox_asr_tras_event_handle(MAJOR_CPU, (void *)msg->param);
+				msg_send_rsp_to_media_app_mailbox(msg, (uint32_t)ret);
+			}
+			break;
+		#endif
 			default:
 				break;
 		}
@@ -635,6 +737,7 @@ static void media_app_mailbox_message_handle(void)
 					media_app_mailbox_msg_handle(node_msg);
 					break;
 				case MAJOR_MODULE:
+				case MINOR_MODULE:
 					media_app_mailbox_msg_send(node_msg);
 					break;
 

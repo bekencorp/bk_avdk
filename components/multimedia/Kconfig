@@ -174,4 +174,9 @@ menu "Media"
 	config AI_AGENT
 		bool "Enable AI Agent"
 		default n
+
+	config AUD_ASR
+		bool "enable audio asr"
+		default n
+
 endmenu

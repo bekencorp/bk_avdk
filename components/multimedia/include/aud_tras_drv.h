@@ -61,6 +61,8 @@ typedef enum {
 	AUD_TRAS_VOC_DAC_BEBUG,
 #endif
 
+	AUD_TRAS_DRV_VOC_ASR_START,
+	AUD_TRAS_DRV_VOC_ASR_STOP,
 	AUD_TRAS_DRV_MAX,
 } aud_tras_drv_op_t;
 

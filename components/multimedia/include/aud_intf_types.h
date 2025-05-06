@@ -222,6 +222,20 @@ typedef struct {
         .aud_tx_rb = NULL,                             \
     }
 
+
+#if (CONFIG_AUD_ASR)
+typedef bk_err_t (*aud_asr_recv_result_callback_t)(uint32_t result);
+
+extern bk_err_t aud_asr_stop(void);
+extern bk_err_t aud_asr_start(aud_asr_recv_result_callback_t recv_result_cb);
+
+#if CONFIG_SYS_CPU1
+extern int aud_asr_is_start(void);
+extern bk_err_t aud_asr_process(char *aud_data, uint32_t aud_len);
+#endif
+
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -26,6 +26,7 @@
 #include "sys_driver.h"
 #include "aud_intf_private.h"
 #include "aud_tras_drv.h"
+
 #include <driver/psram.h>
 #include <driver/audio_ring_buff.h>
 #include <modules/g711.h>
@@ -1076,6 +1077,12 @@ static bk_err_t aud_tras_enc(void)
 			UAC_MIC_DATA_DUMP_DATA(aud_tras_drv_info.voc_info.encoder_temp.pcm_data, temp_mic_samp_rate_points*2);
 		}
 	}
+
+#if (CONFIG_AUD_ASR)
+	if(aud_asr_is_start()){
+		aud_asr_process((char *)aud_tras_drv_info.voc_info.encoder_temp.pcm_data, size);
+	}
+#endif
 
 	switch (aud_tras_drv_info.voc_info.data_type) {
 		case AUD_INTF_VOC_DATA_TYPE_G711A:
@@ -2782,7 +2789,16 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 						aud_tras_dec();
 					}
 					break;
-
+				case AUD_TRAS_DRV_VOC_ASR_START:
+			#if CONFIG_AUD_ASR
+					aud_asr_start(NULL);
+			#endif
+					break;
+				case AUD_TRAS_DRV_VOC_ASR_STOP:
+			#if CONFIG_AUD_ASR
+					aud_asr_stop();
+			#endif
+					break;
 				default:
 					break;
 			}
@@ -3032,7 +3048,14 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 			//TODO set sem
 			//	;
 			break;
-
+		case EVENT_AUD_VOC_ASR_START_REQ:
+			aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_ASR_START, (void *)msg);
+			msg_send_rsp_to_media_major_mailbox(msg, 0, APP_MODULE);
+			break;
+		case EVENT_AUD_VOC_ASR_STOP_REQ:
+			aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_ASR_STOP, (void *)msg);
+			msg_send_rsp_to_media_major_mailbox(msg, 0, APP_MODULE);
+			break;
 		default:
 			break;
 	}
