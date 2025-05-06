@@ -26,6 +26,13 @@
 #define FB_ALLOCATED_PATTERN      (0x8338)
 #define FB_FREE_PATTERN           (0xF00F)
 
+#define FRAME_BUFFER_ASSERT(type, exp) do { \
+            if ( !(exp) ) {                 \
+                LOGE("type: %d\n", type);   \
+                BK_ASSERT(exp);             \
+            }                               \
+        } while(0)
+
 fb_mem_heap_t frame_mem_heap = {0};
 
 static void frame_buffer_heap_init(uint8_t type, uint8_t* heap, uint32_t heap_size)
@@ -117,7 +124,7 @@ void *bk_psram_frame_buffer_malloc(psram_heap_type_t type, uint32_t size)
 	if (frame_mem_heap.heap_size[type] == 0)
 	{
 		LOGE("%s, type:%d not init\r\n", __func__, type);
-		BK_ASSERT(0);
+		FRAME_BUFFER_ASSERT(type, 0);
 	}
 
 	GLOBAL_INT_DECLARATION();
@@ -135,7 +142,7 @@ void *bk_psram_frame_buffer_malloc(psram_heap_type_t type, uint32_t size)
 	}
 
 	// sanity check: the totalsize should be large enough to hold free block descriptor
-	BK_ASSERT(totalsize >= sizeof(struct fb_block_free));
+	FRAME_BUFFER_ASSERT(type, totalsize >= sizeof(struct fb_block_free));
 
 	// protect accesses to descriptors
 	GLOBAL_INT_DISABLE();
@@ -144,12 +151,12 @@ void *bk_psram_frame_buffer_malloc(psram_heap_type_t type, uint32_t size)
 
 	// Select Heap to use, first try to use current heap.
 	node = frame_mem_heap.heap[heap_id];
-	BK_ASSERT(node != NULL);
+	FRAME_BUFFER_ASSERT(type, node != NULL);
 
 	// go through free memory blocks list
 	while (node != NULL)
 	{
-		BK_ASSERT(node->corrupt_check == FB_LIST_PATTERN);
+		FRAME_BUFFER_ASSERT(type, node->corrupt_check == FB_LIST_PATTERN);
 
 		// check if there is enough room in this free block
 		if (node->free_size >= (totalsize))
@@ -192,7 +199,7 @@ void *bk_psram_frame_buffer_malloc(psram_heap_type_t type, uint32_t size)
 		// sublist completely reused
 		if (found->free_size == totalsize)
 		{
-			BK_ASSERT(found->previous != NULL);
+			FRAME_BUFFER_ASSERT(type, found->previous != NULL);
 			// update double linked list
 			found->previous->next = found->next;
 			if(found->next != NULL)
