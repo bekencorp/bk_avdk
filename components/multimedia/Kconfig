@@ -130,7 +130,7 @@ menu "Media"
 
 	choice AUD_TRAS_USE_MEMORY
 		prompt "Select AUD TRAS use memory"
-		default AUD_TRAS_USE_PSRAM
+		default AUD_TRAS_USE_AUDIO_HEAP
 
 		config AUD_TRAS_USE_SRAM
 		bool "Enable AUD TRAS use sram"
@@ -141,6 +141,11 @@ menu "Media"
 		bool "Enable AUD TRAS use psram"
 		help
 			AUD TRAS use psram memory
+
+		config AUD_TRAS_USE_AUDIO_HEAP
+		bool "Enable AUD TRAS use audio heap"
+		help
+			AUD TRAS use audio heap memory
 	endchoice
 
 	config AUD_TRAS_DAC_PA_CTRL

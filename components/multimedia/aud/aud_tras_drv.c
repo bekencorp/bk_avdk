@@ -152,8 +152,14 @@ void *audio_tras_drv_malloc(uint32_t size)
 {
 #if CONFIG_AUD_TRAS_USE_SRAM
     return os_malloc(size);
-#else
+#endif
+
+#if CONFIG_AUD_TRAS_USE_AUDIO_HEAP
     return bk_psram_frame_buffer_malloc(PSRAM_HEAP_AUDIO, size);
+#endif
+
+#if CONFIG_AUD_TRAS_USE_PSRAM
+    return psram_malloc(size);
 #endif
 }
 
@@ -161,8 +167,14 @@ void audio_tras_drv_free(void *mem)
 {
 #if CONFIG_AUD_TRAS_USE_SRAM
     os_free(mem);
-#else
-    return bk_psram_frame_buffer_free(mem);
+#endif
+
+#if CONFIG_AUD_TRAS_USE_AUDIO_HEAP
+    bk_psram_frame_buffer_free(mem);
+#endif
+
+#if CONFIG_AUD_TRAS_USE_PSRAM
+    psram_free(mem);
 #endif
 }
 
