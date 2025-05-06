@@ -145,9 +145,9 @@ Figure 4 is a BK7256 sample device as the Server, which adds an LCD display and 
 
    Server demo path:``./projects/wifi/rlk_av_server``
 
-   Client build cmd:``make bk7256 PROJECT=wifi/rlk_av_client``
+   Client build cmd:``make bk7258 PROJECT=wifi/rlk_av_client``
 
-   Server build cmd:``make bk7256 PROJECT=wifi/rlk_av_server``
+   Server build cmd:``make bk7258 PROJECT=wifi/rlk_av_server``
 
 5 Reference Materials
 -------------------------------------

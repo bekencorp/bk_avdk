@@ -135,9 +135,9 @@ Figure 4是一块作为Server端的BK7256样本设备,该设备添加一块lcd�
 
    Server端demo路径：``./projects/wifi/rlk_av_server``
 
-   Client端编译命令：``make bk7256 PROJECT=wifi/rlk_av_client``
+   Client端编译命令：``make bk7258 PROJECT=wifi/rlk_av_client``
 
-   Server端编译命令：``make bk7256 PROJECT=wifi/rlk_av_server``
+   Server端编译命令：``make bk7258 PROJECT=wifi/rlk_av_server``
 
 5 参考链接
 -------------------------------------

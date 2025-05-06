@@ -3,13 +3,6 @@ var hostRoot = ""
 var asyncDone = false;
 var sdkList = [
     {
-        "name" : "bk7256",
-        "lang" : [ "zh-cn" ],
-        "version" : [
-            "latest"
-        ]
-    },
-    {
         "name" : "bk7258",
         "lang" : [ "zh-cn" ],
         "version" : [
@@ -233,7 +226,7 @@ function setPageStyle()
 
     $("#styleIcon").bind('click', function()
     {
-       var mode = $("#styleIcon").attr('mode'); 
+       var mode = $("#styleIcon").attr('mode');
 
        if(mode == "light")
        {

@@ -1,13 +1,6 @@
-[	
+[
 	{
 		"name" : "bk7258",
-		"lang" : [ "zh-cn" ],
-		"version" : [
-			"latest"
-		]
-	},
-	{
-		"name" : "bk7256",
 		"lang" : [ "zh-cn" ],
 		"version" : [
 			"latest"
