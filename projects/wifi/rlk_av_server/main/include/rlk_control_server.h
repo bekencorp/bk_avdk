@@ -77,6 +77,7 @@ typedef enum
     RLK_MSG_TX_MGMT_CB = 0x1,
     RLK_MSG_RX_MGMT,
     RLK_MSG_RX_DATA,
+    RLK_MSG_CLOSE_MEDIA,
 } rlk_cntrl_msg_e;
 
 

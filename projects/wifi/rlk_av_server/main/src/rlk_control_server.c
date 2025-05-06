@@ -19,6 +19,30 @@ beken2_timer_t rlk_cntrl_server_timer = {0};
 beken_semaphore_t s_rlk_cntrl_server_sem;
 
 bk_err_t rlk_cntrl_server_send_callback(const uint8_t *peer_mac_addr, bk_rlk_send_status_t status);
+
+void bk_rlk_server_close_media_ind(void)
+{
+    struct rlk_msg_t msg;
+    bk_err_t ret = BK_OK;
+
+    if (!rlk_server_local_env.is_inited)
+    {
+        return;
+    }
+
+    msg.msg_id = RLK_MSG_CLOSE_MEDIA;
+    msg.arg = 0;
+    msg.len = 0;
+
+    ret = rtos_push_to_queue(&rlk_server_queue, &msg, BEKEN_NO_WAIT);
+
+    if (ret != BK_OK)
+    {
+        LOGI("%s push err\r\n",__func__);
+    }
+
+}
+
 void bk_rlk_server_mgmt_tx_callback(void *mgmt_args, bool success)
 {
     struct rlk_msg_t msg;
@@ -42,6 +66,7 @@ void bk_rlk_server_mgmt_tx_callback(void *mgmt_args, bool success)
 
 }
 
+
 static void rlk_cntrl_server_timer_handler(void *Larg, void *Rarg)
 {
     uint32_t time = 0;
@@ -57,8 +82,7 @@ static void rlk_cntrl_server_timer_handler(void *Larg, void *Rarg)
     {
         LOGI("RLK server keepalive timeout, update connect to PROBEING\n");
         rlk_server_local_env.state = RLK_STATE_PROBEING;
-        //rlk_mm_server_deinit();
-        //bk_rlk_register_send_cb(rlk_cntrl_server_send_callback);
+        bk_rlk_server_close_media_ind();
         return;
     }
 
@@ -195,6 +219,11 @@ void rlk_cntrl_server_wakeup_peer(void)
     rlk_cntrl_server_tx_mgmt_data(rlk_server_local_env.peer_mac_addr, RLK_MM_HEADER_MGMT_SUBTYPE_WAKEUP_REQ);
 }
 
+void rlk_cntrl_server_handle_close_media(struct rlk_msg_t msg)
+{
+    rlk_mm_server_deinit();
+}
+
 void rlk_cntrl_server_handle_data_rx(struct rlk_msg_t msg)
 {
     bk_err_t ret = BK_OK;
@@ -308,6 +337,9 @@ void rlk_cntrl_server_main(void *arg)
                 break;
             case RLK_MSG_RX_DATA:
                 rlk_cntrl_server_handle_data_rx(msg);
+                break;
+           case RLK_MSG_CLOSE_MEDIA:
+                rlk_cntrl_server_handle_close_media(msg);
                 break;
             default:
                 break;
