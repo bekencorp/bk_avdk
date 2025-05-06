@@ -12,3 +12,7 @@ endif()
 if (CONFIG_LCD_ST7789V)
 	list(APPEND MCU_LCD_DEVICE_FILES ${MCU_LCD_PATH}/lcd_st7789v.c)
 endif()
+
+if (CONFIG_LCD_ST7796PI_MCU16)
+	list(APPEND MCU_LCD_DEVICE_FILES ${MCU_LCD_PATH}/lcd_st7796pi_mcu16.c)
+endif()

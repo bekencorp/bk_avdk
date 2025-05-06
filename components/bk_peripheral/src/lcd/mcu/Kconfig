@@ -13,4 +13,9 @@ menu "MCU LCD"
 		depends on LCD
 		bool "Enable LCD_ST7789V API"
 		default n
+
+	config LCD_ST7796PI_MCU16
+		depends on LCD
+		bool "Enable LCD_ST7796PI_MCU16 API"
+		default n
 endmenu
