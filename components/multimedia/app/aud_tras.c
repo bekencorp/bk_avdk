@@ -297,7 +297,7 @@ aud_tras_exit:
 
 	if (aud_temp_data) {
 		audio_tras_free(aud_temp_data);
-		aud_temp_data == NULL;
+		aud_temp_data = NULL;
 	}
 
     AUD_TX_COUNT_CLOSE();
@@ -307,7 +307,7 @@ aud_tras_exit:
 	if (aud_tras_info->aud_tras_buff_addr) {
 		ring_buffer_clear(&aud_tras_info->aud_tras_rb);
 		audio_tras_free(aud_tras_info->aud_tras_buff_addr);
-		aud_tras_info->aud_tras_buff_addr == NULL;
+		aud_tras_info->aud_tras_buff_addr = NULL;
 	}
 
 	/* delete msg queue */
