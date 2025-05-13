@@ -102,7 +102,8 @@ static bk_err_t uvc_camera_stream_check_config(camera_param_t *param)
 
     bk_usb_hub_port_info *uvc_port_info = param->port_info;
     uvc_config_t *user_config = param->info;
-    LOGI("%s, %d, port:%d, format:%d\r\n", __func__, __LINE__, user_config->port, user_config->img_format);
+    LOGI("%s, %d, port:%d, format:%d, W*H:%d*%d\r\n", __func__, __LINE__, user_config->port, user_config->img_format,
+        user_config->width, user_config->height);
 
     bk_uvc_device_brief_info_t *uvc_device_param = (bk_uvc_device_brief_info_t *)uvc_port_info->usb_device_param;
     bk_uvc_config_t *uvc_device_param_config = (bk_uvc_config_t *)uvc_port_info->usb_device_param_config;
@@ -466,7 +467,7 @@ static void uvc_camera_stream_receive_complete_callback(void *pCompleteParam, in
     LOGD("%s, %d, %d\r\n", __func__, __LINE__, (uint32_t)pCompleteParam);
     struct usbh_urb *urb = NULL;//, *new_urb = NULL;
     camera_param_t *camera_param = (camera_param_t *)pCompleteParam;
-
+    int ret = BK_FAIL;
     urb = camera_param->urb;
 
     if (urb == NULL)
@@ -491,10 +492,44 @@ static void uvc_camera_stream_receive_complete_callback(void *pCompleteParam, in
         return;
     }
 
+#if 0
     if (uvc_stream_task_send_msg(UVC_DATA_REQUEST_IND, (uint32_t)camera_param) != BK_OK)
     {
         LOGI("%s, %d send failed...\r\n", __func__, __LINE__);
     }
+#else
+    urb = uvc_camera_urb_malloc();
+
+    if (urb)
+    {
+        camera_param->urb = urb;
+        ret = uvc_camera_stream_packet_urb(camera_param);
+        if (ret != BK_OK)
+        {
+            camera_param->urb = NULL;
+            uvc_camera_urb_free(urb);
+            return;
+        }
+
+        ret = bk_usbh_hub_dev_request_data(camera_param->info->port, camera_param->port_info->device_index, camera_param->urb);
+        if (ret != BK_OK)
+        {
+            camera_param->urb = NULL;
+            uvc_camera_urb_free(urb);
+            if (uvc_stream_task_send_msg(UVC_DATA_REQUEST_IND, (uint32_t)camera_param) != BK_OK)
+            {
+                LOGW("%s, %d send failed...\r\n", __func__, __LINE__);
+            }
+        }
+    }
+    else
+    {
+        if (uvc_stream_task_send_msg(UVC_DATA_REQUEST_IND, (uint32_t)camera_param) != BK_OK)
+        {
+            LOGW("%s, %d send failed...\r\n", __func__, __LINE__);
+        }
+    }
+#endif
 }
 
 
@@ -1140,7 +1175,7 @@ static void uvc_camera_stream_packet_process(camera_param_t *camera_param, uint8
             /* ERR bit defined in Stream Header*/
             if (header_info & 0x40)
             {
-                LOGW("bad packet: %02x, head_len:%d error bit set\r\n", header_info, header_len);
+                LOGD("bad packet: %02x, head_len:%d error bit set\r\n", header_info, header_len);
                 pro_config->packet_error[index] = true;
 #if (MEDIA_DEBUG_TIMER_ENABLE)
                 pro_config->packet_err_num++;

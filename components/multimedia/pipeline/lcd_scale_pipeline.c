@@ -863,7 +863,7 @@ static void scale_main_entry(beken_thread_arg_t data)
 					}
                     bk_hw_scale_int_enable(HW_SCALE, 0);
                     bk_hw_scale_stop(HW_SCALE);
-                    
+
                     GLOBAL_INT_DECLARATION();
                     GLOBAL_INT_DISABLE();
                     while (!list_empty(&scale_config->request_list))
@@ -888,7 +888,7 @@ static void scale_main_entry(beken_thread_arg_t data)
                     scale_config->state = SCALE_STATE_IDLE;
                     scale_config->scale_buffer[0].state = BUF_IDLE;
                     scale_config->scale_buffer[1].state = BUF_IDLE;
-					LOGE("%s SCALE_RESET line_count%d  scale_config->state %x\n", __func__, scale_config->line_count, scale_config->state);
+                    LOGE("%s SCALE_RESET line_count%d  scale_config->state %x\n", __func__, scale_config->line_count, scale_config->state);
                     if(scale_config->reset_cb && (msg.param == 0))
                         scale_config->reset_cb(NULL);
                    break;
@@ -900,7 +900,7 @@ static void scale_main_entry(beken_thread_arg_t data)
 					beken_semaphore_t *beken_semaphore = (beken_semaphore_t*)msg.param;
 
 					bk_hw_scale_driver_deinit(HW_SCALE);
-                    //bk_hw_scale_mem_free();
+					//bk_hw_scale_mem_free();
 					if (rtos_is_oneshot_timer_running(&scale_config->scale_timer))
 					{
 						rtos_stop_oneshot_timer(&scale_config->scale_timer);
@@ -1164,11 +1164,11 @@ bk_err_t scale_task_close(void)
 		if (scale_request != NULL)
 		{
 			complex_buffer_t *decoder_buffer = (complex_buffer_t*)os_malloc(sizeof(complex_buffer_t));
-            if (decoder_buffer == NULL)
-            {
+			if (decoder_buffer == NULL)
+			{
 				LOGI("%s os_malloc fail\n", __func__);
-                break;
-            }
+			break;
+			}
 			os_memcpy(decoder_buffer, scale_request->buffer, sizeof(complex_buffer_t));
 
 			LOGI("%s free pending list\n", __func__);
@@ -1208,8 +1208,7 @@ bk_err_t scale_task_close(void)
 
 	if (scale_config->scale_frame)
 	{
-		// jinryue need modify
-		//frame_buffer_fb_direct_free(scale_config->scale_frame);
+		frame_buffer_display_free(scale_config->scale_frame);
 		scale_config->scale_frame = NULL;
 		LOGI("%s free scale_frame\n", __func__);
 	}
@@ -1219,8 +1218,7 @@ bk_err_t scale_task_close(void)
 
 	if(scale_config->scale_src_frame)
 	{
-		// jinryue need modify
-		//frame_buffer_fb_direct_free(scale_config->scale_src_frame);
+		frame_buffer_display_free(scale_config->scale_src_frame);
 		scale_config->scale_src_frame = NULL;
 	}
 
@@ -1325,11 +1323,11 @@ bk_err_t bk_scale_pipeline_init(void)
 {
 	bk_err_t ret = BK_FAIL;
 
-    if(scale_info != NULL)
-    {
-        os_free(scale_info);
-        scale_info = NULL;
-    }
+	if(scale_info != NULL)
+	{
+		os_free(scale_info);
+		scale_info = NULL;
+	}
 	scale_info = (scale_info_t*)os_malloc(sizeof(scale_info_t));
 
 	if (scale_info == NULL)
