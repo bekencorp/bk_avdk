@@ -174,6 +174,7 @@ static void dm_ble_gap_private_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_par
             {
                 return;
             }
+
 #endif
         }
     }
@@ -234,12 +235,12 @@ static int32_t dm_ble_gap_common_cb(bk_ble_gap_cb_event_t event, bk_ble_gap_cb_p
 
         ble_ota_start_timer();
         s_is_connect_pending = 0;
+
         dm_ble_del_app_env_by_addr(evt->remote_bda);
 
         if (evt->reason == BK_BT_STATUS_TERMINATED_MIC_FAILURE)
         {
             bk_ble_bond_dev_t *tmp_dev = NULL;
-
             gatt_logw("remove pair because mic err");
 
             if ((tmp_dev = dm_ble_find_bond_info_by_nominal_addr(evt->remote_bda, evt->remote_bda_type)) == NULL)
@@ -1084,6 +1085,7 @@ static int32_t dm_gatt_set_security_method_private(void)
         gatt_loge("wait set rsp key err %d", ret);
         goto error;
     }
+
 #else
     ret = bk_ble_gap_set_security_param(BK_BLE_SM_SET_LOCAL_REMOTE_KEY, (void *)&s_dm_gatt_local_remote_key_distr, sizeof(s_dm_gatt_local_remote_key_distr));
 
@@ -2129,7 +2131,6 @@ int dm_gatt_main(cli_gatt_param_t *param)
         return -1;
     }
 
-
     if (g_dm_gap_use_rpa)
     {
         rtos_delay_milliseconds(100);
@@ -2253,6 +2254,7 @@ int dm_gatt_main(cli_gatt_param_t *param)
     }
 
     s_ble_sema = NULL;
+
     s_dm_gatt_is_inited = 1;
 
     return 0;

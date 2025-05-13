@@ -25,8 +25,11 @@
 typedef struct
 {
     uint8_t status; //0 idle 1 connected
+    beken_semaphore_t server_sem;
+    uint16_t send_notify_status;
 } wifi_boarding_app_env_t;
 
+#define PROFILE_ID 1
 #define MIN_VALUE(x, y) (((x) < (y)) ? (x): (y))
 
 static ble_boarding_info_t *s_ble_boarding_info = NULL;
@@ -135,15 +138,14 @@ static int32_t wifi_boarding_gatts_cb(bk_gatts_cb_event_t event, bk_gatt_if_t ga
                     param->remote_bda[1],
                     param->remote_bda[0]);
 
-        common_env_tmp = dm_ble_alloc_addition_data_by_addr(param->remote_bda, sizeof(*app_env_tmp));
+        common_env_tmp = dm_ble_alloc_profile_data_by_addr(PROFILE_ID, param->remote_bda, sizeof(*app_env_tmp), (uint8_t **)&app_env_tmp);
 
         if (!common_env_tmp)
         {
-            wboard_loge("alloc addition data err !!!!");
+            wboard_loge("alloc profile data err !!!!");
             break;
         }
 
-        app_env_tmp = (typeof(app_env_tmp))common_env_tmp->addition_data;
         app_env_tmp->status = 1;
     }
     break;
@@ -168,13 +170,16 @@ static int32_t wifi_boarding_gatts_cb(bk_gatts_cb_event_t event, bk_gatt_if_t ga
             break;
         }
 
-        if (common_env_tmp->addition_data)
-        {
-            os_free(common_env_tmp->addition_data);
-            common_env_tmp->addition_data = NULL;
-        }
+        app_env_tmp = (typeof(app_env_tmp))dm_ble_find_profile_data_by_profile_id(common_env_tmp, PROFILE_ID);
 
-        common_env_tmp->addition_data_len = 0;
+        if (app_env_tmp)
+        {
+            if (app_env_tmp->server_sem)
+            {
+                rtos_deinit_semaphore(&app_env_tmp->server_sem);
+                app_env_tmp->server_sem = NULL;
+            }
+        }
     }
     break;
 
