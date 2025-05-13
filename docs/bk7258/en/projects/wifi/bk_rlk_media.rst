@@ -152,8 +152,8 @@ Figure 4 is a BK7256 sample device as the Server, which adds an LCD display and 
 5 Reference Materials
 -------------------------------------
 
-    `API reference: <../../api-reference/wifi/bk_wifi.html>`_ introduce BK-RLK API interface
+    `API reference: <https://docs.bekencorp.com/arminodoc/bk_idk/bk7258/zh_CN/v2.0.1/api-reference/network/bk_wifi.html>`_ introduce BK-RLK API interface
 
-    `BK-RLK development guide: <../../developer-guide/wifi/bk_rlk.html>`_ introduce BK-RLK user guide
+    `BK-RLK development guide: <https://docs.bekencorp.com/arminodoc/bk_idk/bk7258/zh_CN/v2.0.1/developer-guide/wifi/bk_rlk.html>`_ introduce BK-RLK user guide
 
-    `BK-RLK project: <../../projects_work/wifi/bk_rlk_media.html>`_ introduce BK-RLK projects
+    `BK-RLK project: <https://docs.bekencorp.com/arminodoc/bk_avdk/bk7258/zh_CN/v2.0.1/projects/wifi/bk_rlk_media.html>`_ introduce BK-RLK projects

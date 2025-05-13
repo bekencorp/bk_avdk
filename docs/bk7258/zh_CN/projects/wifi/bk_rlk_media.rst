@@ -142,8 +142,8 @@ Figure 4是一块作为Server端的BK7256样本设备,该设备添加一块lcd�
 5 参考链接
 -------------------------------------
 
-    `API参考: <../../api-reference/wifi/bk_wifi.html>`_ 介绍了BK-RLK API接口
+    `API参考: <https://docs.bekencorp.com/arminodoc/bk_idk/bk7258/zh_CN/v2.0.1/api-reference/network/bk_wifi.html>`_ 介绍了BK-RLK API接口
 
-    `开发者指南: <../../developer-guide/wifi/bk_rlk.html>`_ 介绍了BK-RLK使用指南
+    `开发者指南: <https://docs.bekencorp.com/arminodoc/bk_idk/bk7258/zh_CN/v2.0.1/developer-guide/wifi/bk_rlk.html>`_ 介绍了BK-RLK使用指南
 
-    `BK-RLK工程: <../../projects_work/wifi/bk_rlk_media.html>`_ 介绍了BK-RLK相关工程
+    `BK-RLK工程: <https://docs.bekencorp.com/arminodoc/bk_avdk/bk7258/zh_CN/v2.0.1/projects/wifi/bk_rlk_media.html>`_ 介绍了BK-RLK相关工程
