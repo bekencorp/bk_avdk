@@ -124,6 +124,7 @@ static beken_thread_t hf_mic_thread_handle = NULL;
 static beken_semaphore_t hf_speaker_sema = NULL;
 static audio_play_t *s_audio_play_obj;
 static audio_record_t *s_audio_record_obj;
+static beken_semaphore_t hf_mic_speaker_exit_sema = NULL;
 
 #if HF_LOCAL_ROLLBACK_TEST
 static uint16_t mic_read_size = 0;
@@ -649,12 +650,19 @@ void bt_audio_hf_demo_main(void *arg)
                     if(hf_speaker_thread_handle || hf_mic_thread_handle)
                     {
                         hf_auido_start = 0;
+                        if (kNoErr != rtos_init_semaphore(&hf_mic_speaker_exit_sema, 1))
+                        {
+                            LOGE("init sema fail, %d \n", __LINE__);
+                        }
                     }
 
                     if(hf_mic_thread_handle)
                     {
                         LOGI("%s wait mic thread end\n", __func__);
-                        rtos_thread_join(&hf_mic_thread_handle);
+                        if (hf_mic_speaker_exit_sema)
+                        {
+                            rtos_get_semaphore(&hf_mic_speaker_exit_sema, BEKEN_WAIT_FOREVER);
+                        }
                         LOGI("%s thread end !!!\n", __func__);
                         hf_mic_thread_handle = NULL;
                     }
@@ -667,9 +675,18 @@ void bt_audio_hf_demo_main(void *arg)
                         }
 
                         LOGI("%s wait spk thread end\n", __func__);
-                        rtos_thread_join(&hf_speaker_thread_handle);
+                        if (hf_mic_speaker_exit_sema)
+                        {
+                            rtos_get_semaphore(&hf_mic_speaker_exit_sema, BEKEN_WAIT_FOREVER);
+                        }
                         LOGI("%s thread end !!!\n", __func__);
                         hf_speaker_thread_handle = NULL;
+                    }
+
+                    if (hf_mic_speaker_exit_sema)
+                    {
+                        rtos_deinit_semaphore(&hf_mic_speaker_exit_sema);
+                        hf_mic_speaker_exit_sema = NULL;
                     }
                 }
                 break;
@@ -878,7 +895,7 @@ static void mic_task(void *arg)
     LOGI("%s wait a2dp task end\n", __func__);
     extern int32_t wait_a2dp_speaker_task_end(void);
     wait_a2dp_speaker_task_end();
-    s_audio_record_obj = audio_record_create(AUDIO_PLAY_ONBOARD_SPEAKER, &cfg);
+    s_audio_record_obj = audio_record_create(AUDIO_RECORD_ONBOARD_MIC, &cfg);
 
     if(!s_audio_record_obj)
     {
@@ -968,6 +985,11 @@ end:;
     s_audio_record_obj = NULL;
 
     LOGI("%s end!! %d\r\n", __func__, hf_auido_start);
+
+    if (hf_mic_speaker_exit_sema)
+    {
+        rtos_set_semaphore(&hf_mic_speaker_exit_sema);
+    }
 
     rtos_delete_thread(NULL);
 }
@@ -1107,6 +1129,12 @@ end:;
 
     rtos_deinit_semaphore(&hf_speaker_sema);
     hf_speaker_sema = NULL;
+
+    if (hf_mic_speaker_exit_sema)
+    {
+        rtos_set_semaphore(&hf_mic_speaker_exit_sema);
+    }
+
     rtos_delete_thread(NULL);
 }
 int32_t wait_hfp_speaker_mic_task_end(void)

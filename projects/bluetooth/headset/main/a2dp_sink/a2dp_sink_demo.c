@@ -136,6 +136,7 @@ static uint8_t *p_cache_buff = NULL;
 
 static beken_thread_t a2dp_speaker_thread_handle = NULL;
 static beken_semaphore_t a2dp_speaker_sema = NULL;
+static beken_semaphore_t a2dp_speaker_exit_sema = NULL;
 //static beken_timer_t a2dp_speaker_tmr = {0};
 
 
@@ -454,14 +455,26 @@ void bt_audio_sink_demo_main(void *arg)
                 if(a2dp_speaker_thread_handle)
                 {
                     s_spk_is_started = 0;
+                    if (kNoErr != rtos_init_semaphore(&a2dp_speaker_exit_sema, 1))
+                    {
+                        LOGE("init sema fail, %d \n", __LINE__);
+                    }
                     if(a2dp_speaker_sema)
                     {
                         rtos_set_semaphore(&a2dp_speaker_sema);
                     }
                     LOGI("%s wait thread end\n", __func__);
-                    rtos_thread_join(&a2dp_speaker_thread_handle);
+                    if (a2dp_speaker_exit_sema)
+                    {
+                        rtos_get_semaphore(&a2dp_speaker_exit_sema, BEKEN_WAIT_FOREVER);
+                    }
                     LOGI("%s thread end !!!\n", __func__);
                     a2dp_speaker_thread_handle = NULL;
+                    if (a2dp_speaker_exit_sema)
+                    {
+                        rtos_deinit_semaphore(&a2dp_speaker_exit_sema);
+                        a2dp_speaker_exit_sema = NULL;
+                    }
                 }
 
 #endif
@@ -1487,12 +1500,12 @@ static void speaker_task(void *arg)
 
     while (1)
     {
-        rtos_get_semaphore(&a2dp_speaker_sema, BEKEN_WAIT_FOREVER);
-
         if(!s_spk_is_started)
         {
             break;
         }
+
+        rtos_get_semaphore(&a2dp_speaker_sema, BEKEN_WAIT_FOREVER);
 
         uint32_t frame_nodes = ring_buffer_node_get_fill_nodes(&s_a2dp_frame_nodes);
         while(frame_nodes)
@@ -1634,6 +1647,12 @@ end:;
         s_spk_is_started = 0;
         LOGE("!! speaker tash exit error !!\n");
     }
+
+    if (a2dp_speaker_exit_sema)
+    {
+        rtos_set_semaphore(&a2dp_speaker_exit_sema);
+    }
+
     rtos_delete_thread(NULL);
 }
 
