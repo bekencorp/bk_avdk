@@ -1,2 +1,4 @@
+#@ Enable Lcd scale
 CONFIG_MEDIA_SCALE=y
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y

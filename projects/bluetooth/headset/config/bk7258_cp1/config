@@ -1,53 +1,94 @@
 CONFIG_DVP_CAMERA_TEST=n
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0x10000
+#@ CPU0 RAM size for SPE
 CONFIG_CPU0_SPE_RAM_SIZE=0x70000
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y
 # USB
+#@ Enable USB
 CONFIG_USB=n
+#@ MUSBMHDRC
 CONFIG_MUSB_MHDRC=n
+#@ CHERRY_USB
 CONFIG_CHERRY_USB=n
+#@ Enable USB Host Mode
 CONFIG_USB_HOST=n
+#@ Enable USB hub
 CONFIG_USB_HUB=n
+#@ Enable MULTIPLE DEVICE IDENTIFICATION by hub
 CONFIG_USB_HUB_MULTIPLE_DEVICES=n
+#@ Enable Usb Uvc
 CONFIG_USB_UVC=n
+#@ Enable Usb Uac
 CONFIG_USB_UAC=n
+#@ Enable Usb Uac Mic
 CONFIG_USB_UAC_MIC=n
+#@ Enable Usb Uac Speaker
 CONFIG_USB_UAC_SPEAKER=n
 
 # Media Hardware
+#@ Enable yuv_buf
 CONFIG_YUV_BUF=n
+#@ Enable h264
 CONFIG_H264=n
+#@ Enable HardWare JPEG ENCODE
 CONFIG_JPEGENC_HW=n
+#@ Enable JPEGDEC Display
 CONFIG_JPEGDEC_HW=n
+#@ Enable hw rotate and pixel convert module
 CONFIG_HW_ROTATE_PFC=n
+#@ Enable hw scale module
 CONFIG_HW_SCALE=n
+#@ Enable DMA2D
 CONFIG_DMA2D=n
+#@ Enable LCD
 CONFIG_LCD=n
+#@ Enable Lcd rotate function
 CONFIG_LCD_ROTATE=n
+#@ Enable Lcd hw pixel convert
 CONFIG_LCD_HW_PFC=n
+#@ Enable Lcd hw decode
 CONFIG_LCD_HW_DECODE=n
+#@ Enable Lcd sw decode
 CONFIG_LCD_SW_DECODE=n
+#@ Enable Draw Blend
 CONFIG_BLEND=n
 
 # DVP & I2C
+#@ Enable GPIO Simulate I2C
 CONFIG_SIM_I2C=n
+#@ Enable encode buffer dynamic malloc
 CONFIG_ENCODE_BUF_DYNAMIC=n
 
 # LCD
+#@ Enable LCD_H050IWV API
 CONFIG_LCD_H050IWV=n
+#@ Enable LCD_HX8282 API
 CONFIG_LCD_HX8282=n
+#@ Enable LCD_MD0430R API
 CONFIG_LCD_MD0430R=n
+#@ Enable LCD_MD0700R API
 CONFIG_LCD_MD0700R=n
+#@ Enable LCD_ST7282 API
 CONFIG_LCD_ST7282=n
+#@ Enable LCD_ST7701S_LY API
 CONFIG_LCD_ST7701S_LY=n
+#@ Enable LCD_ST7701S API
 CONFIG_LCD_ST7701S=n
+#@ Enable LCD_ST7701SN API
 CONFIG_LCD_ST7701SN=n
+#@ Enable LCD_AML01 API
 CONFIG_LCD_AML01=n
+#@ Enable LCD_NT35510_MCU API
 CONFIG_LCD_NT35510_MCU=n
+#@ Enable LCD_ST7796S API
 CONFIG_LCD_ST7796S=n
 
 # Transfer
+#@ Enable Wifi Transfer
 CONFIG_WIFI_TRANSFER=n
+#@ Enable usb Transfer
 CONFIG_USB_TRANSFER=n
+#@ enable image save and read image
 CONFIG_IMAGE_STORAGE=n
-

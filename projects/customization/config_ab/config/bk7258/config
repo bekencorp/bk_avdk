@@ -1,29 +1,54 @@
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y
+#@ Enable Ota Http
 CONFIG_OTA_HTTP=y
 CONFIG_OTA=y
+#@ enable http update ab partition
 CONFIG_HTTP_AB_PARTITION=y
+#@ enable ota update default partition
 CONFIG_OTA_UPDATE_DEFAULT_PARTITION=y
+#@ enable ota evade method
 CONFIG_OTA_EVADE_METHOD=y
+#@ enable ota position independent update
 CONFIG_OTA_POSITION_INDEPENDENT_AB=y
+#@ cli command code size optimize
 CONFIG_CLI_CODE_SIZE_OPTIMIZE_ENABLE=y
+#@ Set the threshold of the CS2 TX buffer. The recommended value is 5120 (1024*5).
 CONFIG_CS2_TX_BUFFER_THD=262144
+#@ Enable PSRAM write through
 CONFIG_PSRAM_WRITE_THROUGH=y
 CONFIG_BLUETOOTH_LINK_MAX_COUNT=1
+#@ BT reuse media memory at beging of cpu1
 CONFIG_BT_REUSE_MEDIA_MEMORY=y
+#@ BT reuse media memory size
 CONFIG_BT_REUSE_MEDIA_MEM_SIZE=0x1B000
+#@ 0
 CONFIG_DMA_LOGIC_CHAN_ID_MIN=0
+#@ Audio ring buff safe interval
 CONFIG_AUD_RING_BUFF_SAFE_INTERVAL=4
+#@ Enable Audio
 CONFIG_AUDIO=n
+#@ Enable audio adc driver
 CONFIG_AUDIO_ADC=n
+#@ Enable audio dac driver
 CONFIG_AUDIO_DAC=n
+#@ Enable I2S
 CONFIG_I2S=n
+#@ enable image save and read image
 CONFIG_IMAGE_STORAGE=y
+#@ Enable Wifi Transfer
 CONFIG_WIFI_TRANSFER=y
+#@ Enable usb Transfer
 CONFIG_USB_TRANSFER=n
+#@ Enable media drop strategy
 CONFIG_MEDIA_DROP_STRATEGY_ENABLE=y
 CONFIG_INTEGRATION_DOORBELL=y
 CONFIG_INTEGRATION_DOORBELL_CS2=y
+#@ Enable CS2 P2P server lib
 CONFIG_CS2_P2P_SERVER=y
+#@ Set transfer app task size
 CONFIG_TRANS_APP_TASK_SIZE=2048
+#@ Cpu1 core offset address default 0x2e0000
 CONFIG_SYS_CPU1_OFFSET=0x2170000
+#@ enable ota hash function
 CONFIG_OTA_HASH_FUNCTION=y

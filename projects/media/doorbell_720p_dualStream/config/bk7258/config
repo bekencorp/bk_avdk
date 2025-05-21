@@ -1,28 +1,53 @@
+#@ Enable PSRAM write through
 CONFIG_PSRAM_WRITE_THROUGH=y
+#@ The psram address is from 0x60000000 to 0x60800000 for psram aps6408l_o
 CONFIG_PSRAM_HEAP_BASE=0x60B00000
+#@ psram aps6408l-o
 CONFIG_PSRAM_HEAP_SIZE=0x200000
+#@ Set psram_malloc base address
 CONFIG_PSRAM_HEAP_CPU0_BASE_ADDER=0x60B00000
+#@ System CPU count: 1: single core, 2: dual core, etc.
 CONFIG_CPU_CNT=2
+#@ CPU0 RAM size for SPE
 CONFIG_CPU0_SPE_RAM_SIZE=0X47000
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0X4B000
+#@ CPU2 app RAM size
 CONFIG_CPU2_APP_RAM_SIZE=0XE000
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y
+#@ 0
 CONFIG_DMA_LOGIC_CHAN_ID_MIN=0
+#@ BT reuse media memory at beging of cpu1
 CONFIG_BT_REUSE_MEDIA_MEMORY=y
+#@ BT reuse media memory size
 CONFIG_BT_REUSE_MEDIA_MEM_SIZE=0x2F000
+#@ enable image save and read image
 CONFIG_IMAGE_STORAGE=y
+#@ Enable Wifi Transfer
 CONFIG_WIFI_TRANSFER=y
+#@ Enable usb Transfer
 CONFIG_USB_TRANSFER=n
+#@ Set the threshold of the CS2 TX buffer. The recommended value is 5120 (1024*5).
 CONFIG_CS2_TX_BUFFER_THD=262144
 CONFIG_SUPPORTED_IMAGE_MAX_720P=y
+#@ Standard dual stream
 CONFIG_STANDARD_DUALSTREAM=y
+#@ Audio ring buff safe interval
 CONFIG_AUD_RING_BUFF_SAFE_INTERVAL=4
+#@ Enable Audio
 CONFIG_AUDIO=n
+#@ Enable audio adc driver
 CONFIG_AUDIO_ADC=n
+#@ Enable audio dac driver
 CONFIG_AUDIO_DAC=n
+#@ Enable I2S
 CONFIG_I2S=n
+#@ Enable media drop strategy
 CONFIG_MEDIA_DROP_STRATEGY_ENABLE=y
 CONFIG_INTEGRATION_DOORBELL=y
 CONFIG_INTEGRATION_DOORBELL_CS2=y
+#@ Enable CS2 P2P server lib
 CONFIG_CS2_P2P_SERVER=y
+#@ Cpu1 core offset address default 0x2e0000
 CONFIG_SYS_CPU1_OFFSET=0x21a0000

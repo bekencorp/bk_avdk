@@ -1,15 +1,30 @@
+#@ video data in dtcm
 CONFIG_VIDEO_DTCM=y
+#@ Enable Media
 CONFIG_MEDIA_MINOR=y
+#@ Enable media service
 CONFIG_MEDIA=y
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n
+#@ CPU0 RAM size for SPE
 CONFIG_CPU0_SPE_RAM_SIZE=0X56000
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0X40000
+#@ CPU2 app RAM size
 CONFIG_CPU2_APP_RAM_SIZE=0XA000
+#@ Enable General DMA
 CONFIG_GENERAL_DMA=n
+#@ Enable SPI DMA
 CONFIG_SPI_DMA=n
+#@ 4
 CONFIG_DMA_LOGIC_CHAN_CNT=7
+#@ 0
 CONFIG_DMA_LOGIC_CHAN_ID_MIN=9
+#@ Enable Software Decode Sram Mapping
 CONFIG_SOFTWARE_DECODE_SRAM_MAPPING=y
+#@ cli command code size optimize
 CONFIG_CLI_CODE_SIZE_OPTIMIZE_ENABLE=y
+#@ Enable mailbox socket ipc driver
 CONFIG_MAILBOX_IPC=n
+#@ Enable flash
 CONFIG_FLASH=n

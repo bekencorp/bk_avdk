@@ -1,6 +1,12 @@
+#@ video data in dtcm
 CONFIG_VIDEO_DTCM=y
+#@ Enable Media
 CONFIG_MEDIA_MINOR=y
+#@ Enable media service
 CONFIG_MEDIA=y
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0x3D000
+#@ CPU2 app RAM size
 CONFIG_CPU2_APP_RAM_SIZE=0x13000

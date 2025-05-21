@@ -1,62 +1,116 @@
 CONFIG_LV_USE_DEMO_METER=y
+#@ Enable Lvgl
 CONFIG_LVGL=y
+#@ Enable TP
 CONFIG_TP=n
+#@ Enable GPIO Simulate I2C
 CONFIG_SIM_I2C=n
+#@ Enable TP_GT911 API
 CONFIG_TP_GT911=n
+#@ Enable TP_GT1151 API
 CONFIG_TP_GT1151=n
+#@ 1 - 1 byte per pixel
 CONFIG_LV_COLOR_DEPTH=16
+#@ Enable Lv Font Montserrat 14
 CONFIG_LV_FONT_MONTSERRAT_14=y
+#@ Enable Lv Font Montserrat 24
 CONFIG_LV_FONT_MONTSERRAT_24=y
+#@ Enable Lv Font Montserrat 32
 CONFIG_LV_FONT_MONTSERRAT_32=y
+#@ Show CPU usage and FPS count
 CONFIG_LV_USE_PERF_MONITOR=n
+#@ Enable Lv Attribute Fast Mem
 CONFIG_LV_ATTRIBUTE_FAST_MEM=n
+#@ Enable use direct mode in LVGL use psram draw buffer
 CONFIG_LVGL_USE_DIRECT_MODE=y
+#@ Set lvgl task priority
 CONFIG_LVGL_TASK_PRIORITY=5
+#@ Enable lvgl task sleep time custimize
 CONFIG_LVGL_TASK_SLEEP_TIME_CUSTOMIZE=y
+#@ Enable LCD QSPI
 CONFIG_LCD_QSPI=n
+#@ Enable LCD_QSPI_ST77903_H0165Y008T API
 CONFIG_LCD_QSPI_ST77903_H0165Y008T=n
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n
+#@ Enable Memory Protect Unit Feature
 CONFIG_MPU=y
+#@ Enable Lcd scale
 CONFIG_MEDIA_SCALE=y
+#@ Enable Lcd scale
 CONFIG_MEDIA_PIPELINE=y
+#@ Enable PSRAM write through
 CONFIG_PSRAM_WRITE_THROUGH=y
+#@ Audio Transfer DAC PA Control Enable
 CONFIG_AUD_TRAS_DAC_PA_CTRL=y
+#@ video data in dtcm
 CONFIG_VIDEO_DTCM=y
+#@ BT reuse media memory at beging of cpu1
 CONFIG_BT_REUSE_MEDIA_MEMORY=y
+#@ BT reuse media memory size
 CONFIG_BT_REUSE_MEDIA_MEM_SIZE=0x1B000
+#@ Audio ring buff safe interval
 CONFIG_AUD_RING_BUFF_SAFE_INTERVAL=4
+#@ CPU0 RAM size for SPE
 CONFIG_CPU0_SPE_RAM_SIZE=0x48000
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0x4D000
+#@ CPU2 app RAM size
 CONFIG_CPU2_APP_RAM_SIZE=0xB000
+#@ Use psram_malloc at os_malloc failed.
 CONFIG_USE_PSRAM_HEAP_AT_SRAM_OOM=y
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y
+#@ enable lcd blend by font logo
 CONFIG_LCD_FONT_BLEND=n
+#@ enable lcd dma2d blend flash logo
 CONFIG_LCD_DMA2D_BLEND=n
+#@ Enable Aon Pmu Test
 CONFIG_AON_PMU_TEST=n
+#@ Enable sdmadc
 CONFIG_SDMADC=n
+#@ Enable Sdmadc Test
 CONFIG_SDMADC_TEST=n
+#@ Enable Interrupt Test
 CONFIG_INTERRUPT_TEST=n
+#@ Enable Psram Test
 CONFIG_PSRAM_TEST=n
+#@ Enable I2S
 CONFIG_I2S=n
+#@ Enable I2S Test
 CONFIG_I2S_TEST=n
+#@ Enable Audio driver test
 CONFIG_AUDIO_TEST=n
 
 #
 # USB configuration
 #
+#@ Enable USB
 CONFIG_USB=y
+#@ USB VBAT CONTROL GPIO ID
 CONFIG_USB_VBAT_CONTROL_GPIO_ID=0x1C
+#@ CHERRY_USB
 CONFIG_CHERRY_USB=y
+#@ Enable USB Host Mode
 CONFIG_USB_HOST=y
+#@ Priority of USB task
 CONFIG_TASK_USB_PRIO=2
+#@ Enable Usb Uvc
 CONFIG_USB_UVC=y
+#@ Enable Usb Uac
 CONFIG_USB_UAC=y
+#@ Enable Usb Uac Mic
 CONFIG_USB_UAC_MIC=y
+#@ Enable Usb Uac Speaker
 CONFIG_USB_UAC_SPEAKER=y
 CONFIG_UVC_UAC_DEMO=y
 
+#@ Enable MULTIPLE DEVICE IDENTIFICATION by hub
 CONFIG_USB_HUB_MULTIPLE_DEVICES=y
+#@ HUB MAX EHPORTS
 CONFIG_USBHOST_HUB_MAX_EHPORTS=4
+#@ SUPPORT_MAX_DEVICE
 CONFIG_USBHOST_HUB_PORT_SUPPORT_MAX_DEVICE=4
+#@ USB usb hub port index Vbus control gpio_id
 CONFIG_USBHOST_HUB_PORT_1_VBAT_CONTROL_GPIO_ID=0
 # end of USB configuration

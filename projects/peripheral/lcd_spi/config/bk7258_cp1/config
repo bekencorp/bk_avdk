@@ -1,4 +1,8 @@
+#@ Enable LCD SPI Display
 CONFIG_LCD_SPI_DISPLAY=y
+#@ Enable LCD_SPI_ST7796U
 CONFIG_LCD_SPI_ST7796U=y
+#@ Enable Lcd scale
 CONFIG_MEDIA_PIPELINE=y
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y

@@ -1,2 +1,4 @@
+#@ Audio Transfer DAC PA Control Enable
 CONFIG_AUD_TRAS_DAC_PA_CTRL=y
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y

@@ -1,5 +1,10 @@
+#@ video data in dtcm
 CONFIG_VIDEO_DTCM=y
+#@ Enable Media
 CONFIG_MEDIA_MINOR=y
+#@ Enable media service
 CONFIG_MEDIA=y
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n
+#@ cli command code size optimize
 CONFIG_CLI_CODE_SIZE_OPTIMIZE_ENABLE=y

@@ -1,11 +1,22 @@
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n
+#@ Enable LCD_ST7796S API
 CONFIG_LCD_ST7796S=y
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y
+#@ Enable PSRAM write through
 CONFIG_PSRAM_WRITE_THROUGH=y
+#@ BT reuse media memory at beging of cpu1
 CONFIG_BT_REUSE_MEDIA_MEMORY=y
+#@ BT reuse media memory size
 CONFIG_BT_REUSE_MEDIA_MEM_SIZE=0x1B000
+#@ Audio ring buff safe interval
 CONFIG_AUD_RING_BUFF_SAFE_INTERVAL=4
+#@ Enable Audio driver test
 CONFIG_AUDIO_TEST=n
+#@ Enable I2S Test
 CONFIG_I2S_TEST=n
+#@ Enable TOUCH
 CONFIG_TOUCH=n
+#@ Cpu1 core offset address default 0x2e0000
 CONFIG_SYS_CPU1_OFFSET=0x21b0000

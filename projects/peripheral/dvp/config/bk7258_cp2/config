@@ -1,4 +1,8 @@
+#@ video data in dtcm
 CONFIG_VIDEO_DTCM=y
+#@ Enable Media
 CONFIG_MEDIA_MINOR=y
+#@ Enable media service
 CONFIG_MEDIA=y
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n

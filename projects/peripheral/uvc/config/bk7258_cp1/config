@@ -1,51 +1,83 @@
 # Audio
+#@ Audio ring buff safe interval
 CONFIG_AUD_RING_BUFF_SAFE_INTERVAL=4
+#@ Enable I2S
 CONFIG_I2S=n
+#@ Enable I2S Test
 CONFIG_I2S_TEST=n
+#@ Enable Audio driver test
 CONFIG_AUDIO_TEST=n
+#@ Audio Transfer DAC PA Control Enable
 CONFIG_AUD_TRAS_DAC_PA_CTRL=y
 #
 # USB configuration
 #
+#@ Enable USB
 CONFIG_USB=y
+#@ USB VBAT CONTROL GPIO ID
 CONFIG_USB_VBAT_CONTROL_GPIO_ID=0x1C
+#@ CHERRY_USB
 CONFIG_CHERRY_USB=y
+#@ Enable USB Host Mode
 CONFIG_USB_HOST=y
+#@ Priority of USB task
 CONFIG_TASK_USB_PRIO=2
+#@ Enable Usb Uvc
 CONFIG_USB_UVC=y
+#@ Enable Usb Uac
 CONFIG_USB_UAC=y
+#@ Enable Usb Uac Mic
 CONFIG_USB_UAC_MIC=y
+#@ Enable Usb Uac Speaker
 CONFIG_USB_UAC_SPEAKER=y
 CONFIG_UVC_UAC_DEMO=y
 
+#@ Enable MULTIPLE DEVICE IDENTIFICATION by hub
 CONFIG_USB_HUB_MULTIPLE_DEVICES=y
+#@ HUB MAX EHPORTS
 CONFIG_USBHOST_HUB_MAX_EHPORTS=4
+#@ SUPPORT_MAX_DEVICE
 CONFIG_USBHOST_HUB_PORT_SUPPORT_MAX_DEVICE=4
+#@ USB usb hub port index Vbus control gpio_id
 CONFIG_USBHOST_HUB_PORT_1_VBAT_CONTROL_GPIO_ID=0
 # end of USB configuration
 
 # YUV_BUF/H264/JPEGENC
+#@ Enable yuv_buf
 CONFIG_YUV_BUF=y
+#@ Enable h264
 CONFIG_H264=y
+#@ Enable HardWare JPEG ENCODE
 CONFIG_JPEGENC_HW=y
+#@ set h264 compress quality level
 CONFIG_H264_QUALITY_LEVEL=2
 
 # LCD
+#@ Enable Lcd hw decode
 CONFIG_SW_ROTATE_TO_YUYV_AND_DMA2D_TO_YUYV_NOT_RGB888=y
 
 # DMA
+#@ 4
 CONFIG_DMA_LOGIC_CHAN_CNT=5
+#@ 0
 CONFIG_DMA_LOGIC_CHAN_ID_MIN=4
 
 # Media
+#@ video data in dtcm
 CONFIG_VIDEO_DTCM=y
+#@ Enable Lcd scale
 CONFIG_MEDIA_SCALE=y
+#@ Enable Lcd scale
 CONFIG_MEDIA_PIPELINE=y
 # Image storage
+#@ enable image save and read image
 CONFIG_IMAGE_STORAGE=y
 
 # Video transfer
+#@ Enable Wifi Transfer
 CONFIG_WIFI_TRANSFER=y
+#@ Enable usb Transfer
 CONFIG_USB_TRANSFER=n
 # FLASH
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y

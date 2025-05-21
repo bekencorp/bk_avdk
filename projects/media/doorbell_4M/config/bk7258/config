@@ -1,35 +1,67 @@
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y
+#@ Set the threshold of the CS2 TX buffer. The recommended value is 5120 (1024*5).
 CONFIG_CS2_TX_BUFFER_THD=262144
+#@ Enable PSRAM write through
 CONFIG_PSRAM_WRITE_THROUGH=y
+#@ CPU0 RAM size for SPE
 CONFIG_CPU0_SPE_RAM_SIZE=0X56000
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0X40000
+#@ CPU2 app RAM size
 CONFIG_CPU2_APP_RAM_SIZE=0XA000
 CONFIG_BLUETOOTH_LINK_MAX_COUNT=1
+#@ BT reuse media memory at beging of cpu1
 CONFIG_BT_REUSE_MEDIA_MEMORY=y
+#@ BT reuse media memory size
 CONFIG_BT_REUSE_MEDIA_MEM_SIZE=0x1B000
+#@ 0
 CONFIG_DMA_LOGIC_CHAN_ID_MIN=0
+#@ Audio ring buff safe interval
 CONFIG_AUD_RING_BUFF_SAFE_INTERVAL=4
+#@ Enable Audio
 CONFIG_AUDIO=n
+#@ Enable audio adc driver
 CONFIG_AUDIO_ADC=n
+#@ Enable audio dac driver
 CONFIG_AUDIO_DAC=n
+#@ Enable I2S
 CONFIG_I2S=n
+#@ The PSRAM used by the media is within 4M.
 CONFIG_MEDIA_PSRAM_SIZE_4M=y
+#@ The psram address is from 0x60000000 to 0x60800000 for psram aps6408l_o
 CONFIG_PSRAM_HEAP_BASE=0x60354000
+#@ psram aps6408l-o
 CONFIG_PSRAM_HEAP_SIZE=0x7D000
+#@ Set psram_malloc base address
 CONFIG_PSRAM_HEAP_CPU0_BASE_ADDER=0x60354000
+#@ size of psram user need to use
 CONFIG_PSRAM_MEM_SLAB_USER_SIZE=0
+#@ size of psram audio need to use
 CONFIG_PSRAM_MEM_SLAB_AUDIO_SIZE=51200
+#@ size of psram encode function need to use
 CONFIG_PSRAM_MEM_SLAB_ENCODE_SIZE=946176
+#@ size of psram display need to use
 CONFIG_PSRAM_MEM_SLAB_DISPLAY_SIZE=2490368
+#@ buck disable analog
 CONFIG_BUCK_ANALOG_DISABLE=y
+#@ enable image save and read image
 CONFIG_IMAGE_STORAGE=y
+#@ Enable Wifi Transfer
 CONFIG_WIFI_TRANSFER=y
+#@ Enable usb Transfer
 CONFIG_USB_TRANSFER=n
+#@ Set transfer app task size
 CONFIG_TRANS_APP_TASK_SIZE=2048
+#@ Enable media drop strategy
 CONFIG_MEDIA_DROP_STRATEGY_ENABLE=y
 CONFIG_INTEGRATION_DOORBELL=y
 CONFIG_INTEGRATION_DOORBELL_CS2=y
+#@ Enable CS2 P2P server lib
 CONFIG_CS2_P2P_SERVER=y
+#@ Enable media service
 CONFIG_MEDIA=y
+#@ only supports ble slave
 CONFIG_BLUETOOTH_BLE_SLAVE_ONLY=y
+#@ Cpu1 core offset address default 0x2e0000
 CONFIG_SYS_CPU1_OFFSET=0x21b0000

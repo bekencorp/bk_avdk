@@ -1,46 +1,88 @@
 CONFIG_LV_USE_DEMO_86BOX=y
+#@ Enable Lvgl
 CONFIG_LVGL=y
+#@ Enable TP
 CONFIG_TP=y
+#@ Enable GPIO Simulate I2C
 CONFIG_SIM_I2C=y
+#@ Enable TP_GT911 API
 CONFIG_TP_GT911=y
+#@ Enable TP_GT1151 API
 CONFIG_TP_GT1151=y
+#@ 1 - 1 byte per pixel
 CONFIG_LV_COLOR_DEPTH=16
+#@ Enable Lv Font Montserrat 14
 CONFIG_LV_FONT_MONTSERRAT_14=y
+#@ Enable Lv Font Montserrat 24
 CONFIG_LV_FONT_MONTSERRAT_24=y
+#@ Show CPU usage and FPS count
 CONFIG_LV_USE_PERF_MONITOR=y
+#@ Enable Lv Attribute Fast Mem
 CONFIG_LV_ATTRIBUTE_FAST_MEM=n
+#@ Enable use direct mode in LVGL use psram draw buffer
 CONFIG_LVGL_USE_DIRECT_MODE=y
+#@ CPU0 RAM size for SPE
 CONFIG_CPU0_SPE_RAM_SIZE=0X40000
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0X60000
+#@ CPU2 app RAM size
 CONFIG_CPU2_APP_RAM_SIZE=0X00000
+#@ BT reuse media memory at beging of cpu1
 CONFIG_BT_REUSE_MEDIA_MEMORY=y
+#@ BT reuse media memory size
 CONFIG_BT_REUSE_MEDIA_MEM_SIZE=0x1B000
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n
+#@ Enable Memory Protect Unit Feature
 CONFIG_MPU=y
 
+#@ Enable Lcd scale
 CONFIG_MEDIA_SCALE=n
+#@ Enable Lcd scale
 CONFIG_MEDIA_PIPELINE=n
+#@ Enable LCD QSPI
 CONFIG_LCD_QSPI=n
+#@ Enable Lcd Qspi Test
 CONFIG_LCD_QSPI_TEST=n
+#@ Enable Aon Pmu Test
 CONFIG_AON_PMU_TEST=n
+#@ Enable sdmadc
 CONFIG_SDMADC=n
+#@ Enable Sdmadc Test
 CONFIG_SDMADC_TEST=n
+#@ Enable Interrupt Test
 CONFIG_INTERRUPT_TEST=n
+#@ Enable Psram Test
 CONFIG_PSRAM_TEST=n
 CONFIG_UVC_UAC_DEMO_DEBUG=n
+#@ Enable I2S
 CONFIG_I2S=n
+#@ Enable I2S Test
 CONFIG_I2S_TEST=n
+#@ Enable SDCARD
 CONFIG_SDCARD=n
+#@ Enable sdio host
 CONFIG_SDIO_HOST=n
+#@ SDIO Version V2P0
 CONFIG_SDIO_V2P0=n
+#@ Enable ACK_NOW if MQTT is open
 CONFIG_MQTT_ACK_NOW=n
+#@ Enable Lcd rotate function
 CONFIG_LCD_ROTATE=n
+#@ enable lcd dma2d blend flash logo
 CONFIG_LCD_DMA2D_BLEND=n
+#@ enable lcd blend by font logo
 CONFIG_LCD_FONT_BLEND=n
+#@ enable image save and read image
 CONFIG_IMAGE_STORAGE=n
+#@ Enable Override Flash Partition
 CONFIG_OVERRIDE_FLASH_PARTITION=y
 
+#@ Enable Audio Record
 CONFIG_AUDIO_RECORD=y
+#@ Enable Wanson Automatic Speech Recognition
 CONFIG_WANSON_ASR=y
+#@ Enable GPIO default set devs
 CONFIG_GPIO_DEFAULT_SET_SUPPORT=y
+#@ Enable user-defined GPIO config for each project
 CONFIG_USR_GPIO_CFG_EN=y

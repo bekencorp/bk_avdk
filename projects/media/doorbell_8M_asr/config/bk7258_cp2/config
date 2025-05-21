@@ -1,22 +1,42 @@
+#@ video data in dtcm
 CONFIG_VIDEO_DTCM=y
+#@ Enable Media
 CONFIG_MEDIA_MINOR=y
+#@ Enable media service
 CONFIG_MEDIA=y
+#@ Enable Cache
 CONFIG_CACHE_ENABLE=n
+#@ CPU0 RAM size for SPE
 CONFIG_CPU0_SPE_RAM_SIZE=0x40000
+#@ CPU1 app RAM size
 CONFIG_CPU1_APP_RAM_SIZE=0x3D000
+#@ CPU2 app RAM size
 CONFIG_CPU2_APP_RAM_SIZE=0x23000
+#@ Enable General DMA
 CONFIG_GENERAL_DMA=n
+#@ Enable SPI DMA
 CONFIG_SPI_DMA=n
+#@ 4
 CONFIG_DMA_LOGIC_CHAN_CNT=7
+#@ 0
 CONFIG_DMA_LOGIC_CHAN_ID_MIN=9
+#@ Enable Software Decode Sram Mapping
 CONFIG_SOFTWARE_DECODE_SRAM_MAPPING=y
+#@ enable audio asr
 CONFIG_AUD_ASR=y
 #CONFIG_WENWEN_ASR=y
 #CONFIG_WENWEN_ASR_VERSION_SINGLE_MIC=y
+#@ Enable Wanson Automatic Speech Recognition
 CONFIG_WANSON_ASR=y
+#@ support wakeword "xiaoding xiaoding"
 CONFIG_WANSON_ASR_WORDS_VERSION_V3=y
+#@ Enable PSRAM
 CONFIG_PSRAM=y
+#@ Enable psram_malloc API
 CONFIG_PSRAM_AS_SYS_MEMORY=y
+#@ Set psram_malloc base address
 CONFIG_PSRAM_HEAP_CPU0_BASE_ADDER=0x60700000
+#@ The psram address is from 0x60000000 to 0x60800000 for psram aps6408l_o
 CONFIG_PSRAM_HEAP_BASE=0x60780000
+#@ psram aps6408l-o
 CONFIG_PSRAM_HEAP_SIZE=0x80000
