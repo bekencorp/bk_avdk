@@ -400,6 +400,7 @@ bk_err_t frame_buffer_list_node_deinit(frame_list_node_t *node)
     if (node->register_mask != 0)
     {
         LOGE("there are modes not deregister: %d\n", node->register_mask);
+        node->invalid = true;
         rtos_unlock_mutex(&node->lock);
         return BK_OK;
     }

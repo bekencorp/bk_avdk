@@ -1128,11 +1128,8 @@ static void jpeg_decode_task_deinit(void)
 		jdec_config = NULL;
 	}
 
-#if CONFIG_SOC_BK7256XX
-#else
 	bk_pm_module_vote_cpu_freq(PM_DEV_ID_DECODER, PM_CPU_FRQ_DEFAULT);
-#endif
-	LOGD("%s complete\r\n", __func__);
+	LOGI("%s complete\r\n", __func__, __LINE__);
 }
 
 

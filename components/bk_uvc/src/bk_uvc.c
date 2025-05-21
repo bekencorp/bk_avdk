@@ -49,7 +49,7 @@ static void uvc_camera_stream_timer_handle(void *arg1)
 
     if (pro_config != NULL)
     {
-        LOGW("uvc_id0:%d[%d %dKB], uvc_id1: %d[%d %dKB], uvc_id2:%d[%d %dKB], packets:[all:%d, err:%d]\n",
+        LOGW("uvc_id1:%d[%d %dKB], uvc_id2: %d[%d %dKB], uvc_id3:%d[%d %dKB], packets:[all:%d, err:%d]\n",
              ((pro_config->frame_id[0] - pro_config->later_id[0]) / UVC_TIME_INTERVAL),
              pro_config->frame_id[0], (pro_config->curr_length[0] / 1024),
              ((pro_config->frame_id[1] - pro_config->later_id[1]) / UVC_TIME_INTERVAL),
@@ -393,7 +393,7 @@ void uvc_camera_stream_disconnect_callback(bk_usb_hub_port_info *port_info, void
         }
 
         camera_param->camera_state = UVC_DISCONNECT_STATE;
-        // camera_param->port_info = NULL;
+        camera_param->port_info = NULL;
     }
 
     uvc_handle->connect_camera_count--;
@@ -2136,7 +2136,6 @@ bk_err_t bk_uvc_set_stop(camera_handle_t *handle)
         else if (uvc_param->camera_state == UVC_CONNECT_STATE || uvc_param->camera_state == UVC_DISCONNECT_STATE)
         {
             LOGE("%s, %d camera not start\r\n", __func__, __LINE__);
-            return ret;
         }
         else if (uvc_param->camera_state == UVC_STREAMING_STATE || uvc_param->camera_state == UVC_CONFIGING_STATE)
         {
