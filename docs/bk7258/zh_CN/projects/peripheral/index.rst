@@ -9,7 +9,10 @@
    dvp <dvp/index>
    uvc <uvc/index>
    slcd <slcd/index>
-   8080_lcd <8080_lcd/index>
-   qspi_lcd <qspi_lcd/index>
-   rgb_lcd <rgb_lcd/index>
-   spi_lcd <spi_lcd/index>
+   lcd_qspi <lcd_qspi/index>
+   lcd_spi <lcd_spi/index>
+   lcd_rgb565 <lcd_rgb565/index>
+   lcd_rgb888 <lcd_rgb888/index>
+   lcd_rgb666 <lcd_rgb666/index>
+   lcd_8080 <lcd_8080/index>
+

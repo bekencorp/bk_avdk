@@ -6,4 +6,20 @@ menu "Bk_thirdparty::Wanson"
 		help
 			Enable Wanson Automatic Speech Recognition
 
+	choice WANSON_ASR_WORDS_VERSION
+		depends on WANSON_ASR
+		prompt "Select Words Version"
+		default WANSON_ASR_WORDS_VERSION_V1
+
+		config WANSON_ASR_WORDS_VERSION_V1
+		bool "Enable Words Version V1"
+		help
+			support wakeword "a er mi nuo"
+
+		config WANSON_ASR_WORDS_VERSION_V2
+		bool "Enable Words Version V2"
+		help
+			support wakeword "hi armino"
+	endchoice
+
 endmenu

@@ -747,8 +747,10 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 		{
 			LOGI("%s, FMT:ERR\r\n", __func__);
 			lcd_info.decode_mode = NONE_DECODE;
+            lcd_info.decoder_frame->fmt = PIXEL_FMT_YUYV;
 			LCD_DRIVER_FRAME_FREE(lcd_info.decoder_frame);
 			lcd_info.decoder_frame = NULL;
+            lcd_info.jpg_fmt_check = false;
 			goto out;
 		}
 		else
@@ -792,7 +794,7 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 #endif
 			if (ret != BK_OK)
 			{
-				LOGE("%s sw decoder error\n", __func__);
+				LOGE("%s %d decoder error\n", __func__, __LINE__);
 				LCD_DRIVER_FRAME_FREE(lcd_info.decoder_frame);
 				lcd_info.decoder_frame = NULL;
 				goto out;
@@ -801,14 +803,14 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 		else
 		{
 			//ret = lcd_sw_minor_jpegdec_start(frame, lcd_info.decoder_frame);
-
 			if (ret != BK_OK)
 			{
-				LOGE("%s sw decoder error\n", __func__);
+				LOGE("%s %d decoder error\n", __func__, __LINE__);
 				LCD_DRIVER_FRAME_FREE(lcd_info.decoder_frame);
 				lcd_info.decoder_frame = NULL;
 				goto out;
 			}
+            lcd_info.jpg_fmt_check = false;
 		}
 #endif
 	}
@@ -1463,24 +1465,15 @@ bk_err_t lcd_open_handle(media_mailbox_msg_t *msg)
 		lcd_info.rotate_en = false;
 	}
 #endif
-	if (lcd_info.decode_mode == NONE_DECODE)
-		lcd_info.decode_mode = lcd_config.decode_mode;
-	if(lcd_info.decode_mode == HARDWARE_DECODING) 
-	{
-		lcd_info.decoder_en = true;
+	lcd_info.decoder_en = true;
 #if CONFIG_LCD_HW_DECODE
-		lcd_hw_decode_init();
-		LOGI("%s, hw decode init ok\r\n", __func__);
+	lcd_hw_decode_init();
+	LOGI("%s, hw decode init ok\r\n", __func__);
 #endif
-	}
-	else
-	{
-		lcd_info.decoder_en = true;
 #if CONFIG_LCD_SW_DECODE
-		lcd_sw_decode_init(lcd_info.decode_mode);
-		LOGI("%s, lcd SW decode init ok\r\n", __func__);
+	lcd_sw_decode_init(lcd_info.decode_mode);
+	LOGI("%s, lcd SW decode init ok\r\n", __func__);
 #endif
-	}
 
 #if CONFIG_MEDIA_SCALE
 	if (lcd_info.scale_en)
@@ -1643,20 +1636,13 @@ bk_err_t lcd_close_handle(media_mailbox_msg_t *msg)
 
 	lcd_driver_deinit();
 
-	if(lcd_info.decode_mode == HARDWARE_DECODING)
-	{
 #if CONFIG_LCD_HW_DECODE
-		lcd_hw_decode_deinit();
-		LOGW("%s lcd_hw_decode_deinit\n", __func__);
+	lcd_hw_decode_deinit();
+	LOGW("%s lcd_hw_decode_deinit\n", __func__);
 #endif
-	}
-	else
-	{
 #if CONFIG_LCD_SW_DECODE
-		if(lcd_info.decode_mode != NONE_DECODE)
-			lcd_sw_decode_deinit(lcd_info.decode_mode);
+	lcd_sw_decode_deinit(lcd_info.decode_mode);
 #endif
-	}
 #if CONFIG_LCD_ROTATE
 	lcd_rotate_deinit();
 #endif
@@ -1728,6 +1714,7 @@ bk_err_t lcd_close_handle(media_mailbox_msg_t *msg)
 	lcd_info.rotate_en = false;
 	lcd_info.display_en = false;
 	lcd_info.enable = false;
+    lcd_info.jpg_fmt_check = false;
 
 	set_lcd_state(LCD_STATE_DISABLED);
 
@@ -1739,7 +1726,7 @@ out:
 
 
 
-void lcd_set_backligth_handle(param_pak_t *param)
+void lcd_set_backlight_handle(param_pak_t *param)
 {
 	int ret = BK_OK;
 
@@ -1884,14 +1871,7 @@ void lcd_event_handle(media_mailbox_msg_t *msg)
 		case EVENT_LCD_DISPLAY_IND:
 			ret = lcd_display_fram_handle(msg);
 			break;
-        case EVENT_LCD_EXAMPLE_IND:
-        {
-            #if CONFIG_LCD_EXAMPLE
-            extern bk_err_t lcd_display_example(media_mailbox_msg_t *msg);
-            ret = lcd_display_example(msg);
-            #endif
-            break;
-        }
+
 		case EVENT_LCD_GET_STATUS_IND:
 		{
 			bool lcd_status = false;

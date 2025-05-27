@@ -32,7 +32,7 @@ Doorbell_cs2_8M
 3.1 区别
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 
-    doorbell_cs2_8M与doorbell_8M的区别在于，请一个不仅支持UDP、TCP图传，还支持CS2尚云图传，后一个只支持UDP/TCP。
+    doorbell_cs2_8M与doorbell_8M的区别在于，前一个不仅支持UDP、TCP图传，还支持CS2尚云图传，后一个只支持UDP/TCP。
 
     支持尚云的宏在CPU0上配置，两个工程的宏配置区别如下：
 

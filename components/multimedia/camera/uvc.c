@@ -50,63 +50,6 @@ void uvc_device_connect_state_callback(uvc_state_t state)
         jpeg_decode_restart();
 #endif
     }
-
-#if 0
-	if (state == UVC_DISCONNECT_ABNORMAL)
-	{
-		if (!uvc_state_flag)
-		{
-			return;
-		}
-
-		uvc_state_flag = false;
-
-		media_mailbox_msg_t *node = NULL;
-
-		node = os_malloc(sizeof(media_mailbox_msg_t));
-		if (node != NULL)
-		{
-			node->event = EVENT_CAM_UVC_RESET_IND;
-			node->param = state;
-		}
-		else
-		{
-			LOGW("%s, %d, %d\n", __func__, state, uvc_state_flag);
-			return;
-		}
-
-		media_msg_t media_msg;
-		media_msg.event = EVENT_CAM_UVC_RESET_IND;
-		media_msg.param = (uint32_t)node;
-
-		media_send_msg(&media_msg);
-	}
-	else if (state == UVC_CONNECTED)
-	{
-		if (uvc_state_flag)
-			return;
-
-		media_mailbox_msg_t *node = NULL;
-
-		node = os_malloc(sizeof(media_mailbox_msg_t));
-		if (node != NULL)
-		{
-			node->event = EVENT_CAM_UVC_RESET_IND;
-			node->param = state;
-		}
-		else
-		{
-			LOGW("%s, %d, %d\n", __func__, state, uvc_state_flag);
-			return;
-		}
-
-		media_msg_t media_msg;
-		media_msg.event = EVENT_CAM_UVC_RESET_IND;
-		media_msg.param = (uint32_t)node;
-
-		media_send_msg(&media_msg);
-	}
-#endif
 }
 
 bk_err_t bk_uvc_camera_open(media_camera_device_t *device)

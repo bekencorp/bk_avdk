@@ -21,6 +21,9 @@ typedef struct
 
     uint32_t data_len;
     uint8_t *data;
+
+    uint32_t addition_data_len;
+    uint8_t *addition_data;
 } dm_gatt_app_env_t;
 
 typedef struct
@@ -32,10 +35,20 @@ typedef struct
     uint8_t job_status; //see GATTC_STATUS_IDLE
     uint8_t noti_indica_switch;
     uint8_t noti_indicate_recv_count;
-} dm_gatt_addition_app_env_t;
+
+    uint16_t peer_interest_service_start_handle; //interest
+    uint16_t peer_interest_service_end_handle;
+    uint16_t peer_interest_char_handle;
+    uint16_t peer_interest_char_desc_handle;
+
+    uint16_t peer_gap_service_start_handle;
+    uint16_t peer_gap_service_end_handle;
+
+} dm_gatt_demo_app_env_t;
 
 dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len);
 dm_gatt_app_env_t *dm_ble_find_app_env_by_addr(uint8_t *addr);
 dm_gatt_app_env_t *dm_ble_find_app_env_by_conn_id(uint16_t conn_id);
 uint8_t dm_ble_del_app_env_by_addr(uint8_t *addr);
+dm_gatt_app_env_t *dm_ble_alloc_addition_data_by_addr(uint8_t *addr, uint32_t data_len);
 uint8_t dm_ble_app_env_foreach( int32_t (*func) (dm_gatt_app_env_t *env, void *arg), void *arg );

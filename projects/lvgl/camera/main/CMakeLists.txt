@@ -4,22 +4,6 @@ set(srcs
 	camera_main.c
 )
 
-if (CONFIG_SOC_BK7256)
-if (CONFIG_LVGL_DEMO)
-list(APPEND srcs
-	lv_example_image_show.c
-	img_utility.c
-)
-endif()
-
-if (CONFIG_LV_USE_DEMO_METER)
-list(APPEND srcs
-	lv_example_meter.c
-	lvgl_vfs_init.c
-)
-endif()
-else ()
-
 if (CONFIG_INTEGRATION_DOORBELL)
 if (CONFIG_SYS_CPU0)
 list(APPEND srcs
@@ -40,13 +24,6 @@ if (CONFIG_INTEGRATION_DOORBELL_CS2)
 list(APPEND srcs
 	../../../media/doorbell/main/src/doorbell_cs2_service.c
 )
-endif()
-
-if (CONFIG_LV_USE_DEMO_METER)
-list(APPEND srcs
-	bg_img.c
-)
-endif()
 endif()
 
 if (CONFIG_OVERRIDE_FLASH_PARTITION)

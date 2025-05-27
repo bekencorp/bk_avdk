@@ -477,9 +477,15 @@ void media_major_mailbox_msg_handle(media_mailbox_msg_t *msg)
 
 				case AUD_EVENT:
 				case AUD_NOTIFY:
+					{
+#if (CONFIG_AI_AGENT)
+					extern bk_err_t audio_control_event_handle(media_mailbox_msg_t * msg);
+                    audio_control_event_handle(msg);
+#else
 					audio_event_handle(msg);
+#endif
 					break;
-
+                    }
 				case BT_EVENT:
                     media_msg.event = msg->event;
                     media_msg.param = (uint32_t)msg;

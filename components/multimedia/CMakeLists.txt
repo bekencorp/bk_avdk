@@ -204,4 +204,4 @@ endif()#(CONFIG_CPU_CNT GREATER 1)
 endif()# CONFIG_MEDIA
 
 endif() # CONFIG_SOC_BK7258
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_cli lvgl net_transfer audio_pipeline avdk_libs video unity media_utils  bk_draw_blend display_service )
+armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_cli lvgl net_transfer avdk_libs video unity media_utils  bk_draw_blend display_service )

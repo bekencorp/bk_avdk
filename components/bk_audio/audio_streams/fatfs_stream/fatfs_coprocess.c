@@ -256,10 +256,10 @@ audio_element_coprocess_ctx_t *fatfs_coprocess_create(audio_element_coprocess_cf
 						  sizeof(audio_msg_t),
 						  30);
 	if (ret != kNoErr) {
-		BK_LOGE(TAG, "ceate fatfs coprocess message queue fail \n");
+		BK_LOGE(TAG, "create fatfs coprocess message queue fail \n");
 		goto exit;
 	}
-	BK_LOGI(TAG, "ceate fatfs coprocess message queue complete \n");
+	BK_LOGI(TAG, "create fatfs coprocess message queue complete \n");
 
 	ret = rtos_create_thread(&fatfs_coprocess_ctx->audio_element_coprocess_thread_hdl,
 						 setup_cfg->task_prio,

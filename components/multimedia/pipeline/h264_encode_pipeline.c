@@ -273,6 +273,11 @@ static void h264_encode_reset_handle(void)
 
 	LOGI("%s, complete\r\n", __func__);
 
+    if (h264_encode_config->input_buf_type)
+    {
+        jpeg_decode_task_send_msg(JPEGDEC_H264_FRAME_NOTIFY, 0);
+    }
+
     if(h264_encode_config->reset_cb)
         h264_encode_config->reset_cb(NULL);
 }

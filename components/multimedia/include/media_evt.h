@@ -122,6 +122,13 @@ typedef enum
 	EVENT_AUD_VOC_TX_DEBUG_REQ,			/**< dump tx data */
 	EVENT_AUD_VOC_RX_DEBUG_REQ,			/**< dump rx data */
 	EVENT_AUD_VOC_AEC_DEBUG_REQ, 		/**< dump aec data */
+
+    /* AI Agent */
+	EVENT_AUD_AI_INIT_REQ,			/**< init audio ai data tx and rx */
+    EVENT_AUD_AI_START_REQ,
+    EVENT_AUD_AI_STOP_REQ,
+    EVENT_AUD_AI_DEINIT_REQ,
+
 	/* UAC op */
 	EVENT_AUD_UAC_REGIS_CONT_STATE_CB_REQ,		/**< register uac mic and speaker connect state callback */
 	EVENT_AUD_UAC_CONT_REQ,						/**< recover uac status after uac automatically connect */
@@ -169,7 +176,6 @@ typedef enum
 	EVENT_LCD_SCALE_IND,
 	EVENT_LCD_GET_STATUS_IND,
 	EVENT_GET_UVC_STATUS_IND,
-    EVENT_LCD_EXAMPLE_IND,
 
 	EVENT_PIPELINE_LCD_DISP_OPEN_IND = (UVC_PIPELINE_EVENT << MEDIA_EVT_BIT),
 	EVENT_PIPELINE_LCD_DISP_CLOSE_IND,

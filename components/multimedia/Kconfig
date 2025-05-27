@@ -135,6 +135,14 @@ menu "Media"
 		bool "Enable Aud intf test"
 		default n
 
+	config AUD_INTF_SUPPORT_G722
+		bool "Enable Aud intf support G722 data type"
+		default n
+
+	config AUD_INTF_SUPPORT_AI_DIALOG_FREE
+		bool "Enable Aud intf support ai_dialog_free"
+		default n
+
 	choice AUD_TRAS_USE_MEMORY
 		prompt "Select AUD TRAS use memory"
 		default AUD_TRAS_USE_PSRAM
@@ -173,4 +181,18 @@ menu "Media"
     config SOFTWARE_DECODE_SRAM_MAPPING
         bool "Enable Software Decode Sram Mapping"
 		default n
+
+    config MEDIA_PSRAM_SIZE_4M
+        bool "The PSRAM used by the media is within 4M."
+            default n
+
+	config AUD_DAC_PA_CTRL_GPIO
+		depends on AUD_TRAS_DAC_PA_CTRL
+		int "Audio DAC PA Controller GPIO Set"
+		range 0 100
+		default 5
+
+    config AI_AGENT
+        bool "Enable AI Agent"
+        default n
 endmenu

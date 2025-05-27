@@ -16,15 +16,12 @@
 #include "lv_vendor.h"
 #endif
 #include "driver/drv_tp.h"
-#include "lvgl_vfs_init.h"
 #include <driver/lcd.h>
 #include "doorbell_comm.h"
 #include "media_service.h"
 
 extern void user_app_main(void);
 extern void rtos_set_user_app_entry(beken_thread_function_t entry);
-extern void lv_example_meter(void);
-extern void lv_example_meter_exit(void);
 
 
 #if (CONFIG_SYS_CPU0)
@@ -138,10 +135,8 @@ lv_obj_t * qr;
 
 static void lv_example_qrcode(void)
 {
-    LV_IMG_DECLARE(bg_img);
-    lv_obj_t * img = lv_img_create(lv_scr_act());
-    lv_img_set_src(img, &bg_img);
-    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(lv_scr_act(), 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t * label = lv_label_create(lv_scr_act());
     lv_obj_set_width(label, LV_SIZE_CONTENT);
@@ -177,10 +172,17 @@ void lvgl_event_open_handle(media_mailbox_msg_t *msg)
     lv_vnd_config_t lv_vnd_config = {0};
     lcd_open_t *lcd_open = (lcd_open_t *)msg->param;
 
+    frame_buffer_t *lv_frame_buffer= frame_buffer_display_malloc(ppi_to_pixel_x(lcd_open->device_ppi) * ppi_to_pixel_y(lcd_open->device_ppi) * sizeof(lv_color_t));
+    if (lv_frame_buffer == NULL) {
+        os_printf("[%s] lv_frame_buffer malloc fail\r\n", __func__);
+        msg_send_rsp_to_media_major_mailbox(msg, BK_FAIL, APP_MODULE);
+        return;
+    }
+
     lv_vnd_config.draw_pixel_size = (60 * 1024) / sizeof(lv_color_t);
     lv_vnd_config.draw_buf_2_1 = LV_MEM_CUSTOM_ALLOC(lv_vnd_config.draw_pixel_size * sizeof(lv_color_t));
     lv_vnd_config.draw_buf_2_2 = NULL;
-    lv_vnd_config.frame_buf_1 = (lv_color_t *)psram_malloc(ppi_to_pixel_x(lcd_open->device_ppi) * ppi_to_pixel_y(lcd_open->device_ppi) * sizeof(lv_color_t));
+    lv_vnd_config.frame_buf_1 = (lv_color_t *)lv_frame_buffer->frame;
     lv_vnd_config.frame_buf_2 = NULL;
 
     lv_vnd_config.lcd_hor_res = ppi_to_pixel_x(lcd_open->device_ppi);

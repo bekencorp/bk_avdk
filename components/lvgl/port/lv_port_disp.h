@@ -23,7 +23,9 @@ extern "C" {
  *********************/
 #define DISPLAY_BUFFER_1    1
 #define DISPLAY_BUFFER_2    2
-#define DISPLAY_BUFFER_DEF  0
+#if CONFIG_LVGL_USE_TRIPLE_BUFFERS
+#define DISPLAY_BUFFER_3    3
+#endif
 
 /**********************
  *      TYPEDEFS

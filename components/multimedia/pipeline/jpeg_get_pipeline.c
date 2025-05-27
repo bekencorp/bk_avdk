@@ -38,6 +38,7 @@ typedef struct {
 	beken_semaphore_t jdec_sem;
 	beken_queue_t jdec_queue;
 	beken_thread_t jdec_thread;
+	beken_mutex_t jdec_lock;
 } jpeg_get_config_t;
 
 static void jpeg_decode_line_complete_handler(jpeg_dec_res_t *result);
@@ -51,14 +52,18 @@ bk_err_t jpeg_get_task_send_msg(uint8_t type, uint32_t param)
 
 	if (jpeg_get_config && jpeg_get_config->jdec_queue)
 	{
+		rtos_lock_mutex(&jpeg_get_config->jdec_lock);
 		if (jpeg_get_config->module_decode_status == 1 && param == MODULE_DECODER)
 		{
+			rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
 			return BK_OK;
 		}
 		else if (jpeg_get_config->module_decode_cp1_status == 1 && param == MODULE_DECODER_CP1)
 		{
+			rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
 			return BK_OK;
 		}
+
 		msg.event = type;
 		msg.param = param;
 		if (msg.param == MODULE_DECODER)
@@ -69,10 +74,21 @@ bk_err_t jpeg_get_task_send_msg(uint8_t type, uint32_t param)
 		{
 			jpeg_get_config->module_decode_cp1_status = 1;
 		}
+		rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
 		ret = rtos_push_to_queue(&jpeg_get_config->jdec_queue, &msg, BEKEN_NO_WAIT);
 
 		if (ret != BK_OK)
 		{
+            rtos_lock_mutex(&jpeg_get_config->jdec_lock);
+			if (param == MODULE_DECODER)
+			{
+				jpeg_get_config->module_decode_status = 0;
+			}
+			else if (param == MODULE_DECODER_CP1)
+			{
+				jpeg_get_config->module_decode_cp1_status = 0;
+			}
+            rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
 			LOGE("%s push failed\n", __func__);
 		}
 	}
@@ -85,10 +101,16 @@ static void jpeg_get_start_handle(frame_module_t frame_module)
 	// step 1: read a jpeg frame
 	while (jpeg_get_config->task_state)
 	{
-		jpeg_get_config->jpeg_frame = frame_buffer_fb_read(frame_module);
-		if (jpeg_get_config->jpeg_frame)
+#if CONFIG_MEDIA_PSRAM_SIZE_4M
+		frame_buffer_t *decode_frame = frame_buffer_display_malloc(864 *
+										480 * 2);
+		if(decode_frame != NULL)
 		{
-			jpeg_decode_task_send_more_msg(JPEGDEC_START, (uint32_t)jpeg_get_config->jpeg_frame, frame_module);
+			frame_buffer_display_free(decode_frame);
+		}
+		else
+		{
+			rtos_lock_mutex(&jpeg_get_config->jdec_lock);
 			if (frame_module == MODULE_DECODER)
 			{
 				jpeg_get_config->module_decode_status = 0;
@@ -97,6 +119,36 @@ static void jpeg_get_start_handle(frame_module_t frame_module)
 			{
 				jpeg_get_config->module_decode_cp1_status = 0;
 			}
+			rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
+			break;
+		}
+#endif
+		jpeg_get_config->jpeg_frame = frame_buffer_fb_read(frame_module);
+		if (jpeg_get_config->jpeg_frame)
+		{
+#if CONFIG_MEDIA_PSRAM_SIZE_4M
+#if 0
+            //this is for decode only in cpu2
+			if (frame_module == MODULE_DECODER_CP1)
+			{
+				frame_buffer_fb_free(jpeg_get_config->jpeg_frame, frame_module);
+				jpeg_get_config->module_decode_cp1_status = 0;
+				break;
+			}
+#endif
+#endif
+
+			jpeg_decode_task_send_more_msg(JPEGDEC_START, (uint32_t)jpeg_get_config->jpeg_frame, frame_module);
+			rtos_lock_mutex(&jpeg_get_config->jdec_lock);
+			if (frame_module == MODULE_DECODER)
+			{
+				jpeg_get_config->module_decode_status = 0;
+			}
+			else if (frame_module == MODULE_DECODER_CP1)
+			{
+				jpeg_get_config->module_decode_cp1_status = 0;
+			}
+			rtos_unlock_mutex(&jpeg_get_config->jdec_lock);
 			break;
 		}
 	}
@@ -115,6 +167,10 @@ static void jpeg_get_task_deinit(void)
 		if(jpeg_get_config->jdec_sem)
 		{
 			rtos_deinit_semaphore(&jpeg_get_config->jdec_sem);
+		}
+		if(jpeg_get_config->jdec_lock)
+		{
+			rtos_deinit_mutex(&jpeg_get_config->jdec_lock);
 		}
 		jpeg_get_config->jdec_thread = NULL;
 
@@ -206,7 +262,14 @@ bk_err_t jpeg_get_task_open(void)
 		LOGE("%s, init jpeg_get_config->jdec_sem failed\r\n", __func__);
 		goto error;
 	}
-	// step 5: init jdec_task
+
+	ret = rtos_init_mutex(&jpeg_get_config->jdec_lock);
+	if (ret != BK_OK)
+	{
+		LOGE("%s, init jpeg_get_config->jdec_lock failed\r\n", __func__);
+		goto error;
+	}
+
 	frame_buffer_fb_register(MODULE_DECODER, FB_INDEX_JPEG);
 
 	ret = rtos_init_queue(&jpeg_get_config->jdec_queue,

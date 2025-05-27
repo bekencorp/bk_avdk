@@ -4,4 +4,7 @@ menu "SPI LCD"
 		bool "Enable LCD_SPI_ST7796U"
 		default n
 
+	config LCD_SPI_GC9D01
+		bool "Enable LCD_SPI_GC9D01"
+		default n
 endmenu

@@ -26,6 +26,9 @@ typedef struct {
 
     lv_color_t *frame_buf_1;
     lv_color_t *frame_buf_2;
+#if CONFIG_LVGL_USE_TRIPLE_BUFFERS
+    lv_color_t *frame_buf_3;
+#endif
     uint32_t draw_pixel_size;
     media_rotate_t rotation;
 } lv_vnd_config_t;

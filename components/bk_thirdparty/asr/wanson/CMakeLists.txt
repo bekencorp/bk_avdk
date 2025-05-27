@@ -24,9 +24,22 @@ if ("${ARMINO_SOC}" STREQUAL "bk7236" OR "${ARMINO_SOC}" STREQUAL "bk7258" OR "$
 				include
                 bk7258
     )
+
+if (CONFIG_WANSON_ASR_WORDS_VERSION_V1)
+    list(APPEND incs
+				bk7258/words_version_v1
+    )
+endif()
+
+if (CONFIG_WANSON_ASR_WORDS_VERSION_V2)
+    list(APPEND incs
+				bk7258/words_version_v2
+    )
 endif()
 
 endif()
+
+endif()	#(CONFIG_WANSON_ASR)
 
 armino_component_register(INCLUDE_DIRS "${incs}")
 

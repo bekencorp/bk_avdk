@@ -4,6 +4,7 @@ set(incs .
 
 set(srcs
 		app_main.c
+		cli_jpeg_sw_enc.c
 	)
 
 set(priv_req bk_init bk_cli)

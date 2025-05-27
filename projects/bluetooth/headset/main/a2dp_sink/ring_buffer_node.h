@@ -6,7 +6,7 @@ extern "C" {
 #endif//__cplusplus
 
 #include <stdint.h>
-
+#include <os/os.h>
 /**
  * @brief ring buffer node context definition
  */
@@ -28,7 +28,7 @@ typedef struct _RingBufferNodeContext
  * @return void
  */
 void ring_buffer_node_init(RingBufferNodeContext *rbn, uint8_t *address, uint32_t node_len, uint32_t nodes);
-
+void ring_buffer_node_deinit(RingBufferNodeContext *rbn);
 /**
  * @brief ring buffer node clear
  * @param[in] rbn ring buffer node context pointer
@@ -78,6 +78,7 @@ uint8_t *ring_buffer_node_peek_read_node(RingBufferNodeContext *rbn);
  */
 void ring_buffer_node_take_read_node(RingBufferNodeContext *rbn);
 
+int32_t ring_buffer_node_write(RingBufferNodeContext *rbn, uint8_t *data, uint16_t len);
 #ifdef  __cplusplus
 }
 #endif//__cplusplus

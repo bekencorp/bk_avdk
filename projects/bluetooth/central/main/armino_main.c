@@ -8,6 +8,7 @@
 #else
 #include "media_service.h"
 #endif
+#include "driver/trng.h"
 
 extern void user_app_main(void);
 extern void rtos_set_user_app_entry(beken_thread_function_t entry);
@@ -49,12 +50,14 @@ int main(void)
     extern int cli_a2dp_source_demo_init(void);
     cli_a2dp_source_demo_init();
 #endif
-
 #if CONFIG_BLE
     extern int cli_ble_gatt_demo_init(void);
     cli_ble_gatt_demo_init();
 
+    extern int cli_ble_hogpd_demo_init(void);
+    cli_ble_hogpd_demo_init();
 #endif
 #endif
+
     return 0;
 }

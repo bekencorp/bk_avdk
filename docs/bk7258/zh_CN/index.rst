@@ -25,6 +25,6 @@
     低功耗 <power_save/index>
 	音频算法 <audio_algorithms/index>
 	FAQ <FAQ/index>
-
+        文档中心 <https://docs.bekencorp.com/>
 
 * :ref:`genindex`

@@ -45,10 +45,10 @@
 #define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
 #ifdef DISP_DIAG_DEBUG
-#define DISPLAY_START()			do { GPIO_UP(GPIO_DVP_D6); } while (0)
-#define DISPLAY_END()			do { GPIO_DOWN(GPIO_DVP_D6); } while (0)
-#define DISPLAY_ISR_START()			do { GPIO_UP(GPIO_DVP_D7); } while (0)
-#define DISPLAY_ISR_END()			do { GPIO_DOWN(GPIO_DVP_D7); } while (0)
+#define DISPLAY_START()             do { GPIO_UP(GPIO_DVP_D6); } while (0)
+#define DISPLAY_END()               do { GPIO_DOWN(GPIO_DVP_D6); } while (0)
+#define DISPLAY_ISR_START()         do { GPIO_UP(GPIO_DVP_D7); } while (0)
+#define DISPLAY_ISR_END()           do { GPIO_DOWN(GPIO_DVP_D7); } while (0)
 #else
 #define DISPLAY_START()
 #define DISPLAY_END()
@@ -128,10 +128,10 @@ __attribute__((section(".itcm_sec_code"))) static void lcd_driver_display_rgb_is
 #endif
 {
     DISPLAY_ISR_START();
-	flash_op_status_t flash_status = FLASH_OP_IDLE;
-	flash_status = bk_flash_get_operate_status();
+//	flash_op_status_t flash_status = FLASH_OP_IDLE;
+//	flash_status = bk_flash_get_operate_status();
 	media_debug->isr_lcd++;
-if (flash_status == FLASH_OP_IDLE)
+//if (flash_status == FLASH_OP_IDLE)
 {
 	GLOBAL_INT_DECLARATION();
 	if (lcd_disp_config->pingpong_frame != NULL)
@@ -307,6 +307,10 @@ static void lcd_display_task_entry(beken_thread_arg_t data)
 					break;
 				case DISPLAY_FRAME_FREE:
 					frame_buffer_display_free((frame_buffer_t*)msg.param);
+#if CONFIG_MEDIA_PSRAM_SIZE_4M
+					extern void jpeg_decode_get_next_frame();
+					jpeg_decode_get_next_frame();
+#endif
 					break;
 				case DISPLAY_FRAME_EXTI:
 				{
@@ -518,6 +522,7 @@ bk_err_t lcd_display_open(lcd_open_t *config)
 		LOGE("%s lcd device not found\n", __func__);
 		goto out;
 	}
+
     lcd_disp_config->lcd_width = lcd_device->ppi >> 16;
     lcd_disp_config->lcd_height = lcd_device->ppi & 0xFFFF;
     lcd_disp_config->lcd_type = lcd_device->type;
@@ -557,7 +562,12 @@ bk_err_t lcd_display_open(lcd_open_t *config)
 
     if (lcd_device->type == LCD_TYPE_SPI) {
     #if CONFIG_LCD_SPI_DISPLAY
-        lcd_spi_init(lcd_device);
+        #if (LCD_SPI_DEVICE_NUM > 1)
+            lcd_spi_init(LCD_SPI_ID0, lcd_device);
+            lcd_spi_init(LCD_SPI_ID1, lcd_device);
+        #else
+            lcd_spi_init(LCD_SPI_ID, lcd_device);
+        #endif
     #endif
     } else if (lcd_device->type == LCD_TYPE_QSPI) {
     #if CONFIG_LCD_QSPI
@@ -599,11 +609,18 @@ bk_err_t lcd_display_close(void)
 
 	lcd_driver_backlight_close();
 
-#if CONFIG_LCD_QSPI
+#if CONFIG_LCD_SPI_DISPLAY
+    #if (LCD_SPI_DEVICE_NUM > 1)
+        lcd_spi_deinit(LCD_SPI_ID0);
+        lcd_spi_deinit(LCD_SPI_ID1);
+    #else
+        lcd_spi_deinit(LCD_SPI_ID);
+    #endif
+#elif CONFIG_LCD_QSPI
     bk_lcd_qspi_disp_task_stop();
     lcd_disp_config->disp_task_running = false;
 #else
-	lcd_display_task_stop();
+    lcd_display_task_stop();
 #endif
 
 	lcd_display_config_free();

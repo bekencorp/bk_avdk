@@ -289,7 +289,7 @@ bk_err_t media_major_init(void)
 
 	if (ret != kNoErr)
 	{
-		LOGE("%s, ceate media major message queue failed\n", __func__);
+		LOGE("%s, create media major message queue failed\n", __func__);
 		goto error;
 	}
 

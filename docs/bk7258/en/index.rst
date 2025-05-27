@@ -25,5 +25,6 @@ Platform related configurations and usage, please refer to `Armino IDK <https://
     Power Save <power_save/index>
 	Audio Algorithms <audio_algorithms/index>
 	FAQ <FAQ/index>
+        Document Center <https://docs.bekencorp.com/>
 
 * :ref:`genindex`

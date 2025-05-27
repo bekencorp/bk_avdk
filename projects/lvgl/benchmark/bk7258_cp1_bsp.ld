@@ -28,6 +28,16 @@ __PRIMARY_APP_RAM_BASE = CONFIG_CPU0_SRAM_BASE;
 __PRIMARY_APP_RAM_BASE = SOC_SRAM0_DATA_BASE;
 #endif
 
+__BT_SRAM_BASE = __PRIMARY_APP_RAM_BASE + CONFIG_CPU0_SPE_RAM_SIZE;
+#if (CONFIG_BT_REUSE_MEDIA_MEMORY)
+__BT_SRAM_SIZE = CONFIG_BT_REUSE_MEDIA_MEM_SIZE;
+#else
+__BT_SRAM_SIZE = 0;
+#endif
+
+__CPU1_APP_RAM_BASE = __BT_SRAM_BASE + __BT_SRAM_SIZE;
+__CPU1_APP_RAM_SIZE = CONFIG_CPU1_APP_RAM_SIZE - __BT_SRAM_SIZE;
+
 #if CONFIG_LV_ATTRIBUTE_FAST_MEM_L2
 __LVGL_SRAM_CODE_SIZE = 0x1000;
 #else
@@ -37,14 +47,18 @@ __LVGL_SRAM_CODE_SIZE = 0;
 MEMORY
 {
   FLASH (rx)            : ORIGIN = (SOC_FLASH_DATA_BASE + CONFIG_PRIMARY_CPU1_APP_VIRTUAL_CODE_START), LENGTH = CONFIG_PRIMARY_CPU1_APP_VIRTUAL_CODE_SIZE
-  RAM (rwx)             : ORIGIN = __PRIMARY_APP_RAM_BASE + CONFIG_CPU0_SPE_RAM_SIZE, LENGTH = CONFIG_CPU1_APP_RAM_SIZE
+#if (CONFIG_BT_REUSE_MEDIA_MEMORY)
+  SRAM_BT (rwx)         : ORIGIN = __BT_SRAM_BASE, LENGTH = __BT_SRAM_SIZE 
+#endif
+  RAM (rwx)             : ORIGIN = __CPU1_APP_RAM_BASE, LENGTH = __CPU1_APP_RAM_SIZE
+
 #if CONFIG_LV_ATTRIBUTE_FAST_MEM_L2
   LVGL_SRAM_CODE (rx)   : ORIGIN = SOC_SRAM5_DATA_BASE, LENGTH = __LVGL_SRAM_CODE_SIZE
 #endif
   LVGL (rwx)            : ORIGIN = (SOC_SRAM5_DATA_BASE + __LVGL_SRAM_CODE_SIZE), LENGTH = 0x20000 - __LVGL_SRAM_CODE_SIZE
 
   ITCM (rwx)            : ORIGIN = SOC_ITCM_DATA_BASE + __MPU_PROTECT_SIZE, LENGTH = CONFIG_ITCM_SIZE - __MPU_PROTECT_SIZE
-  DTCM (rwx)            : ORIGIN = SOC_DTCM_DATA_BASE,     LENGTH = CONFIG_DTCM_SIZE
+  DTCM (rwx)            : ORIGIN = SOC_DTCM_DATA_BASE, LENGTH = CONFIG_DTCM_SIZE
   SWAP (rwx)            : ORIGIN = __PRIMARY_APP_RAM_BASE + CONFIG_CPU0_SPE_RAM_SIZE - __SWAP_SIZE, LENGTH = __SWAP_SIZE
   PSRAM (rwx)           : ORIGIN = SOC_PSRAM_DATA_BASE, LENGTH = 0x4000000
 #if CONFIG_LV_CODE_LOAD_PSRAM
@@ -142,8 +156,9 @@ SECTIONS
         LONG (__itcm_text)
         LONG (__itcm_start__)
         LONG ((__itcm_end__ - __itcm_start__) / 4)
+
 #if CONFIG_LV_CODE_LOAD_PSRAM
-		LONG (__lvgl_psram_code)
+        LONG (__lvgl_psram_code)
         LONG (__lvgl_psram_code_start)
         LONG ((__lvgl_psram_code_end - __lvgl_psram_code_start) / 4)
 #endif
@@ -166,10 +181,23 @@ SECTIONS
         /* Add each additional bss section here */
         LONG (__bss2_start__)
         LONG ((__bss2_end__ - __bss2_start__) / 4)
-		LONG (__lvgl_start)
+        LONG (__lvgl_start)
         LONG ((__lvgl_end - __lvgl_start) / 4)
         __zero_table_end__ = .;
     } > FLASH
+
+#if (CONFIG_BT_REUSE_MEDIA_MEMORY)
+    .sram_bt (NOLOAD):
+    {
+        . = ALIGN(32);
+        PROVIDE(_bt_data_lmastart = LOADADDR(.sram_bt));
+        _bt_data_start = .;
+        KEEP(*(.bt_spec_data ))
+        KEEP(*(.ble_bss_data ))
+        . = ALIGN(4);
+        _bt_data_end = .;
+    } > SRAM_BT AT > FLASH
+#endif
 
     .itcm :
     {
@@ -177,10 +205,13 @@ SECTIONS
         PROVIDE(__itcm_text = LOADADDR(.itcm));
         __itcm_start__ = .;
         KEEP(*(.null_trap_handler))
+
+
         *(.itcm)
         *(.itcm_section*)
         *(.itcm_sec_code*)
         *(.interrupt)
+        . = ALIGN(4);
         __itcm_end__ = .;
     } > ITCM AT > FLASH
 
@@ -192,6 +223,7 @@ SECTIONS
 
         *(.dtcm)
         *(.dtcm_sec_data*)
+        . = ALIGN(4);
 
         __dtcm_end__ = .;
     } > DTCM AT > FLASH
@@ -204,13 +236,13 @@ SECTIONS
         __iram_start__ = .;
 
         . = ALIGN(512);
-        __vector_itcm_table = .;
+        __vector_iram_table = .;
         KEEP(*(.vectors_iram))
         . = ALIGN(128);
 
 
         *(.iram)
-
+        . = ALIGN(4);
         __iram_end__ = .;
 
         . = ALIGN(4);
@@ -221,27 +253,30 @@ SECTIONS
         *(.sdata)
 
         *(.gnu.linkonce.d*)
+        . = ALIGN(4);
         __data_end__ = .;
     } > RAM AT > FLASH
-	
+
 #if CONFIG_LV_CODE_LOAD_PSRAM
 	.lvgl_psram_code : 
 	{
         . = ALIGN(4);
         PROVIDE(__lvgl_psram_code = LOADADDR(.lvgl_psram_code));
 		__lvgl_psram_code_start = .;
-		*(.text.lv_*)		
+		*(.text.lv_*)
+        . = ALIGN(4);		
 		__lvgl_psram_code_end = .;
 	} > LVGL_PSRAM_CODE AT > FLASH
 #endif
-	
+
 #if CONFIG_LV_ATTRIBUTE_FAST_MEM_L2
 	.lvgl_sram_code : 
 	{
         . = ALIGN(4);
         PROVIDE(__lvgl_sram_code = LOADADDR(.lvgl_sram_code));
 		__lvgl_sram_code_start = .;		
-        *(.sram_sec_code*)		
+        *(.sram_sec_code*)
+        . = ALIGN(4);		
 		__lvgl_sram_code_end = .;
 	} > LVGL_SRAM_CODE AT > FLASH
 #endif
@@ -265,6 +300,14 @@ SECTIONS
 
     .bss (NOLOAD):
     {
+#if (!CONFIG_BT_REUSE_MEDIA_MEMORY)
+        . = ALIGN(32);
+        PROVIDE(_bt_data_lmastart = LOADADDR(.sram_bt));
+        _bt_data_start = .;
+        KEEP(*(.bt_spec_data ))
+        KEEP(*(.ble_bss_data ))
+        _bt_data_end = .;
+#endif
         . = ALIGN(4);
         _bss_start = .;
         *(.bss)
@@ -303,18 +346,20 @@ SECTIONS
 
         * (.swap_data)
         * (.swap_data*)
+        . = ALIGN(4);
         _swap_end = .;
     } > SWAP AT > FLASH
 
-	.lvgl ORIGIN(LVGL) (NOLOAD):
-	{
-		. = ALIGN(4);
-		__lvgl_start = .;
-		*(.lvgl_draw)
-		*(.lvgl_draw*)
-		__lvgl_end = .;
-		
-	} > LVGL AT > FLASH
+    .lvgl ORIGIN(LVGL) (NOLOAD):
+    {
+        . = ALIGN(4);
+        __lvgl_start = .;
+        *(.lvgl_draw)
+        *(.lvgl_draw*)
+        . = ALIGN(4);
+        __lvgl_end = .;
+
+    } > LVGL AT > FLASH
 
     .video.cache.data :
     {
@@ -338,8 +383,6 @@ SECTIONS
         . = ALIGN(4);
         __bss2_end__ = .;
     } > PSRAM
-	
-
 
     /* Set stack top to end of RAM, and stack limit move down by
      * size of stack_dummy section */

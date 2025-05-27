@@ -42,11 +42,20 @@ LVGL
  - 调用 ``lv_vendor_start()`` 的接口创建LVGL的task开始调度执行；
  - 调用 ``msg_send_rsp_to_media_major_mailbox(media_mailbox_msg_t msg, uint32_t result, uint32_t dest)`` 返回执行状态，dest的参数为APP_MODULE。
 
-.. note::
-	lvgl的draw_buffer在选择使用sram内存时，其大小根据官方的推荐为十分之一屏幕大小的size，可以在不损失帧率的情况下节省内存。
+
+4. 参数配置说明
+---------------------
+
+ - LVGL中使用SRAM作为运行内存，其中draw_buffer的内存有两种选择，可通过宏 ``CONFIG_LVGL_USE_PSRAM`` 来设置draw_buffer使用psram内存还是sram内存，使用sram内存时的帧率会比使用psram内存时的帧率高。
+ - LVGL的draw_buffer在选择使用sram内存时，其大小根据官方的推荐为十分之一屏幕大小的size，可以在不损失帧率的情况下节省内存，以字节为单位。
+ - 参数draw_pixel_size根据draw_buffer的大小进行设置，以像素为单位。
+ - 关于双draw_buffer和双frame_buffer，双draw_buffer主要是为了并行绘制来提升显示帧率，但会消耗更多的sram内存，双frame_buffer主要是为了解决显示撕裂问题，在无触摸滑动交互的情况下可不使用双frame_buffer，具体情况可自行选择。
+ - 参数lcd_hor_res和lcd_ver_res分别为LCD分辨率的宽和高。
+ - 参数rotation可传入不同的值实现不旋转、旋转90度、旋转180度和旋转270度。
+ - LCD TP打开接口中的最后一个参数用于解决触摸坐标和实际坐标是否存在镜像关系的问题。
 
 
-4. 代码讲解
+5. 代码讲解
 ---------------------
 
 ::
@@ -116,22 +125,33 @@ LVGL
     }
 
 
-5、开发说明
+6、开发说明
 ---------------------
 
- - 关于draw_buffer的选择，可通过 ``CONFIG_LVGL_USE_PSRAM`` 设置draw_buffer使用psram内存还是sram内存。
- - 调用LVGL提供的组件接口绘制相应的UI时需要使用 ``lv_vendor_disp_lock()`` 和 ``lv_vendor_disp_unlock()`` 的接口进行代码保护。
- - LVGL源码本身额外提供了许多第三方的库，包含文件系统接口、JPG解码器、BMP解码器、PNG解码器以及GIF解码器等等，由于系统SRAM内存的限制，这些解码器只能解码小分辨率的图片进行显示，对于大分辨率的图像，可使用PSRAM内存进行解码。
- - LVGL使用PNG、JPG和GIF解码器进行解码时，需要打开lv_conf.h文件中对应的宏，分别为 ``LV_USE_PNG`` ``LV_USE_SJPG`` 和 ``LV_USE_GIF``。
- - 关于LVGL文件系统：sdk目前即可支持fatfs，也可支持littlefs，是基于bk_vfs的posix接口实现（可参考cli_vfs.c)，在使用时，打开 ``CONFIG_VFS``，依据需要选择littlefs还是fatfs（``CONFIG_FATFS / CONFIG_LITTLEFS``），若使用FATFS文件系统，还可选择另外一种方式进行，只需打开 ``CONFIG_FATFS``，并将lv_conf.h文件中的 ``LV_USE_FS_FATFS`` 设置为1。
- - 在使用PNG、JPG和GIF解码器选择PSRAM内存进行解码时，不需要打开 ``CONFIG_LVGL_USE_PSRAM`` 的宏。
- - 关于LVGL旋转功能的使用方法，LVGL本身自带软件旋转功能，可通过函数 ``lv_disp_set_rotation()`` 传入参数 ``LV_DISP_ROT_90`` 、 ``LV_DISP_ROT_180`` 和 ``LV_DISP_ROT_270`` 实现90度、180度和270度的图像旋转，但由于该功能存在缺陷，仅适用于显示屏宽和高相同的屏幕，对于宽和高不相同的屏幕，旋转90度和270度就会造成图像显示异常。针对该问题，且在显示屏硬件无法更改显示方向的情况下，SDK提供了一种额外的旋转功能，通过该功能可以实现图像90度旋转显示、180度旋转显示和270度旋转显示，具体实现是：在主函数中调用函数 ``lv_vendor_init(lv_vnd_config_t *config)`` 初始化LVGL时，对结构体 ``lv_vnd_config_t`` 中的 ``rotation`` 参数进行赋值，可传入 ``ROTATE_NONE``、 ``ROTATE_90``、 ``ROTATE_180`` 和 ``ROTATE_270`` 四种值，分别表示不旋转、旋转90度、旋转180度和旋转270度。
- - 关于freetype字体库的使用，需要将自己文件打包成bin文件并烧录到user分区地址，同时将lv_conf.h文件中的 ``LV_USE_FREETYPE`` 设置为1，并配置 ``CONFIG_MEDIA_UI_TASK_STACK_SIZE`` 来扩大栈空间，使用freetype字体需要消耗更大的栈空间。
- - 关于资源文件如何打包成bin文件，根据选择的文件系统类型，选择对应的打包工具，工具可咨询FAE。
- - LVGL的工程已加入到自动化分区列表中，若要重新配置分区大小，只需直接设置工程中的 ``bk7258_partitions.csv`` 文件即可，并注意一些对齐要求。
+    +-----------------+---------------------------------------------------------------------------+
+    |目录             |说明                                                                       |
+    +=================+===========================================================================+
+    |图片解码显示     |在lv_conf.h文件中打开 ``LV_USE_PNG``、``LV_USE_SJPG`` 和 ``LV_USE_GIF``，  |
+    |                 |对于大分辨率图像，还需打开 ``LV_PNG_USE_PSRAM``、``LV_SJPG_USE_PSRAM`` 和  |
+    |                 |``LV_GIF_USE_PSRAM`` 宏来使用psram进行解码。                               |
+    +-----------------+---------------------------------------------------------------------------+
+    |文件系统         |bk_vfs既支持FATFS又支持LITTLEFS，可参考cli_vfs.c文件熟悉用法。首先需要打开 |
+    |                 |``CONFIG_VFS``，再依据所需文件系统类型打开对应的宏（``CONFIG_FATFS`` 或    |
+    |                 |``CONFIG_LITTLEFS``），若使用FATFS文件系统，还可选择另一种方式，只需打开   |
+    |                 |``CONFIG_FATFS`` ，并将lv_conf.h文件中的 ``LV_USE_FS_FATFS`` 设置为1。     |
+    +-----------------+---------------------------------------------------------------------------+
+    |freetype字库     |将字体打包成bin文件烧录到user分区地址，并将lv_conf.h文件中的               |
+    |                 |``LV_USE_FREETYPE`` 设置为1，同时在工程中通过配置宏                        |
+    |                 |``CONFIG_MEDIA_UI_TASK_STACK_SIZE`` 来扩大task栈空间。                     |
+    +-----------------+---------------------------------------------------------------------------+
+    |调整工程分区大小 |只需修改工程中的 ``bk7258_partitions.csv`` 文件即可，注意对齐要求，重新编译|
+    |                 |前需要先make clean。                                                       |
+    +-----------------+---------------------------------------------------------------------------+
+    |资源文件打包工具 |根据选择的文件系统类型，使用对应的打包工具进行生成，工具可咨询FAE获取。    |
+    +-----------------+---------------------------------------------------------------------------+
 
 
-6、示例工程说明
+7、示例工程说明
 ---------------------
 
 如下表所示，BK7258上提供了多种LVGL demo工程，用于演示不同类型不同场景的功能，具体细节可见参考工程中：`图形界面工程 <../../projects/lvgl/index.html>`_。

@@ -14,8 +14,8 @@ This project is a demo of a USB/DVP camera door lock, supporting end-to-end (BK7
     * Hardware configuration:
         * Core board, **BK7258_QFN88_9X9_V3.2**
         * Display adapter board, **BK7258_LCD_interface_V3.0**
-        * Mac Xiaoban, **BK_madule_Microphone_V1.1**
-        * Speaker small board, **BKnModule_Speaker_V1.1**
+        * MIC small board, **BK_Module_Microphone_V1.1**
+        * SPEAKER small board, **BK_Module_Speaker_V1.1**
         * PSRAM 8M/16M
     * Support, UVC/DVP
         * Reference peripherals, UVC resolution of **864 * 480**
@@ -57,7 +57,7 @@ This project is a demo of a USB/DVP camera door lock, supporting end-to-end (BK7
 
     As shown in the following figure, BK7258 has multiple CPUs:
         * CPU0, running WIFI/BLE as a low-power CPU.
-        * CPU1, runs multimedia and serves as a high-performance multimedia CPU.
+        * CPU1, running multimedia and serves as a high-performance multimedia CPU.
 
 .. figure:: ../../../../_static/doorviewer_arch.png
     :align: center

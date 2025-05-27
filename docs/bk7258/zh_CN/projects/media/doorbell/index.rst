@@ -75,7 +75,7 @@ Doorbell
     * UVC摄像头输出的图像可以分为两种，一种是YUV420 MJPEG，一种是YUV422 MJPEG。
         * 软件会自动识别，并使用硬件解码器进行YUV422 MJPEG解码。而YUV420 MJPEG，则采用CPU1和CPU2进行软件解码。
         * 硬件解码时，图像分辨率的宽需要时32的倍数，高的需要时16的倍数。
-        * YUV像素排列分为，平面格式（planar）、打包格式（packed）、半平面格式（semi-planar）。硬件编码的数据，需要时packed格式。
+        * YUV像素排列分为，平面格式（planar）、打包格式（packed）、半平面格式（semi-planar）。硬件编码的数据，需要是packed格式。
     * MJPEG HW Decoder，在pipeline模式中，由于H264的编码数据，需要基于MJPEG解码再编码。因此，本地显示和图传都会用到这个硬件模块。
         * 关闭的时候，需要注意，显示和图传全部关闭的情况，才能关闭此模块。默认demo已经包含了这个逻辑。
     * MJPEG SW Decoder，同一时间，不会两种解码器同时工作。

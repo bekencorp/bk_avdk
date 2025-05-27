@@ -63,6 +63,11 @@ uint8_t dm_ble_del_app_env_by_addr(uint8_t *addr)
                 os_free(s_dm_gatt_env_array[i].data);
             }
 
+            if (s_dm_gatt_env_array[i].addition_data)
+            {
+                os_free(s_dm_gatt_env_array[i].addition_data);
+            }
+
             os_memset(&s_dm_gatt_env_array[i], 0, sizeof(s_dm_gatt_env_array[i]));
             return 0;
         }
@@ -111,6 +116,37 @@ dm_gatt_app_env_t *dm_ble_alloc_app_env_by_addr(uint8_t *addr, uint32_t data_len
 
     return NULL;
 }
+
+dm_gatt_app_env_t *dm_ble_alloc_addition_data_by_addr(uint8_t *addr, uint32_t data_len)
+{
+    dm_gatt_app_env_t *tmp = dm_ble_find_app_env_by_addr(addr);
+
+    if (!tmp)
+    {
+        gatt_logw("not exist %02x:%02x:%02x:%02x:%02x:%02x", addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+        return NULL;
+    }
+
+    if (tmp->addition_data)
+    {
+        gatt_loge("addition data exist");
+        return NULL;
+    }
+
+    tmp->addition_data = os_malloc(data_len);
+
+    if (!tmp->addition_data)
+    {
+        gatt_loge("alloc err %d", data_len);
+        return NULL;
+    }
+
+    os_memset(tmp->addition_data, 0, data_len);
+    tmp->addition_data_len = data_len;
+
+    return tmp;
+}
+
 
 uint8_t dm_ble_app_env_foreach( int32_t (*func) (dm_gatt_app_env_t *env, void *arg), void *arg )
 {

@@ -18,8 +18,7 @@
 #include "components/bluetooth/bk_dm_gap_bt.h"
 
 #include <driver/sbc_types.h>
-//#include <driver/aud_types.h>
-//#include <driver/aud.h>
+
 #ifdef CONFIG_A2DP_AUDIO
 #include "aud_intf.h"
 #endif
@@ -32,10 +31,6 @@
 #endif
 #include "bt_manager.h"
 
-#include "audio_pipeline.h"
-#include "audio_mem.h"
-#include "raw_stream.h"
-#include "onboard_speaker_stream.h"
 #include "bk_gpio.h"
 
 #if CONFIG_AAC_DECODER
@@ -45,6 +40,10 @@
 
 #include <driver/aud_dac.h>
 #include <driver/aud_dac_types.h>
+
+#include "audio_play.h"
+
+#include "mpeg4_latm_dec.h"
 
 #define TAG "a2dp_sink"
 
@@ -76,7 +75,7 @@
 
 #define A2DP_SPEAKER_THREAD_PRI             BEKEN_DEFAULT_WORKER_PRIORITY-2
 #define A2DP_SPEAKER_WRITE_SBC_FRAME_NUM    7
-#define A2DP_SBC_MAX_FRAME_NUMS             0xF*5
+#define A2DP_SBC_MAX_FRAME_NUMS             0xF*5*1
 #define A2DP_SBC_FRAME_HEADER_LEN           13
 
 #if CONFIG_AAC_DECODER
@@ -86,11 +85,6 @@
 
 #define AVRCP_PASSTHROUTH_CMD_TIMEOUT                     2000
 
-#if CONFIG_USE_AUDIO_LEGACY_INTERFACE
-extern int32_t bt_a2dp_aac_decoder_init(void* aac_decoder, uint32_t sample_rate, uint32_t channels);
-extern uint32_t aac_decoder_get_ram_size_without_in_buffer(void);
-extern int32_t bt_a2dp_aac_decoder_decode(void* aac_decoder, uint8_t* inbuf, uint32_t inlen, uint8_t** outbuf, uint32_t* outlen);
-#endif
 static int speaker_task_init();
 static void speaker_task(void *arg);
 
@@ -133,12 +127,7 @@ static sbcdecodercontext_t bt_audio_sink_sbc_decoder;
 #if CONFIG_AAC_DECODER
 static aacdecodercontext_t bt_audio_sink_aac_decoder;
 #endif
-#if CONFIG_USE_AUDIO_LEGACY_INTERFACE
-static void *sink_aac_decoder = NULL;
-//static uint16_t speaker_frame_size = 0;
-static uint8_t s_frames_2_spk_per_pkt = 0;
-static uint8_t s_frame_caching = 0;
-#endif
+
 static RingBufferNodeContext s_a2dp_frame_nodes;
 static uint8_t s_spk_is_started = 0;
 static uint16_t frame_length = 0;
@@ -161,18 +150,27 @@ static coex_to_bt_func_p_t s_coex_to_bt_func = {0};
 static beken_semaphore_t s_bt_api_event_cb_sema = NULL;
 static beken_semaphore_t s_bt_avrcp_event_cb_sema = NULL;
 
+static audio_play_t *s_audio_play_obj;
 
 static bk_err_t bk_bt_dac_set_gain(uint8_t gain)
 {
-    bk_aud_dac_set_gain(gain);
-
-    if (gain == 0)
+    if(s_audio_play_obj)
     {
-        bk_aud_dac_mute();
+        LOGI("%s set gain 0x%x\n", __func__, gain);
+        audio_play_set_volume(s_audio_play_obj, gain);
+
+        if (gain == 0)
+        {
+            audio_play_control(s_audio_play_obj, AUDIO_PLAY_MUTE);
+        }
+        else
+        {
+            audio_play_control(s_audio_play_obj, AUDIO_PLAY_UNMUTE);
+        }
     }
     else
     {
-        bk_aud_dac_unmute();
+        LOGE("%s audio play not enable\n", __func__);
     }
 
     return BK_OK;
@@ -220,15 +218,34 @@ static bk_err_t one_spk_frame_played_cmpl_handler(unsigned int size)
 
 void bt_audio_sink_demo_main(void *arg)
 {
-    uint8_t recon_addr[6];
+    uint8_t recon_addr[6] = {0};
     if ((bluetooth_storage_get_newest_linkkey_info(recon_addr,NULL)) < 0)
     {
+		LOGI("%s can't find linkkey info\n", __func__);
         bt_manager_set_mode(BT_MNG_MODE_PAIRING);
     }
     else
     {
-        bluetooth_storage_find_volume_by_addr(recon_addr, &s_a2dp_vol);
-        LOGI("initial volume %d \r\n",s_a2dp_vol);
+		LOGI("%s find addr\n", __func__);
+        if(bluetooth_storage_find_volume_by_addr(recon_addr, &s_a2dp_vol) < 0)
+        {
+            s_a2dp_vol = DEFAULT_A2DP_VOLUME; //default vol
+        }
+
+        if(s_a2dp_vol == 0)
+		{
+		    s_a2dp_vol = DEFAULT_A2DP_VOLUME;
+		}
+
+        LOGI("initial volume %d %02x:%02x:%02x:%02x:%02x:%02x\r\n",s_a2dp_vol,
+                        recon_addr[5],
+                        recon_addr[4],
+                        recon_addr[3],
+                        recon_addr[2],
+                        recon_addr[1],
+                        recon_addr[0]
+                        );
+
         bt_manager_start_reconnect(recon_addr, 1);
     }
 
@@ -249,7 +266,6 @@ void bt_audio_sink_demo_main(void *arg)
 
 #ifdef CONFIG_A2DP_AUDIO
                 bk_a2dp_mcc_t *p_codec_info = (bk_a2dp_mcc_t *)msg.data;
-#if !CONFIG_USE_AUDIO_LEGACY_INTERFACE
                 if (CODEC_AUDIO_SBC == p_codec_info->type)
                 {
                     uint8_t chnl_mode = p_codec_info->cie.sbc_codec.channel_mode;
@@ -267,6 +283,9 @@ void bt_audio_sink_demo_main(void *arg)
                     {
                         frame_length = 4 + ((4 * subbands * chnls)>>3) + ((subbands+blocks*bitpool+7)>>3);
                     }
+
+                    //get_sbc_encoder_len(p_codec_info);
+
                     LOGI("cm:%d, c:%d, s:%d, b:%d, bi:%d, frame_length:%d \n",chnl_mode, chnls, subbands,blocks, bitpool, frame_length);
                     bk_sbc_decoder_init(&bt_audio_sink_sbc_decoder);
                     if(p_cache_buff)
@@ -274,14 +293,14 @@ void bt_audio_sink_demo_main(void *arg)
                         LOGE("p_cache_buffer remalloc, error !!");
                     }else
                     {
-                        p_cache_buff  = (uint8_t *)os_malloc(frame_length * A2DP_SBC_MAX_FRAME_NUMS); //max number of frames 4bit
+                        p_cache_buff  = (uint8_t *)os_malloc((frame_length + 2) * A2DP_SBC_MAX_FRAME_NUMS); //max number of frames 4bit
                         if (!p_cache_buff)
                         {
                             LOGE("%s, malloc cache buf failed!!!\r\n", __func__);
                         }
                         else
                         {
-                            ring_buffer_node_init(&s_a2dp_frame_nodes, p_cache_buff, frame_length, A2DP_SBC_MAX_FRAME_NUMS);
+                            ring_buffer_node_init(&s_a2dp_frame_nodes, p_cache_buff, frame_length + 2, A2DP_SBC_MAX_FRAME_NUMS);
                         }
                     }
                 }
@@ -317,125 +336,7 @@ void bt_audio_sink_demo_main(void *arg)
 #endif
                 s_spk_is_started = 1;
                 speaker_task_init();
-#else
-                bk_err_t ret = BK_OK;
-                uint32_t dac_sample_rate = 0;
-                uint16_t frame_size = 0;
-                s_frame_caching = 0;
-                s_spk_is_started = 0;
-
-                if (CODEC_AUDIO_SBC == p_codec_info->type)
-                {
-                    dac_sample_rate = p_codec_info->cie.sbc_codec.sample_rate;
-                    s_frames_2_spk_per_pkt = (p_codec_info->cie.sbc_codec.sample_rate * 20 / 1000 / (p_codec_info->cie.sbc_codec.block_len * p_codec_info->cie.sbc_codec.subbands)) + 1;
-                    frame_size = s_frames_2_spk_per_pkt * (p_codec_info->cie.sbc_codec.block_len * p_codec_info->cie.sbc_codec.subbands) * 2 * 2;
-                    LOGI("--> frames_2_speaker %d, frame_size %d, block_len:%d, subband:%d \r\n", s_frames_2_spk_per_pkt, frame_size, p_codec_info->cie.sbc_codec.block_len, p_codec_info->cie.sbc_codec.subbands);
-                    bk_sbc_decoder_init(&bt_audio_sink_sbc_decoder);
-
-                    p_cache_buff  = (uint8_t *)os_malloc(A2DP_CACHE_BUFFER_SIZE);
-                    if (!p_cache_buff)
-                    {
-                        LOGE("%s, malloc cache buf failed!!!\r\n", __func__);
-                    }
-                    else
-                    {
-                        ring_buffer_node_init(&s_a2dp_frame_nodes, p_cache_buff, A2DP_SBC_FRAME_BUFFER_MAX_SIZE, A2DP_CACHE_BUFFER_SIZE / A2DP_SBC_FRAME_BUFFER_MAX_SIZE);
-                    }
-                }
-#if (CONFIG_AAC_DECODER)
-                else if (CODEC_AUDIO_AAC == p_codec_info->type)
-                {
-                    dac_sample_rate = p_codec_info->cie.aac_codec.sample_rate;
-                    s_frames_2_spk_per_pkt = 1;
-                    frame_size = 4096;
-                    sink_aac_decoder = (void *)(os_malloc(aac_decoder_get_ram_size_without_in_buffer()));
-
-                    if (!sink_aac_decoder)
-                    {
-                        LOGE("%s, malloc sink_aac_decoder failed!!!\r\n", __func__);
-                    }
-                    else
-                    {
-                        bt_a2dp_aac_decoder_init(sink_aac_decoder, p_codec_info->cie.aac_codec.sample_rate, p_codec_info->cie.aac_codec.channels);
-                    }
-
-                    p_cache_buff  = (uint8_t *)os_malloc(A2DP_CACHE_BUFFER_SIZE);
-                    if (!p_cache_buff)
-                    {
-                        LOGE("%s, malloc cache buf failed!!!\r\n", __func__);
-                    }
-                    else
-                    {
-                        ring_buffer_node_init(&s_a2dp_frame_nodes, p_cache_buff, A2DP_AAC_FRAME_BUFFER_MAX_SIZE, A2DP_CACHE_BUFFER_SIZE / A2DP_AAC_FRAME_BUFFER_MAX_SIZE);
-                    }
-                }
 #endif
-                else
-                {
-                    LOGE("%s, Unsupported codec %d \r\n", __func__, p_codec_info->type);
-                }
-                LOGI("dac_sample_rate %d \r\n", dac_sample_rate);
-
-                aud_intf_drv_setup_t aud_intf_drv_setup = DEFAULT_AUD_INTF_DRV_SETUP_CONFIG();
-                aud_intf_spk_setup_t aud_intf_spk_setup = DEFAULT_AUD_INTF_SPK_SETUP_CONFIG();
-                aud_intf_work_mode_t aud_work_mode = AUD_INTF_WORK_MODE_NULL;
-
-                aud_intf_drv_setup.work_mode = AUD_INTF_WORK_MODE_NULL;
-                aud_intf_drv_setup.task_config.priority = 3;
-                aud_intf_drv_setup.aud_intf_rx_spk_data = one_spk_frame_played_cmpl_handler;
-                aud_intf_drv_setup.aud_intf_tx_mic_data = NULL;
-                ret = bk_aud_intf_drv_init(&aud_intf_drv_setup);
-
-                if (ret != BK_ERR_AUD_INTF_OK)
-                {
-                    LOGE("bk_aud_intf_drv_init fail, ret:%d \r\n", ret);
-                }
-                else
-                {
-                    LOGI("bk_aud_intf_drv_init complete \r\n");
-                }
-
-                aud_work_mode = AUD_INTF_WORK_MODE_GENERAL;
-                ret = bk_aud_intf_set_mode(aud_work_mode);
-
-                if (ret != BK_ERR_AUD_INTF_OK)
-                {
-                    LOGE("bk_aud_intf_set_mode fail, ret:%d \r\n", ret);
-                }
-                else
-                {
-                    LOGI("bk_aud_intf_set_mode complete \r\n");
-                }
-
-                aud_intf_spk_setup.spk_chl = AUD_INTF_SPK_CHL_DUAL;
-                aud_intf_spk_setup.samp_rate = dac_sample_rate;
-                aud_intf_spk_setup.frame_size = frame_size;
-                aud_intf_spk_setup.spk_gain = s_a2dp_vol >> 1;
-                aud_intf_spk_setup.work_mode = AUD_DAC_WORK_MODE_DIFFEN;
-                ret = bk_aud_intf_spk_init(&aud_intf_spk_setup);
-
-                if (ret != BK_ERR_AUD_INTF_OK)
-                {
-                    LOGE("bk_aud_intf_spk_init fail, ret:%d \r\n", ret);
-                }
-                else
-                {
-                    LOGI("bk_aud_intf_spk_init complete \r\n");
-                }
-
-
-                if (s_a2dp_vol)
-                {
-                    //sys_hal_aud_dacmute_en(0);//TODO
-                }
-                else
-                {
-                    //sys_hal_aud_dacmute_en(1);//TODO
-                }
-
-#endif
-#endif
-            
                 os_free(msg.data);
             }
             break;
@@ -443,86 +344,7 @@ void bt_audio_sink_demo_main(void *arg)
             case BT_AUDIO_D2DP_DATA_IND_MSG:
             {
 #ifdef CONFIG_A2DP_AUDIO
-#if CONFIG_USE_AUDIO_LEGACY_INTERFACE
-                bk_err_t ret = BK_OK;
-                uint8 *fb = (uint8_t *)msg.data;;
 
-                if (CODEC_AUDIO_SBC == bt_audio_a2dp_sink_codec.type)
-                {
-                    uint8_t frames = *fb++;
-                    LOGI("recv sbc frames %d %d\r\n",frames, msg.len - 1);
-
-                    for (uint8_t i = 0; i < frames; i++)
-                    {
-                        uint32_t len = (msg.len - 1) / frames;
-
-                        if (ring_buffer_node_get_free_nodes(&s_a2dp_frame_nodes))
-                        {
-                            uint8_t *node = ring_buffer_node_get_write_node(&s_a2dp_frame_nodes);
-                            *((uint32_t *)node) = len;
-                            os_memcpy(node + 4, fb, len);
-                            fb += len;
-                        }
-                        else
-                        {
-                            LOGI("A2DP frame nodes buffer(sbc) is full\n");
-                        }
-                    }
-                }
-                else if (CODEC_AUDIO_AAC == bt_audio_a2dp_sink_codec.type)
-                {
-                    uint8_t *inbuf = &fb[9];
-                    uint32_t inlen = 0;
-                    uint8_t  len   = 255;
-
-                    do
-                    {
-                        inlen += len = *inbuf++;
-                    }
-                    while (len == 255);
-
-                    if (ring_buffer_node_get_free_nodes(&s_a2dp_frame_nodes))
-                    {
-                        uint8_t *node = ring_buffer_node_get_write_node(&s_a2dp_frame_nodes);
-                        *((uint32_t *)node) = inlen;
-                        os_memcpy(node + 4, inbuf, inlen);
-                    }
-                    else
-                    {
-                        LOGI("A2DP frame nodes buffer(aac) is full\n");
-                    }
-                }
-                else
-                {
-                    LOGE("%s, cannot decode data due to unsupported a2dp codec %d \r\n", __func__, bt_audio_a2dp_sink_codec.type);
-                }
-
-                os_free(msg.data);
-
-                if (0 == s_spk_is_started)
-                {
-                    s_frame_caching++;
-
-                    if (s_frame_caching <= 2)
-                    {
-                        one_spk_frame_played_cmpl_handler(0);
-                    }
-                    else if (CONFIG_A2DP_CACHE_FRAME_NUM == s_frame_caching)
-                    {
-                        ret = bk_aud_intf_spk_start();
-
-                        if (ret != BK_ERR_AUD_INTF_OK)
-                        {
-                            LOGE("bk_aud_intf_spk_start fail, ret:%d \r\n", ret);
-                        }
-                        else
-                        {
-                            LOGI("bk_aud_intf_spk_start complete \r\n");
-                        }
-                        s_spk_is_started = 1;
-                    }
-                }
-#else //CONFIG_USE_AUDIO_LEGACY_INTERFACE
                 uint8 *fb = (uint8_t *)msg.data;
                 if(s_spk_is_started)
                 {
@@ -530,25 +352,35 @@ void bt_audio_sink_demo_main(void *arg)
                     {
                         uint8_t payload_header = *fb++;
                         uint8_t frame_num = payload_header&0xF;
+
                         if(msg.len - 1 != frame_length*frame_num)
                         {
-                            LOGI("recv undef sbc, payload_header %d, payload_len: %d, frame_num:%d \r\n", payload_header, msg.len - 1, frame_num);
+                            //LOGI("recv undef sbc, payload_header %d, payload_len: %d, frame_num:%d %d\n", payload_header, msg.len - 1, frame_num, frame_length);
                         }
-                        for(uint8_t i=0;i<frame_num;i++)
+
+                        if((msg.len - 1) % frame_num)
+                        {
+                            LOGE("%s frame len invalid\n", __func__);
+                        }
+
+
+                        for(uint8_t i = 0; i < frame_num; i++)
                         {
                             if (ring_buffer_node_get_free_nodes(&s_a2dp_frame_nodes))
                             {
-                                uint8_t *node = ring_buffer_node_get_write_node(&s_a2dp_frame_nodes);
-                                os_memcpy(node, fb, frame_length);
-                                fb += frame_length;
+                                uint16_t tmp_len = (msg.len - 1) / frame_num;
+
+                                ring_buffer_node_write(&s_a2dp_frame_nodes, fb, tmp_len);
+                                fb += tmp_len;
                             }
                             else
                             {
-                                LOGI("A2DP frame nodes buffer(sbc) is full\n");
+                                LOGI("A2DP frame nodes buffer(sbc) is full %d %d\n", i, frame_num);
                                 //os_free(msg.data);
                                 break;
                             }
                         }
+
                     }
 #if CONFIG_AAC_DECODER
                     else if(CODEC_AUDIO_AAC == bt_audio_a2dp_sink_codec.type)
@@ -557,17 +389,36 @@ void bt_audio_sink_demo_main(void *arg)
                         uint8_t *inbuf = &fb[9];
                         uint32_t inlen = 0;
                         uint8_t  len   = 255;
+
                         do
                         {
                             inlen += len = *inbuf++;
                         }
                         while (len == 255);
+
                         {
                             if (ring_buffer_node_get_free_nodes(&s_a2dp_frame_nodes))
                             {
+                                uint8_t *output = 0;
+                                uint32_t output_len = 0;
+
+                                if(mpeg4_latm_decode(fb, msg.len, &output, &output_len))
+                                {
+                                    LOGE("====%s latm decode err, discard it\n", __func__);
+                                    os_free(msg.data);
+                                    break;
+                                }
+                                else if(msg.len - (output - fb) != output_len ||
+                                                inlen != output_len ||
+                                                output != inbuf)
+                                {
+                                    LOGE("====%s len not match, total %d, type1 offset %d len %d, type2 offset %d len %d\n", __func__, msg.len, output - fb, inbuf - fb, output_len, inlen);
+                                }
+
                                 uint8_t *node = ring_buffer_node_get_write_node(&s_a2dp_frame_nodes);
-                                *((uint32_t *)node) = inlen;
-                                os_memcpy(node + 4, inbuf, inlen);
+
+                                os_memcpy(node, &inlen, sizeof(inlen));
+                                os_memcpy(node + sizeof(inlen), inbuf, inlen);
                             }
                             else
                             {
@@ -588,7 +439,6 @@ void bt_audio_sink_demo_main(void *arg)
                     }
                 }
                 os_free(msg.data);
-#endif
 #else
                 os_free(msg.data);
 #endif
@@ -599,30 +449,20 @@ void bt_audio_sink_demo_main(void *arg)
             {
                 LOGI("BT_AUDIO_D2DP_STOP_MSG \r\n");
 #ifdef CONFIG_A2DP_AUDIO
-#if !CONFIG_USE_AUDIO_LEGACY_INTERFACE
-                s_spk_is_started = 0;
-                if(a2dp_speaker_sema)
-                {
-                    rtos_set_semaphore(&a2dp_speaker_sema);
-                }
-#else
-                bk_aud_intf_spk_deinit();
-                bk_aud_intf_drv_deinit();
 
-                if (sink_aac_decoder)
+                if(a2dp_speaker_thread_handle)
                 {
-                    os_free(sink_aac_decoder);
-                    sink_aac_decoder = NULL;
+                    s_spk_is_started = 0;
+                    if(a2dp_speaker_sema)
+                    {
+                        rtos_set_semaphore(&a2dp_speaker_sema);
+                    }
+                    LOGI("%s wait thread end\n", __func__);
+                    rtos_thread_join(&a2dp_speaker_thread_handle);
+                    LOGI("%s thread end !!!\n", __func__);
+                    a2dp_speaker_thread_handle = NULL;
                 }
 
-                ring_buffer_node_clear(&s_a2dp_frame_nodes);
-
-                if (p_cache_buff)
-                {
-                    os_free(p_cache_buff);
-                    p_cache_buff = NULL;
-                }
-#endif
 #endif
 
             }
@@ -630,60 +470,7 @@ void bt_audio_sink_demo_main(void *arg)
 
             case BT_AUDIO_D2DP_SEND_DATA_2_SPK_MSG:
             {
-#ifdef CONFIG_A2DP_AUDIO
-#if CONFIG_USE_AUDIO_LEGACY_INTERFACE
-                uint32_t frame_count = ring_buffer_node_get_fill_nodes(&s_a2dp_frame_nodes);
-                uint32_t i, sent_frames = s_frames_2_spk_per_pkt > frame_count ? frame_count : s_frames_2_spk_per_pkt;
 
-                //LOGI("frame_count %d, sent_frames %d \r\n", frame_count, sent_frames);
-
-                for (i = 0; i < sent_frames; i++)
-                {
-                    uint8_t *inbuf = ring_buffer_node_get_read_node(&s_a2dp_frame_nodes);
-                    uint32_t inlen = *(uint32_t *)inbuf;
-                    bk_err_t ret;
-
-                    inbuf += 4;//skip length
-
-                    if (CODEC_AUDIO_SBC == bt_audio_a2dp_sink_codec.type)
-                    {
-                        ret = bk_sbc_decoder_frame_decode(&bt_audio_sink_sbc_decoder, inbuf, inlen);
-                        if (ret < 0)
-                        {
-                            LOGE("sbc_decoder_decode error <%d>\n", ret);
-                            break;
-                        }
-
-                        ret = bk_aud_intf_write_spk_data((uint8_t *)bt_audio_sink_sbc_decoder.pcm_sample, bt_audio_sink_sbc_decoder.pcm_length * 4);
-
-                        if (ret != BK_OK)
-                        {
-                            LOGE("write spk data fail \r\n");
-                        }
-                    }
-#if (CONFIG_AAC_DECODER)
-                    else if (CODEC_AUDIO_AAC == bt_audio_a2dp_sink_codec.type)
-                    {
-                        uint8_t *outbuf = NULL;
-                        uint32_t outlen;
-                        if (sink_aac_decoder && (0 == bt_a2dp_aac_decoder_decode(sink_aac_decoder, inbuf, inlen, &outbuf, &outlen)))
-                        {
-                            ret = bk_aud_intf_write_spk_data(outbuf, outlen);
-
-                            if (ret != BK_OK)
-                            {
-                                LOGE("write spk data fail \r\n");
-                            }
-                        }
-                        else
-                        {
-                            LOGE("bt_a2dp_aac_decoder_decode failed!\r\n");
-                        }
-                    }
-#endif
-                }
-#endif
-#endif
             }
             break;
 
@@ -1047,7 +834,7 @@ static void bk_bt_app_avrcp_ct_cb(bk_avrcp_ct_cb_event_t event, bk_avrcp_ct_cb_p
                        pm->remote_bda[2],
                        pm->remote_bda[1],
                        pm->remote_bda[0]);
-            if(s_bt_avrcp_event_cb_sema 
+            if(s_bt_avrcp_event_cb_sema
                 && pm->key_state == BK_AVRCP_PT_CMD_STATE_PRESSED //press state set sem
                 && (pm->key_code == BK_AVRCP_PT_CMD_PLAY
                 ||  pm->key_code == BK_AVRCP_PT_CMD_PAUSE
@@ -1310,6 +1097,7 @@ void bk_bt_app_avrcp_ct_fast_forward(uint32_t ms)
 void bk_bt_app_avrcp_ct_vol_up(void)
 {
     uint8_t idx = (s_a2dp_vol + 5) >> 3;
+    uint8_t old = s_a2dp_vol;
     if (idx < 16)
     {
         idx += 1;
@@ -1343,6 +1131,11 @@ void bk_bt_app_avrcp_ct_vol_up(void)
 
             bluetooth_storage_save_volume(bt_manager_get_connected_device(), s_a2dp_vol);
         }
+        else if(0)
+        {
+            LOGE("%s peer not reg vol change, adjust local only !!!\n", __func__);
+            bluetooth_storage_save_volume(bt_manager_get_connected_device(), s_a2dp_vol);
+        }
         else
         {
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_UP, BK_AVRCP_PT_CMD_STATE_PRESSED);
@@ -1351,15 +1144,19 @@ void bk_bt_app_avrcp_ct_vol_up(void)
                 rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
             }
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_UP, BK_AVRCP_PT_CMD_STATE_RELEASED);
+
+            bluetooth_storage_save_volume(bt_manager_get_connected_device(), s_a2dp_vol);
         }
 #endif
-        LOGI("vol_up, vol:%d\r\n", s_a2dp_vol);
+        LOGI("vol_up, vol: %d -> %d\r\n", old, s_a2dp_vol);
     }
 }
 
 void bk_bt_app_avrcp_ct_vol_down(void)
 {
     uint8_t idx = (s_a2dp_vol + 5) >> 3;
+    uint8_t old = s_a2dp_vol;
+
     if (idx > 0)
     {
         idx -= 1;
@@ -1393,6 +1190,11 @@ void bk_bt_app_avrcp_ct_vol_down(void)
 
             bluetooth_storage_save_volume(bt_manager_get_connected_device(), s_a2dp_vol);
         }
+        else if(0)
+        {
+            LOGE("%s peer not reg vol change, adjust local only !!!\n", __func__);
+            bluetooth_storage_save_volume(bt_manager_get_connected_device(), s_a2dp_vol);
+        }
         else
         {
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_DOWN, BK_AVRCP_PT_CMD_STATE_PRESSED);
@@ -1401,9 +1203,11 @@ void bk_bt_app_avrcp_ct_vol_down(void)
                 rtos_get_semaphore(&s_bt_avrcp_event_cb_sema, AVRCP_PASSTHROUTH_CMD_TIMEOUT);
             }
             bk_bt_avrcp_ct_send_passthrough_cmd(avrcp_remote_bda, BK_AVRCP_PT_CMD_VOL_DOWN, BK_AVRCP_PT_CMD_STATE_RELEASED);
+
+            bluetooth_storage_save_volume(bt_manager_get_connected_device(), s_a2dp_vol);
         }
 #endif
-        LOGI("vol_down, vol:%d\r\n", s_a2dp_vol);
+        LOGI("vol_down, vol: %d -> %d\r\n", old, s_a2dp_vol);
     }
 }
 
@@ -1542,7 +1346,7 @@ int a2dp_sink_demo_init(uint8_t aac_supported)
     coex_regisiter_wifi_state();
 #endif
 
-    btm_callback_s btm_cb = 
+    btm_callback_s btm_cb =
     {
         .gap_cb = gap_event_cb,
         .start_connect_cb = bk_bt_a2dp_connect,
@@ -1629,109 +1433,86 @@ static int speaker_task_init()
     }
     else
     {
+        LOGE("%s task is exist !!!\n", __func__);
         return kInProgressErr;
     }
 }
 
 static void speaker_task(void *arg)
 {
-    audio_pipeline_handle_t  play_pipeline;
-    audio_element_handle_t raw_write, onboard_speaker;
+    bk_err_t ret = 0;
 
-    audio_pipeline_cfg_t play_pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
-    play_pipeline = audio_pipeline_init(&play_pipeline_cfg);
-    CHECK_NULL(play_pipeline);
+    audio_play_cfg_t cfg = DEFAULT_AUDIO_PLAY_CONFIG();
 
-    raw_stream_cfg_t raw_write_cfg = RAW_STREAM_CFG_DEFAULT();
-    raw_write_cfg.type = AUDIO_STREAM_WRITER;
-    raw_write = raw_stream_init(&raw_write_cfg);
-    CHECK_NULL(raw_write);
+    cfg.nChans = CONFIG_BOARD_AUDIO_CHANNLE_NUM;
+    cfg.sampRate = (bt_audio_a2dp_sink_codec.type == CODEC_AUDIO_SBC ? bt_audio_a2dp_sink_codec.cie.sbc_codec.sample_rate : bt_audio_a2dp_sink_codec.cie.aac_codec.sample_rate);
+    cfg.volume = (s_a2dp_vol >> 1);
+    cfg.frame_size = cfg.sampRate * cfg.nChans / 1000 * 20 * cfg.bitsPerSample / 8;
+    cfg.pool_size = cfg.frame_size * 2;
 
-    onboard_speaker_stream_cfg_t onboard_speaker_cfg = ONBOARD_SPEAKER_STREAM_CFG_DEFAULT();
-    onboard_speaker_cfg.samp_rate = (bt_audio_a2dp_sink_codec.type == CODEC_AUDIO_SBC ? bt_audio_a2dp_sink_codec.cie.sbc_codec.sample_rate : bt_audio_a2dp_sink_codec.cie.aac_codec.sample_rate);
-    onboard_speaker_cfg.chl_num = CONFIG_BOARD_AUDIO_CHANNLE_NUM;
-    onboard_speaker_cfg.spk_gain = 0x10;
-    onboard_speaker_cfg.pool_frame_num = 2;
-    onboard_speaker_cfg.pool_play_thold = 2;
-    onboard_speaker = onboard_speaker_stream_init(&onboard_speaker_cfg);
-    CHECK_NULL(onboard_speaker);
+    LOGI("%s wait hfp task end\n", __func__);
+    extern int32_t wait_hfp_speaker_mic_task_end(void);
+    wait_hfp_speaker_mic_task_end();
 
-    if (BK_OK != audio_pipeline_register(play_pipeline, raw_write, "raw_write"))
+    s_audio_play_obj = audio_play_create(AUDIO_PLAY_ONBOARD_SPEAKER, &cfg);
+
+    if(!s_audio_play_obj)
     {
-        LOGE("register element fail, %d \n", __LINE__);
-        return;
-    }
-    if (BK_OK != audio_pipeline_register(play_pipeline, onboard_speaker, "onboard_speaker"))
-    {
-        LOGE("register element fail, %d \n", __LINE__);
-        return;
+        LOGE("%s create audio play err\n", __func__);
+
+        goto end;
     }
 
-    if (BK_OK != audio_pipeline_link(play_pipeline, (const char *[]){"raw_write", "onboard_speaker"}, 2))
+    if((ret = audio_play_open(s_audio_play_obj)) != 0)
     {
-        LOGE("pipeline link fail, %d \n", __LINE__);
-        return;
-    }
+        LOGE("%s open audio play err\n", __func__, ret);
 
-    audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
-    audio_event_iface_handle_t play_evt = audio_event_iface_init(&evt_cfg);
-	if (BK_OK != audio_pipeline_set_listener(play_pipeline, play_evt)) {
-		LOGE("set listener fail, %d \n", __LINE__);
-		return;
-	}
-    audio_event_iface_handle_t evt = audio_event_iface_init(&evt_cfg);
-	audio_event_iface_set_listener(play_evt, evt);
+        goto end;
+    }
 
     if (a2dp_speaker_sema == NULL)
     {
         if (kNoErr != rtos_init_semaphore(&a2dp_speaker_sema, 1))
         {
             LOGE("init sema fail, %d \n", __LINE__);
+            goto end;
         }
     }
 
-    if (BK_OK != audio_pipeline_run(play_pipeline))
-    {
-        LOGE("play_pipeline run fail, %d \n", __LINE__);
-        return;
-    }
-
-    LOGI("%s init success!! \r\n", __func__);
+    LOGI("%s init a2dp success!! \r\n", __func__);
 
     while (1)
     {
         rtos_get_semaphore(&a2dp_speaker_sema, BEKEN_WAIT_FOREVER);
-        if(!s_spk_is_started) 
+
+        if(!s_spk_is_started)
         {
             break;
         }
-        audio_event_iface_msg_t msg;
-		bk_err_t ret = audio_event_iface_listen(evt, &msg, 0);//portMAX_DELAY
-		if (ret == BK_OK) {
-			if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT
-				&& msg.cmd == AEL_MSG_CMD_REPORT_STATUS
-				&& (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED))) {
-				BK_LOGW(TAG, "[ * ] Stop event received \n");
-				break;
-			}
-		}
+
         uint32_t frame_nodes = ring_buffer_node_get_fill_nodes(&s_a2dp_frame_nodes);
         while(frame_nodes)
         {
 //            LOGI("speaker get node :%d \n", frame_nodes);
             int i = 0;
             uint8_t s_frame = (CODEC_AUDIO_SBC == bt_audio_a2dp_sink_codec.type ? (frame_nodes>A2DP_SPEAKER_WRITE_SBC_FRAME_NUM ? A2DP_SPEAKER_WRITE_SBC_FRAME_NUM:frame_nodes) : frame_nodes);
+            s_frame = frame_nodes;
             for (; i < s_frame; i++)
             {
-                uint8_t *inbuf = ring_buffer_node_get_read_node(&s_a2dp_frame_nodes);
+                uint8_t *inbuf = ring_buffer_node_peek_read_node(&s_a2dp_frame_nodes);
+                uint16_t tmp_len = (inbuf[1] << 8 | inbuf[0]);
+
+                inbuf += 2;
+
                 bk_err_t ret;
 
                 if (CODEC_AUDIO_SBC == bt_audio_a2dp_sink_codec.type)
                 {
-                    ret = bk_sbc_decoder_frame_decode(&bt_audio_sink_sbc_decoder, inbuf, frame_length);
+                    ret = bk_sbc_decoder_frame_decode(&bt_audio_sink_sbc_decoder, inbuf, tmp_len);
+                    ring_buffer_node_take_read_node(&s_a2dp_frame_nodes);
                     if (ret < 0)
                     {
-                        LOGE("sbc_decoder_decode error <%d>\n", ret);
+                        LOGE("sbc_decoder_decode error <%d> %d %d\n", ret, tmp_len, s_frame);
                         continue;
                     }
                     int16_t *dst = (int16_t*)bt_audio_sink_sbc_decoder.pcm_sample;
@@ -1744,8 +1525,8 @@ static void speaker_task(void *arg)
                         }
                         w_len = bt_audio_sink_sbc_decoder.pcm_length * 2;
                     }
-                    
-                    int size = raw_stream_write(raw_write, (char *)dst, w_len);
+
+                    int size = audio_play_write_data(s_audio_play_obj, (char *)dst, w_len);
                     if (size <= 0)
                     {
                         LOGE("raw_stream_write size fail: %d \n", size);
@@ -1755,15 +1536,18 @@ static void speaker_task(void *arg)
                     {
                         //LOGI("raw_stream_write size: %d \n", size);
                     }
+
                 }
 #if (CONFIG_AAC_DECODER)
                 else if(CODEC_AUDIO_AAC == bt_audio_a2dp_sink_codec.type)
                 {
-                    uint32_t len = *(uint32_t *)inbuf;
+                    uint32_t len = 0;
+                    memcpy(&len, inbuf, sizeof(len));
+
                     // LOGI("<- %d \n", len);
                     uint8_t *out_buf = 0;
                     uint32_t out_len = 0;
-                    ret = bk_aac_decoder_decode(&bt_audio_sink_aac_decoder, (inbuf+4), len, &out_buf, &out_len);
+                    ret = bk_aac_decoder_decode(&bt_audio_sink_aac_decoder, (inbuf + sizeof(len)), len, &out_buf, &out_len);
                     if(ret == 0)
                     {
                         int16_t *dst = (int16_t*)out_buf;
@@ -1776,7 +1560,8 @@ static void speaker_task(void *arg)
                             }
                             w_len = out_len/2;
                         }
-                        int size = raw_stream_write(raw_write, (char *)dst, w_len);
+
+                        int size = audio_play_write_data(s_audio_play_obj, (char *)dst, w_len);
                         if (size <= 0)
                         {
                             LOGE("raw_stream_write size fail: %d \n", size);
@@ -1788,7 +1573,7 @@ static void speaker_task(void *arg)
                         }
                     }else
                     {
-                        LOGE("sbc_decoder_decode error <%d>\n", ret);
+                        LOGE("aac_decoder_decode error <%d>\n", ret);
                     }
                 }
 #endif
@@ -1800,62 +1585,38 @@ static void speaker_task(void *arg)
             frame_nodes -= s_frame;
         }
     }
-    LOGI("%s exit start!! \r\n", __func__);
 
-    if (BK_OK != audio_pipeline_stop(play_pipeline))
+end:;
+    LOGI("%s a2dp exit start!! \r\n", __func__);
+
+    ret = audio_play_close(s_audio_play_obj);
+
+    if(ret)
     {
-        LOGE("play_pipeline stop fail, %d \n", __LINE__);
-    }
-    if (BK_OK != audio_pipeline_wait_for_stop(play_pipeline))
-    {
-        LOGE("play_pipeline wait stop fail, %d \n", __LINE__);
-    }
-    if (BK_OK != audio_pipeline_terminate(play_pipeline))
-    {
-        LOGE("pipeline terminate fail, %d \n", __LINE__);
-    }
-    if (BK_OK != audio_pipeline_unregister(play_pipeline, onboard_speaker))
-    {
-        LOGE("pipeline terminate fail, %d \n", __LINE__);
-    }
-    if (BK_OK != audio_pipeline_unregister(play_pipeline, raw_write))
-    {
-        LOGE("pipeline terminate fail, %d \n", __LINE__);
+        LOGE("%s close audio play err %d\n", __func__, ret);
     }
 
-    if (BK_OK != audio_pipeline_remove_listener(play_pipeline)) {
-		LOGE("pipeline terminate fail, %d \n", __LINE__);
-	}
+    ret = audio_play_destroy(s_audio_play_obj);
 
-	if (BK_OK != audio_event_iface_destroy(play_evt)) {
-		LOGE("pipeline terminate fail, %d \n", __LINE__);
-	}
-	if (BK_OK != audio_event_iface_destroy(evt)) {
-		LOGE("pipeline terminate fail, %d \n", __LINE__);
-	}
-
-    if (BK_OK != audio_pipeline_deinit(play_pipeline))
+    if(ret)
     {
-        LOGE("pipeline terminate fail, %d \n", __LINE__);
-    }
-    if (BK_OK != audio_element_deinit(onboard_speaker))
-    {
-        LOGE("element deinit fail, %d \n", __LINE__);
+        LOGE("%s destroy audio play err %d\n", __func__, ret);
     }
 
-    if (BK_OK != audio_element_deinit(raw_write))
-    {
-        LOGE("element deinit fail, %d \n", __LINE__);
-    }
+    s_audio_play_obj = NULL;
 
-    LOGI("%s end!!\r\n", __func__);
-    a2dp_speaker_thread_handle = NULL;
+    LOGI("%s a2dp end!!\r\n", __func__);
     rtos_deinit_semaphore(&a2dp_speaker_sema);
     a2dp_speaker_sema = NULL;
+    if (CODEC_AUDIO_SBC == bt_audio_a2dp_sink_codec.type)
+    {
+        bk_sbc_decoder_deinit();
+    }
 #if (CONFIG_AAC_DECODER)
     bk_aac_decoder_deinit(&bt_audio_sink_aac_decoder);
 #endif
     ring_buffer_node_clear(&s_a2dp_frame_nodes);
+    ring_buffer_node_deinit(&s_a2dp_frame_nodes);
     if (p_cache_buff)
     {
         os_free(p_cache_buff);
@@ -1867,5 +1628,14 @@ static void speaker_task(void *arg)
         LOGE("!! speaker tash exit error !!\n");
     }
     rtos_delete_thread(NULL);
+}
 
+int32_t wait_a2dp_speaker_task_end(void)
+{
+    while(a2dp_speaker_thread_handle)
+    {
+        rtos_delay_milliseconds(20);
+    }
+
+    return 0;
 }

@@ -1,6 +1,7 @@
 #include "cli.h"
 #include "components/bluetooth/bk_dm_a2dp.h"
 #include "a2dp_sink/a2dp_sink_demo.h"
+#include "hfp_hf/hfp_hf_demo.h"
 
 static void headset_usage(void)
 {
@@ -245,6 +246,71 @@ static void cmd_headset_demo(char *pcWriteBuffer, int xWriteBufferLen, int argc,
         }
 
         bk_bt_app_avrcp_ct_get_attr(attr);
+    }
+    else if(os_strcmp(argv[1], "vr") == 0 && argc >= 3)
+    {
+        uint8_t enable = 0;
+
+        ret = sscanf(argv[2], "%hhu", &enable);
+
+        if (ret != 1)
+        {
+            goto __error;
+        }
+
+        hfp_demo_vr(enable);
+    }
+    else if(os_strcmp(argv[1], "dial") == 0 && argc >= 3)
+    {
+        uint8_t enable = 0;
+        uint8_t number[32] = "112";
+
+        ret = sscanf(argv[2], "%hhu", &enable);
+
+        if (ret != 1)
+        {
+            goto __error;
+        }
+
+        if (argc >= 4)
+        {
+            ret = sscanf(argv[3], "%31s", number);
+
+            if (ret != 1)
+            {
+                goto __error;
+            }
+        }
+
+        hfp_demo_dial(enable, number);
+    }
+    else if(os_strcmp(argv[1], "answer") == 0 && argc >= 3)
+    {
+        uint8_t accept = 0;
+        uint8_t number[32] = "112";
+
+        ret = sscanf(argv[2], "%hhu", &accept);
+
+        if (ret != 1)
+        {
+            goto __error;
+        }
+
+        hfp_demo_answer(accept);
+    }
+    else if(os_strcmp(argv[1], "hfpcmd") == 0 && argc >= 3)
+    {
+        uint8_t accept = 0;
+        uint8_t cmd[64] = {0};
+
+        ret = sscanf(argv[2], "%63s", cmd);
+
+        if (ret != 1)
+        {
+            goto __error;
+        }
+
+        hfp_demo_cust_cmd(cmd);
     }
     else
     {

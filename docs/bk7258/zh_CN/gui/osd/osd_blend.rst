@@ -25,14 +25,6 @@ OSD视频叠加
 --------------------
 
 字库融合需要先生成字库，然后融合到图片上，关于字库生成的文档请参考 `字库生成 <font_generate.html>`_
-调用字库的app层接口在lcd_draw_blend.c中， API具体的使用如下:
-
- -  start_x，start_y 刷屏的起始位置，是在图片比LCD屏幕尺寸大时，display取居中数据刷屏。
- - pixel_bytes是根据背景像素是RGB888还是YUV或RGB565定义
- - frame_addr_offset：即图标显示基于基地址的偏移量，比如时钟clock显示在屏幕坐标的（0，0）位置，那么frame_addr_offset = (start_y * frame->width + start_x) * pixel_bytes
-
-比如天气显示在屏幕坐标的的(DATA_POSTION_X,DATA_POSTION_Y)那么 frame_addr_offset = ((start_y + DATA_POSTION_Y) * frame->width + start_x + DATA_POSTION_X) * pixel_bytes;
-用户需要考虑当屏幕宽度不足够显示字符时，可能需要更改坐标计算偏移地址。
 
 字库融合的示意图如下：
 
@@ -41,6 +33,27 @@ OSD视频叠加
 	:figclass: align-center
 
 	Figure. font_osd
+
+下面对图进行说明：
+	 - 外面的大图表示摄像头实际出图，可能比屏幕大，也可能可屏幕大小相同。
+
+	 - 融合的位置是以LCD为参考的坐标点。
+
+调用字库融合的的app层接口在lcd_draw_blend.c中， API具体的使用如下:
+
+ - start_x，start_y 刷屏的起始位置，是在图片比LCD屏幕尺寸大时，display取居中数据刷屏，即图中的坐标点（0，0）。
+ - pixel_bytes是根据背景像素是RGB888还是YUV或RGB565定义
+ - frame_addr_offset：即图标显示基于基地址的偏移量，比如时钟clock显示在屏幕坐标的（0，0）位置，那么frame_addr_offset = (start_y * frame->width + start_x) * pixel_bytes
+
+比如天气显示在屏幕坐标的的(DATA_POSTION_X,DATA_POSTION_Y)那么 frame_addr_offset = ((start_y + DATA_POSTION_Y) * frame->width + start_x + DATA_POSTION_X) * pixel_bytes;
+
+用户需要考虑当屏幕宽度不足够显示字符时，可能需要更改坐标计算偏移地址。
+
+用户主要调用下面的接口配置的参数有：
+
+	 - 计算融合图标的偏移位置 frame_addr_offset
+	 - 融合图标的xsize ysize
+
 
 ::
 
@@ -127,24 +140,6 @@ OSD视频叠加
 		return BK_OK;
 	}
 
-对于lcd_driver_font_blend驱动中的实现, 关键代码如下,用户可不做了解。
-
-:: 
-
-		font_t font;
-		font.info = (ui_display_info_struct){(unsigned char *)p_yuv_dst,0,lcd_font->ysize,0,{0}};
-		font.width = lcd_font->xsize;
-		font.height = lcd_font->ysize;
-		font.font_fmt = lcd_font->font_format;
-		for(int i = 0; i < lcd_font->str_num; i++)
-		{
-			font.digit_info = lcd_font->str[i].font_digit_type;
-			font.s = lcd_font->str[i].str;
-			font.font_color = lcd_font->str[i].font_color;
-			font.x_pos = lcd_font->str[i].x_pos;
-			font.y_pos = lcd_font->str[i].y_pos;
-			lcd_draw_font(&font);
-		}
 
 .. note::
 
@@ -243,90 +238,6 @@ OSD视频叠加
 		}
 	#endif
 	return BK_OK;
-	}
-
-下面为具体的DMA2D实现,用户可以简单了解，感兴趣的话可以详细参考DMA2D驱动代码``/api-reference/multi_media/bk_dma2d.html``
-
-::
-
-	bk_err_t lcd_dma2d_driver_blend(lcd_blend_t *lcd_blend)
-	{
-	#if CONFIG_LCD_DMA2D_BLEND
-		uint16_t lcd_start_x = 0;
-		uint16_t lcd_start_y = 0;
-		if ((lcd_blend->lcd_width < lcd_blend->bg_width)  || (lcd_blend->lcd_height < lcd_blend->bg_height)) //for lcd size is small then frame image size
-		{
-			if (lcd_blend->lcd_width < lcd_blend->bg_width)
-				lcd_start_x = (lcd_blend->bg_width - lcd_blend->lcd_width) / 2;
-			if (lcd_blend->lcd_height < lcd_blend->bg_height)
-				lcd_start_y = (lcd_blend->bg_height - lcd_blend->lcd_height) / 2;
-		}
-			//if bg data is rgb565(after hw rotate)
-			dma2d_offset_blend_t dma2d_config;
-
-			dma2d_config.pfg_addr = (char *)lcd_blend->pfg_addr;
-			dma2d_config.pbg_addr = (char *)lcd_blend->pbg_addr;
-			dma2d_config.pdst_addr = (char *)lcd_blend->pbg_addr;
-			dma2d_config.fg_color_mode = DMA2D_INPUT_ARGB8888; 
-			switch (lcd_blend->bg_data_format)
-			{
-				case PIXEL_FMT_YUYV:
-					dma2d_config.bg_color_mode = DMA2D_INPUT_YUYV;
-					dma2d_config.dst_color_mode = DMA2D_OUTPUT_YUYV;
-					break;
-				case PIXEL_FMT_VUYY:
-					dma2d_config.bg_color_mode = DMA2D_INPUT_VUYY;
-					dma2d_config.dst_color_mode = DMA2D_OUTPUT_YUYV;
-					break;
-				case PIXEL_FMT_RGB888:
-					dma2d_config.bg_color_mode = DMA2D_INPUT_RGB888;
-					dma2d_config.dst_color_mode = DMA2D_OUTPUT_RGB888;
-					break;
-				case PIXEL_FMT_RGB565:
-					default:
-					dma2d_config.bg_color_mode = DMA2D_INPUT_RGB565;
-					dma2d_config.dst_color_mode = DMA2D_OUTPUT_RGB565;
-					break;
-			}
-			dma2d_config.fg_red_blue_swap = DMA2D_RB_SWAP ;
-			dma2d_config.bg_red_blue_swap = DMA2D_RB_REGULAR;
-			dma2d_config.dst_red_blue_swap = DMA2D_RB_REGULAR;
-			
-			dma2d_config.fg_frame_width = lcd_blend->xsize;
-			dma2d_config.fg_frame_height = lcd_blend->ysize;
-			dma2d_config.bg_frame_width = lcd_blend->bg_width;
-			dma2d_config.bg_frame_height = lcd_blend->bg_height;
-			dma2d_config.dst_frame_width = lcd_blend->bg_width;
-			dma2d_config.dst_frame_height = lcd_blend->bg_height;
-
-			dma2d_config.fg_frame_xpos = 0;
-			dma2d_config.fg_frame_ypos = 0;
-			dma2d_config.bg_frame_xpos = lcd_start_x + lcd_blend->xpos;
-			dma2d_config.bg_frame_ypos = lcd_start_y + lcd_blend->ypos;
-			dma2d_config.dst_frame_xpos = lcd_start_x + lcd_blend->xpos;
-			dma2d_config.dst_frame_ypos = lcd_start_y + lcd_blend->ypos;
-			
-			dma2d_config.fg_pixel_byte = FOUR_BYTES;
-			dma2d_config.bg_pixel_byte = TWO_BYTES;
-			dma2d_config.dst_pixel_byte = TWO_BYTES;
-			
-			dma2d_config.dma2d_width = lcd_blend->xsize;
-			dma2d_config.dma2d_height = lcd_blend->ysize;
-			dma2d_config.fg_alpha_mode = DMA2D_NO_MODIF_ALPHA;
-			dma2d_config.bg_alpha_mode = DMA2D_REPLACE_ALPHA;
-			bk_dma2d_offset_blend(&dma2d_config);
-			bk_dma2d_start_transfer();
-	#if (USE_DMA2D_BLEND_ISR_CALLBACKS == 1)
-			if (rtos_get_semaphore(&s_blend.dma2d_complete_sem, BEKEN_NEVER_TIMEOUT) != BK_OK)
-			{
-				LOGE("%s, dma2d_complete_sem get failed: %d\n", __func__);
-			}
-	#else
-			while (bk_dma2d_is_transfer_busy()) {}
-	#endif
-
-	#endif  //CONFIG_LCD_DMA2D_BLEN
-		return BK_OK;
 	}
 
 4.2 CPU融合

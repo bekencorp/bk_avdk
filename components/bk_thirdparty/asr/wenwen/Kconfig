@@ -1,0 +1,25 @@
+menu "Bk_thirdparty::WenWen"
+
+	config WENWEN_ASR
+		bool "Enable WenWen ASR"
+		default n
+		help
+			Enable WenWen Automatic Speech Recognition
+
+	choice WENWEN_ASR_VERSION
+		depends on WENWEN_ASR
+		prompt "Select WenWen ASR Version"
+		default WENWEN_ASR_VERSION_SINGLE_MIC
+
+		config WENWEN_ASR_VERSION_SINGLE_MIC
+			bool "Enable WenWen ASR Single Mic Version"
+			help
+				WenWen ASR only need one mic data
+
+		config WENWEN_ASR_VERSION_DUAL_MIC
+			bool "Enable WenWen ASR Dual Mic Version"
+			help
+				WenWen ASR only need two mic data
+	endchoice
+
+endmenu

@@ -420,7 +420,7 @@ int storage_app_task_init(void)
 		                         BEKEN_DEFAULT_WORKER_PRIORITY,
 		                         "storage_app_task_thread",
 		                         (beken_thread_function_t)storage_app_task_entry,
-		                         2 * 1024,
+		                         2560,
 		                         NULL);
 
 		if (BK_OK != ret)

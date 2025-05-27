@@ -105,6 +105,11 @@ const lcd_device_t *lcd_devices[] =
 #if CONFIG_LCD_SPI_ST7796U
 	&lcd_device_st7796u,
 #endif
+
+#if CONFIG_LCD_SPI_GC9D01
+	&lcd_device_gc9d01,
+#endif
+
 };
 
 

@@ -1,3 +1,4 @@
 [submodule "bk_idk"]
 	path = bk_idk
-	url = https://github.com/bekencorp/bk_idk.git
+	url = ../bk_idk.git
+        branch = release/v2.0.1

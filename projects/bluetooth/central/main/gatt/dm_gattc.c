@@ -39,6 +39,8 @@
 #define INVALID_ATTR_HANDLE 0
 #define MIN_VALUE(x, y) (((x) < (y)) ? (x): (y))
 
+#define AUTO_ENABLE_NOTIFY 1
+
 enum
 {
     GATTC_STATUS_IDLE,
@@ -63,17 +65,12 @@ enum
 //    uint8_t noti_indicate_recv_count;
 //} dm_gattc_app_env_t;
 
-#define dm_gattc_app_env_t dm_gatt_addition_app_env_t
+#define dm_gattc_app_env_t dm_gatt_demo_app_env_t
 
 //static dm_gattc_app_env_t s_dm_gattc_app_env_array[GATT_MAX_CONNECTION_COUNT];
 
 static bk_gatt_if_t s_gattc_if;
 static beken_semaphore_t s_ble_sema = NULL;
-
-static uint16_t s_peer_service_start_handle = 0;
-static uint16_t s_peer_service_end_handle = 0;
-static uint16_t s_peer_service_char_handle = 0;
-static uint16_t s_peer_service_char_desc_handle = 0;
 
 static uint8_t s_dm_gattc_local_addr_is_public = 0;
 
@@ -204,12 +201,35 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
             gatt_logi("0x%04x %d~%d", short_uuid, param->array[i].start_handle, param->array[i].end_handle);
 
+            common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
+
+            if (!common_env_tmp || !common_env_tmp->data)
+            {
+                gatt_loge("conn_id %d not found %d %p", param->conn_id, common_env_tmp->data);
+                break;
+            }
+
+            app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
             if (INTERESTING_SERIVCE_UUID == short_uuid)
             {
-                s_peer_service_start_handle = param->array[i].start_handle;
-                s_peer_service_end_handle = param->array[i].end_handle;
+                app_env_tmp->peer_interest_service_start_handle = param->array[i].start_handle;
+                app_env_tmp->peer_interest_service_end_handle = param->array[i].end_handle;
 
-                gatt_logi("interesting service %d~%d", s_peer_service_start_handle, s_peer_service_end_handle);
+                gatt_logi("interesting service 0x%04x %d~%d", short_uuid, param->array[i].start_handle, param->array[i].end_handle);
+            }
+
+            if (BK_GATT_UUID_GAP_SVC == short_uuid)
+            {
+                app_env_tmp->peer_gap_service_start_handle = param->array[i].start_handle;
+                app_env_tmp->peer_gap_service_end_handle = param->array[i].end_handle;
+
+                gatt_logi("gap service %d~%d", param->array[i].start_handle, param->array[i].end_handle);
+            }
+
+            if (BK_GATT_UUID_GATT_SVC == short_uuid)
+            {
+                gatt_logi("gatt service %d~%d", param->array[i].start_handle, param->array[i].end_handle);
             }
         }
     }
@@ -241,13 +261,47 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
             gatt_logi("0x%04x %d~%d char_value_handle %d", short_uuid, param->array[i].start_handle, param->array[i].end_handle, param->array[i].char_value_handle);
 
-            if ( s_peer_service_start_handle <= param->array[i].char_value_handle &&
-                    s_peer_service_end_handle >= param->array[i].char_value_handle &&
-                    INTERESTING_CHAR_UUID == short_uuid)
-            {
-                s_peer_service_char_handle = param->array[i].char_value_handle;
+            common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
 
-                gatt_logi("interesting char %d", s_peer_service_char_handle);
+            if (!common_env_tmp || !common_env_tmp->data)
+            {
+                gatt_loge("conn_id %d not found %d %p", param->conn_id, common_env_tmp->data);
+                break;
+            }
+
+            app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
+            if ( INTERESTING_CHAR_UUID == short_uuid &&
+                    app_env_tmp->peer_interest_service_start_handle <= param->array[i].char_value_handle &&
+                    app_env_tmp->peer_interest_service_end_handle >= param->array[i].char_value_handle
+               )
+            {
+                app_env_tmp->peer_interest_char_handle = param->array[i].char_value_handle;
+
+                gatt_logi("interesting char 0x%04x %d", short_uuid, param->array[i].char_value_handle);
+            }
+
+            if ( app_env_tmp->peer_gap_service_start_handle <= param->array[i].char_value_handle &&
+                    app_env_tmp->peer_gap_service_end_handle >= param->array[i].char_value_handle
+               )
+            {
+                switch (short_uuid)
+                {
+                case BK_GATT_UUID_GAP_DEVICE_NAME:
+                    gatt_logi("device name value attr handle 0x%04x", param->array[i].char_value_handle);
+                    break;
+
+                case BK_GATT_UUID_GAP_CENTRAL_ADDR_RESOL:
+                    gatt_logi("central addr resolvable attr handle 0x%04x", param->array[i].char_value_handle);
+                    break;
+
+                case BK_GATT_UUID_GAP_RESOLV_RPVIATE_ADDR_ONLY:
+                    gatt_logi("peer resolve RPA only !!!");
+                    break;
+
+                default:
+                    break;
+                }
             }
         }
     }
@@ -283,13 +337,24 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
             gatt_logi("0x%04x char_handle %d desc_handle %d", short_uuid, param->array[i].char_handle, param->array[i].desc_handle);
 
-            if (BK_GATT_UUID_CHAR_CLIENT_CONFIG == short_uuid &&
-                    s_peer_service_char_handle == param->array[i].char_handle)
-            {
-                gatt_logi("interesting char desc %d", param->array[i].desc_handle);
+            common_env_tmp = dm_ble_find_app_env_by_conn_id(param->conn_id);
 
-                //if don't want enable notify, remove this.
-                s_peer_service_char_desc_handle = param->array[i].desc_handle;
+            if (!common_env_tmp || !common_env_tmp->data)
+            {
+                gatt_loge("conn_id %d not found %d %p", param->conn_id, common_env_tmp->data);
+                break;
+            }
+
+            app_env_tmp = (typeof(app_env_tmp))common_env_tmp->data;
+
+            if (BK_GATT_UUID_CHAR_CLIENT_CONFIG == short_uuid &&
+                    app_env_tmp->peer_interest_char_handle == param->array[i].char_handle)
+            {
+                gatt_logi("interesting char desc 0x%04x %d", short_uuid, param->array[i].desc_handle);
+
+#if AUTO_ENABLE_NOTIFY
+                app_env_tmp->peer_interest_char_desc_handle = param->array[i].desc_handle;
+#endif
             }
         }
     }
@@ -413,7 +478,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
         if (app_env_tmp->job_status == GATTC_STATUS_READ_MULTI)
         {
-            if (0 != bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, s_peer_service_char_desc_handle, sizeof(client_config_noti_enable), (uint8_t *)&client_config_noti_enable, BK_GATT_WRITE_TYPE_RSP, auth_req))
+            if (0 != bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, app_env_tmp->peer_interest_char_desc_handle, sizeof(client_config_noti_enable), (uint8_t *)&client_config_noti_enable, BK_GATT_WRITE_TYPE_RSP, auth_req))
             {
                 gatt_loge("bk_ble_gattc_write_char_descr err");
             }
@@ -463,7 +528,7 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
         if (app_env_tmp->job_status == GATTC_STATUS_WRITE_DESC_NEED_RSP)
         {
-            if (0 != bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, s_peer_service_char_desc_handle, sizeof(client_config_all_disable), (uint8_t *)&client_config_all_disable, BK_GATT_WRITE_TYPE_NO_RSP, auth_req))
+            if (0 != bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, app_env_tmp->peer_interest_char_desc_handle, sizeof(client_config_all_disable), (uint8_t *)&client_config_all_disable, BK_GATT_WRITE_TYPE_NO_RSP, auth_req))
             {
                 gatt_loge("bk_ble_gattc_write_char_descr err");
             }
@@ -609,11 +674,11 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
 
             if (app_env_tmp->noti_indica_switch)
             {
-                ret = bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, s_peer_service_char_desc_handle, sizeof(client_config_noti_enable), (uint8_t *)&client_config_noti_enable, BK_GATT_WRITE_TYPE_RSP, auth_req);
+                ret = bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, app_env_tmp->peer_interest_char_desc_handle, sizeof(client_config_noti_enable), (uint8_t *)&client_config_noti_enable, BK_GATT_WRITE_TYPE_RSP, auth_req);
             }
             else
             {
-                ret = bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, s_peer_service_char_desc_handle, sizeof(client_config_indic_enable), (uint8_t *)&client_config_indic_enable, BK_GATT_WRITE_TYPE_RSP, auth_req);
+                ret = bk_ble_gattc_write_char_descr(s_gattc_if, param->conn_id, app_env_tmp->peer_interest_char_desc_handle, sizeof(client_config_indic_enable), (uint8_t *)&client_config_indic_enable, BK_GATT_WRITE_TYPE_RSP, auth_req);
             }
 
             app_env_tmp->noti_indica_switch = (app_env_tmp->noti_indica_switch + 1) % 2;
@@ -642,15 +707,21 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     case BK_GATTC_CONNECT_EVT:
     {
         struct gattc_connect_evt_param *param = (typeof(param))comm_param;
+        uint16_t hci_handle = 0;
+        ble_err_t ret = bk_ble_get_hci_handle_from_gatt_conn_id(param->conn_id, &hci_handle);
 
-        gatt_logi("BK_GATTC_CONNECT_EVT role %d %02X:%02X:%02X:%02X:%02X:%02X %d", param->link_role,
+        gatt_logi("BK_GATTC_CONNECT_EVT role %d %02X:%02X:%02X:%02X:%02X:%02X conn_id %d hci_handle 0x%x",
+                  param->conn_id,
+                  param->link_role,
                   param->remote_bda[5],
                   param->remote_bda[4],
                   param->remote_bda[3],
                   param->remote_bda[2],
                   param->remote_bda[1],
                   param->remote_bda[0],
-                  param->conn_id);
+                  param->conn_id,
+                  (!ret ? hci_handle : 0xffff)
+                 );
 
         common_env_tmp = dm_ble_find_app_env_by_addr(param->remote_bda);
 
@@ -706,13 +777,15 @@ static int32_t bk_gattc_cb (bk_gattc_cb_event_t event, bk_gatt_if_t gattc_if, bk
     {
         struct gattc_disconnect_evt_param *param = (typeof(param))comm_param;
 
-        gatt_logi("BK_GATTC_DISCONNECT_EVT %02X:%02X:%02X:%02X:%02X:%02X",
+        gatt_logi("BK_GATTC_DISCONNECT_EVT %02X:%02X:%02X:%02X:%02X:%02X conn_id %d",
                   param->remote_bda[5],
                   param->remote_bda[4],
                   param->remote_bda[3],
                   param->remote_bda[2],
                   param->remote_bda[1],
-                  param->remote_bda[0]);
+                  param->remote_bda[0],
+                  param->conn_id
+                 );
 
         common_env_tmp = dm_ble_find_app_env_by_addr(param->remote_bda);
 
@@ -794,8 +867,8 @@ int32_t dm_gattc_connect(uint8_t *addr, uint32_t addr_type)
         param.peer_addr_type = addr_type;
     }
 
-    param.conn_interval_min = 16;
-    param.conn_interval_max = 16;
+    param.conn_interval_min = 0x20;
+    param.conn_interval_max = 0x20;
     param.conn_latency = 0;
     param.supervision_timeout = 500;
     param.min_ce = 0;

@@ -10,6 +10,9 @@
 #if CONFIG_FATFS
 #include "lv_fatfs.h"
 #endif
+#if (CONFIG_VFS)
+#include "lv_vfs.h"
+#endif
 
 
 static beken_thread_t g_disp_thread_handle;
@@ -64,6 +67,10 @@ void lv_vendor_init(lv_vnd_config_t *config)
     lv_fatfs_init();
 #endif
 
+#if (CONFIG_VFS)
+    lv_vfs_init();
+#endif
+
     rtos_init_mutex(&g_disp_mutex);
 
     ret = rtos_init_semaphore_ex(&lvgl_sem, 1, 0);
@@ -90,6 +97,10 @@ void lv_vendor_deinit(void)
 
 #if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
     lv_fatfs_deinit();
+#endif
+
+#if (CONFIG_VFS)
+    lv_vfs_deinit();
 #endif
 
     rtos_deinit_mutex(&g_disp_mutex);
@@ -173,10 +184,6 @@ void lv_vendor_stop(void)
     ret = rtos_get_semaphore(&lvgl_sem, BEKEN_NEVER_TIMEOUT);
     if (BK_OK != ret) {
         LOGE("%s lvgl_sem get failed\n", __func__);
-    }
-
-    if (lv_vendor_display_frame_cnt() == 2 || lv_vendor_draw_buffer_cnt() == 2) {
-        while (bk_dma2d_is_transfer_busy()) {}
     }
 
     LOGI("%s complete\n", __func__);

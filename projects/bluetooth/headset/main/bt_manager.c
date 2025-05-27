@@ -31,6 +31,7 @@ typedef struct
     beken2_timer_t recon_tmr;
     uint8_t peer_addr[6];
     uint8_t recon_addr[6];
+    uint8_t tmp_link_key[16];//BT_LINK_KEY_SIZE];
 } btm_env_s;
 
 static btm_env_s btm_env={0};
@@ -317,11 +318,17 @@ void gap_event_cb(bk_gap_bt_cb_event_t event, bk_bt_gap_cb_param_t *param)
     {
         uint8_t *addr = param->link_key_req.bda;
         bk_bt_linkkey_storage_t tmp;
+        int ret = 0;
+        uint8_t zero_linkkey[16] = {0};
+        uint8_t ff_linkkey[16] = {0};
+        uint8_t found_key = 0;
 
         memset(&tmp, 0, sizeof(tmp));
         memcpy(tmp.addr, addr, sizeof(tmp.addr));
 
-        int ret = bluetooth_storage_find_linkkey_info_index(addr, tmp.link_key);
+        os_memset(ff_linkkey, 0xff, sizeof(ff_linkkey));
+
+        ret = bluetooth_storage_find_linkkey_info_index(addr, tmp.link_key);
 
         if (ret >= 0)
         {
@@ -333,6 +340,18 @@ void gap_event_cb(bk_gap_bt_cb_event_t event, bk_bt_gap_cb_param_t *param)
                       addr[1],
                       addr[0]);
 
+            found_key = 1;
+        }
+        else if(os_memcmp(btm_env.tmp_link_key, zero_linkkey, sizeof(btm_env.tmp_link_key)) &&
+                        os_memcmp(btm_env.tmp_link_key, ff_linkkey, sizeof(btm_env.tmp_link_key)))
+        {
+            LOGI("%s use tmp linkkey\n");
+            os_memcpy(tmp.link_key, btm_env.tmp_link_key, sizeof(btm_env.tmp_link_key));
+            found_key = 1;
+        }
+
+        if(found_key)
+        {
             bk_bt_gap_linkkey_reply(1, &tmp);
         }
         else
@@ -399,7 +418,7 @@ int bt_manager_register_callback(btm_callback_s *cb)
     for(;i<MAX_PROFILE_NUM;i++)
     {
         if(
-            btm_cbs[i].gap_cb == NULL 
+            btm_cbs[i].gap_cb == NULL
             && btm_cbs[i].start_connect_cb == NULL
             && btm_cbs[i].stop_connect_cb == NULL
         )
@@ -434,3 +453,8 @@ uint8_t* bt_manager_get_connected_device()
     return btm_env.peer_addr;
 }
 
+void bt_manager_set_tmp_linkkey(uint8_t *addr, uint8_t *linkkey)
+{
+    LOGI("%s set tmp linkkey\n", __func__);
+    os_memcpy(btm_env.tmp_link_key, linkkey, sizeof(btm_env.tmp_link_key));
+}

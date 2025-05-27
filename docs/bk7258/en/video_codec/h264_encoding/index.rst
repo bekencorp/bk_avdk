@@ -53,3 +53,41 @@ H264 Encoding
 	- Value range: [0, 3], define three gears, the values are 1/2/3, corresponding to the h264 compressed image quality from low to high, the clearer the image is.
 	- If CONFIG_H264_QUALITY_LEVEL=0, the default value is used instead of the three-gear parameter. The default value reference path: ``.\bk_idk\middleware\soc\bk7258\hal\h264_default_config.h``, you can change the default value to achieve the desired effect.
 	- The default SDK gear is defined in the middle gear, CONFIG_H264_QUALITY_LEVEL=2. You can change this value in project config.
+
+5.Adjustment of P-Frame Count
+--------------------------------
+
+	Under the default SDK configuration, the number of P-frames per GOP in H264 encoding is 5, which can be adjusted through the macro: ``CONFIG_H264_P_FRAME_CNT``.
+	The valid range is [0, 1023]. Increasing the number of P-frames can lead to a reduction in the overall bitrate of the encoded output.
+
+6.Suggestions for Adjusting Image Quality
+-------------------------------------------
+
+	The SDK provides three predefined H264 image quality levels, which can be controlled through the macro: ``CONFIG_H264_QUALITY_LEVEL``.
+	Adjusting image quality primarily involves parameters within the structure of: ``compress_ratio_t``.
+
+	Debugging Steps:
+
+	1.Adjust the number of P-frames: Increase the number of P-frames based on the variation in image content to reduce bitrate.
+
+	2.Adjust the frame buffer size: The default is 64K. Adjust it as needed to prevent I-frames from being too large and causing the output to fail. It is recommended to set the CONFIG_H264_FRAME_SIZE to 102400 (100K).
+
+	3.Configure the H264 image quality level: Use CONFIG_H264_QUALITY_LEVEL=0 to use the SDK's original encoding parameters.
+
+	4.Real-time compression rate adjustment: Monitor image quality and bitrate simultaneously, and use a controlled variable method to change one parameter at a time.
+
+	5.Obtain/configure encoding parameters: Use the command-line tool to get encoding parameters. To obtain: media h264 get_config, and to configure: media compress h264 init_qp iframe_max_qp pframe_max_qp num_ibits num_pbits.
+
+	6.Adjust the initial quantization parameter (init_qp): Start from 1 and increase by 5 each time, with a maximum value of no more than 51 until the image does not show obvious macroblock motion.
+
+	7.Adjust the I-frame encoding parameter (num_ibits): Increase this value by 20 each time until the image quality is satisfactory, but be cautious not to increase it too much to avoid increased bitrate, with a suggested maximum value of no more than 200.
+
+	8.Adjust the P-frame encoding parameter (num_pbits): Adjust this similarly, but be cautious not to increase it too much to avoid increased bitrate; a suggested maximum value is no more than 150.
+
+	9.Repeat steps 7-8: Continue adjusting until the best parameters are found.
+
+	10.Adjust the maximum quantization parameters for I-frames and P-frames (iframe_max_qp and pframe_max_qp): Reducing these values can improve image quality, but will also increase bitrate. These should not be set lower than 32.
+
+	11.Adjust the frame buffer size: After achieving the final effect, if the I-frame size does not exceed 64K, you can revert it to the default value CONFIG_H264_FRAME_SIZE=65536 (64K).
+
+	Through these steps, you can optimize the number of P-frames and image quality in the H264 encoding process to meet specific application requirements.

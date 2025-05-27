@@ -10,16 +10,7 @@ DVP_CAMERA APIs
 DVP_CAMERA Interface
 ----------------------------
 
-   Current software version support two types dvp sensor: gc0328c and hm1055. they are comunicate by i2c with chip.
-   gc0328c have 20pins interface, hm1055 have 24pins interface.
-
-   gc0328c support different image resolution and frame rate:
-   1. WQVGA(480*272)
-   2. QVGA(320*240)
-   3. VGA(640*480)
-   frame rate: 5fps/10fps/20fps/25fps
-
-   hm1055 only support 720p(1280*720) image resolution, and different frame rates: 5fps/15fps/20fps
+   Current software version support peripherals, please refer to `Support Peripherals <../../../support_peripherals/index.html>`_
 
 DVP_CAMERA API Categories
 ----------------------------
@@ -28,7 +19,7 @@ Most of DVP_CAMERA APIs can be categoried as:
 
  - DVP_CAMERA APIs
 
-   The common APIs are prefixed with bk_camera, e.g. bk_camera_driver_init() etc.
+   The common APIs are prefixed with bk_camera, e.g. bk_dvp_camera_driver_init() etc.
 
 DVP_CAMERA APIs:
  - :cpp:func:`bk_dvp_camera_driver_init` - init dvp camera(power on sensor, begin to sample image)

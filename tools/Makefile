@@ -55,6 +55,11 @@ else
 	PROJECT_BUILD_DIR := ../build/$(PROJECT_NAME)
 endif
 
+ifdef USE_LIBS_DETERMINED_MODE
+	export ARMINO_USE_WRAPPER := 1
+	export ARMINO_WRAPPER_PATH := $(ARMINO_AVDK_DIR)
+	export ARMINO_WRAPPER_NEW_PATH := /armino_avdk
+endif
 
 .PHONY: all_targets
 

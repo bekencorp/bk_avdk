@@ -584,3 +584,107 @@
         ...
         return err;
     }
+
+
+7 常见问题FAQ
+-------------------------------------
+
+7.1 ble连接、断连evt是怎样的顺序？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 1. BK_BLE_GAP_CONNECT_COMPLETE_EVT -> dm_gatts.c dm_gattc.c BK_GATTS_CONNECT_EVT|BK_GATTC_CONNECT_EVT -> 各个上层profile的 BK_GATTS_CONNECT_EVT|BK_GATTC_CONNECT_EVT
+    | 2. 各个上层profile的 BK_GATTS_DISCONNECT_EVT|BK_GATTC_DISCONNECT_EVT -> dm_gatts.c dm_gattc.c BK_GATTS_DISCONNECT_EVT|BK_GATTC_DISCONNECT_EVT -> BK_BLE_GAP_CONNECT_COMPLETE_EVT
+
+
+7.2 蓝牙多模(bt/ble)链接的有哪些库？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | libbluetooth_host_dm_dual.a 和 libbluetooth_controller_dual.a
+
+
+7.3 对于一个已存在的ble链路，有没有handle之类的以便于控制？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | BK_GATTS_CONNECT_EVT和 BK_GATTC_CONNECT_EVT中有conn_id，所有gatts/gattc接口都以此作为handle。这些evt也包含对端addr可供上层作映射关系。
+    | BK_BLE_GAP_CONNECT_COMPLETE_EVT也有hci_handle，但不能在gatt直接使用，需要通过转换接口。
+
+7.4 如何创建gatts db，如何将其和attribute handle对应起来？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 1.请参考dm_gatts.c的表结构。
+    | 2.表reg成功后会上报BK_GATTS_CREAT_ATTR_TAB_EVT，handles对应表每一行的attribute handle(其中char decl/char value只有后者有效)
+
+7.5 bk_ble_gap_register_callback能不能复用，比如多个profile都想收到evt？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 不能，但在dm_gatt.c里有个dm_gatt_add_gap_callback通过bk_ble_gap_register_callback封装了这个功能，更多细节请参考dm_gatts.c dm_gattc.c及现有profile的实现
+
+7.6 attribute handle的evt能不能分别给到各个profile？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 请参考dm_gatts_reg_db的实现
+
+7.7 各个profile能否收到gatts的evt？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 请参考dm_gatts_reg_db的实现，目前已添加了几个evt，可以根据需要修改
+
+7.8 配对相关的evt有哪些流程？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | BK_BLE_GAP_SEC_REQ_EVT 配对请求
+    | BK_BLE_GAP_AUTH_CMPL_EVT 配对结果
+    | BK_BLE_GAP_BOND_KEY_GENERATE_EVT key生成
+    | BK_BLE_GAP_PASSKEY_NOTIF_EVT passkey生成通知
+    | BK_BLE_GAP_PASSKEY_REQ_EVT 本地输入passkey req evt
+    | BK_BLE_GAP_NC_REQ_EVT 本地number compare请求
+    | 大致流程是BK_BLE_GAP_SEC_REQ_EVT -> passkey、number compare(如果有) -> BK_BLE_GAP_BOND_KEY_GENERATE_EVT -> BK_BLE_GAP_AUTH_CMPL_EVT
+
+7.9 app应该存储key吗？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 需要，BK_BLE_GAP_BOND_KEY_GENERATE_EVT需要存入flash
+
+7.10 绑定(bond)和解绑流程？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 1.绑定：BK_BLE_GAP_BOND_KEY_GENERATE_EVT后需要存入flash
+    | 2.解绑：通过bk_ble_gap_bond_dev_list_operation 删除(有限制)
+
+7.11 绑定相关还有哪些注意事项？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 1.绑定涉及到的存储分app部分和sdk部分
+    | 2.配对成功后，sdk上报BK_BLE_GAP_BOND_KEY_GENERATE_EVT，app需要将key存入flash中以备下次开机使用。sdk也会存储这部分key但只是在ram里。
+    | 3.配对成功后，如果断连并第二次连接，如果对端请求加密、鉴权，结果也会在BK_BLE_GAP_AUTH_CMPL_EVT体现
+    | 4.配对失败(或者加密、鉴权失败)，auth_cmpl.success为0，则app需要将对应key从flash删除
+    | 5.一旦app决定要删除key，则同时还需要调用bk_ble_gap_bond_dev_list_operation删除sdk存储的key
+    | 6.使用bk_ble_gap_bond_dev_list_operation时，要保证当前ble不在广播、扫描状态。
+    | 7.使用bk_ble_gap_bond_dev_list_operation删除或清空key时，sdk不会断开涉及的链路
+    | 8.开机蓝牙初始化后，开广播、扫描前，需要用bk_ble_gap_bond_dev_list_operation将先前BK_BLE_GAP_BOND_KEY_GENERATE_EVT的key添加给sdk
+
+7.12 如何修改ble地址？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 1.如果是public，则通过bk_get_mac获取，可以通过bk_set_base_mac设置(具体请参考对应文档)。bk_ble_gap_ext_adv_params_t.own_addr_type = BLE_ADDR_TYPE_PUBLIC; bk_gap_create_conn_params_t.local_addr_type = BLE_ADDR_TYPE_PUBLIC
+    | 2.如果是random，对于发adv：bk_ble_gap_set_adv_rand_addr设置地址且bk_ble_gap_ext_adv_params_t.own_addr_type = BLE_ADDR_TYPE_RANDOM; 对于master或扫描：bk_ble_gap_set_rand_addr设置地址且bk_gap_create_conn_params_t.local_addr_type = BLE_ADDR_TYPE_RANDOM
+
+7.13 bt、ble public addr能否不一样？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 目前只能一样
+
+7.14 rpa是什么意思？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | RPA(resolvable private address): ble一种防止跟踪的随机地址生成、使用机制，基于random addr，开启后adv、scan、connect的local addr由特殊算法生成，在空口上看是随机的。
+
+7.15 ble如何使用rpa？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | dm_gatt.c dm_gatts.c dm_gattc.c里，g_dm_gap_use_rpa = 1; s_dm_gattc_local_addr_is_public = 0; s_dm_gatts_local_addr_is_public = 0;
+
+7.16 ble如果配对使用，推荐用哪种地址？
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+    | 只推荐public或rpa，单纯random addr会在与手机交互的场景里出现兼容性问题。

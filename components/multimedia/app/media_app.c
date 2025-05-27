@@ -581,20 +581,6 @@ bk_err_t media_app_lcd_pipline_scale_close(void)
 	return ret;
 }
 
-bk_err_t media_app_lcd_example_display(void *lcd_open)
-{
-	bk_err_t ret = BK_OK;
-	lcd_open_t *ptr = NULL;
-	ptr = (lcd_open_t *)os_malloc(sizeof(lcd_open_t));
-	os_memcpy(ptr, (lcd_open_t *)lcd_open, sizeof(lcd_open_t));
-
-	ret = media_send_msg_sync(EVENT_LCD_EXAMPLE_IND, (uint32_t)ptr);
-
-	os_free(ptr);
-	LOGI("%s complete\n", __func__);
-	return ret;
-}
-
 
 bk_err_t media_app_mailbox_test(void)
 {

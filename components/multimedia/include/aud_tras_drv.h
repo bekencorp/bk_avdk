@@ -89,6 +89,8 @@ typedef enum {
 	AUD_TRAS_DRV_AVI_STOP,
 #endif
 
+    AUD_AI_INIT,
+
 	AUD_TRAS_DRV_MAX,
 } aud_tras_drv_op_t;
 
@@ -486,8 +488,6 @@ typedef struct {
 	uint32_t length;		/**< the data size (byte) */
 } aud_tras_drv_mic_notify_t;
 
-
-
 bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg);
 
 bk_err_t aud_tras_drv_deinit(void);
@@ -498,6 +498,13 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg);
 
 void *audio_tras_drv_malloc(uint32_t size);
 
+#if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
+typedef int (*aud_tras_drv_aec_output_callback)(unsigned char *data, unsigned int size, void *user_data);
+
+bk_err_t aud_tras_drv_register_aec_ouput_callback(aud_tras_drv_aec_output_callback cb, void *user_data);
+
+bk_err_t aud_tras_drv_set_dialog_run_state(bool state);
+#endif
 
 #ifdef __cplusplus
 }

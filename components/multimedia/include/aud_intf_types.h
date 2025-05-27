@@ -162,6 +162,11 @@ typedef enum {
 	AUD_INTF_VOC_DATA_TYPE_G711A = 0,		/**< the data of voice transfer encoded by G711A */
 	AUD_INTF_VOC_DATA_TYPE_PCM,				/**< the data of voice transfer is PCM */
 	AUD_INTF_VOC_DATA_TYPE_G711U,			/**< the data of voice transfer encoded by G711U */
+
+#if CONFIG_AUD_INTF_SUPPORT_G722
+	AUD_INTF_VOC_DATA_TYPE_G722,			/**< the data of voice transfer encoded by G722 */
+#endif
+
 	AUD_INTF_VOC_DATA_TYPE_MAX,
 } aud_intf_voc_data_type_t;
 

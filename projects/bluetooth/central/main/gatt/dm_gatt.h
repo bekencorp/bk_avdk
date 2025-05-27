@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define BLE_USE_STORAGE 1
+#define GATTS_TEST_ATTR_ENABLE 1
 
 #define GAP_IS_OLD_API 0
 

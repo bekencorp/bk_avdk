@@ -193,7 +193,7 @@ bk_err_t media_minor_init(void)
 
 	if (ret != kNoErr)
 	{
-		LOGE("%s, ceate media minor message queue failed\n", __func__);
+		LOGE("%s, create media minor message queue failed\n", __func__);
 		goto error;
 	}
 

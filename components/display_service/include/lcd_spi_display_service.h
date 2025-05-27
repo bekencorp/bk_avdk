@@ -21,15 +21,30 @@
 extern "C" {
 #endif
 
+#ifndef LCD_SPI_DEVICE_NUM
+    #ifdef CONFIG_LCD_SPI_DEVICE_NUM
+        #define LCD_SPI_DEVICE_NUM CONFIG_LCD_SPI_DEVICE_NUM
+    #else
+        #define LCD_SPI_DEVICE_NUM 1
+    #endif
+#endif
+
+#if (LCD_SPI_DEVICE_NUM > 1)
+#define LCD_SPI_ID0   0
+#define LCD_SPI_ID1   1
+#else
+#define LCD_SPI_ID    0
+#endif
+
 void lcd_spi_backlight_open(void);
 
 void lcd_spi_backlight_close(void);
 
-void lcd_spi_init(const lcd_device_t *device);
+void lcd_spi_init(uint8_t id, const lcd_device_t *device);
 
-void lcd_spi_deinit(void);
+void lcd_spi_deinit(uint8_t id);
 
-void lcd_spi_display_frame(uint8_t *frame_buffer, uint32_t width, uint32_t height);
+void lcd_spi_display_frame(uint8_t id, uint8_t *frame_buffer, uint32_t width, uint32_t height);
 
 #ifdef __cplusplus
 }

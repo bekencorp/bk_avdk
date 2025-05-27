@@ -1426,7 +1426,7 @@ static int32_t a2dp_source_demo_sbc_encoder_init(void)
     return 0;
 }
 
-
+static FATFS *s_pfs = NULL;
 static int32_t get_mp3_info(MP3FrameInfo *info)
 {
     FRESULT fr = 0;
@@ -1440,29 +1440,31 @@ static int32_t get_mp3_info(MP3FrameInfo *info)
     uint8_t id3_maj_ver = 0;
     uint16_t id3_min_ver = 0;
     uint32_t file_size = 0;
-    FATFS *s_pfs = NULL;
     uint32_t frame_start_offset = 0;
     int ret = 0;
     HMP3Decoder *s_mp3_decoder = NULL;
 
     os_memset(info, 0, sizeof(*info));
 
-    s_pfs = os_malloc(sizeof(*s_pfs));
-
-    if (!s_pfs)
+    if(s_pfs == NULL)
     {
-        a2dp_loge("s_pfs malloc failed!");
-        goto error;
-    }
+        s_pfs = os_malloc(sizeof(*s_pfs));
 
-    os_memset(s_pfs, 0, sizeof(*s_pfs));
+        if (!s_pfs)
+        {
+            a2dp_loge("s_pfs malloc failed!");
+            goto error;
+        }
 
-    fr = f_mount(s_pfs, "1:", 1);
+        os_memset(s_pfs, 0, sizeof(*s_pfs));
 
-    if (fr != FR_OK)
-    {
-        a2dp_loge("f_mount failed:%d", fr);
-        goto error;
+        fr = f_mount(s_pfs, "1:", 1);
+
+        if (fr != FR_OK)
+        {
+            a2dp_loge("f_mount failed:%d", fr);
+            goto error;
+        }
     }
 
     a2dp_logi("f_mount OK!");
@@ -1626,6 +1628,7 @@ error:;
         os_memset(&mp3file, 0, sizeof(mp3file));
     }
 
+#if 0
     if (s_pfs)
     {
         fr = f_unmount(DISK_NUMBER_SDIO_SD, "1:", 1);
@@ -1638,6 +1641,7 @@ error:;
         os_free(s_pfs);
         s_pfs = NULL;
     }
+#endif
 
     if (pcm_write_ptr)
     {
@@ -1676,27 +1680,30 @@ static void bt_a2dp_source_decode_task(void *arg)
     MP3FrameInfo tmp_mp3_frame_info;
     HMP3Decoder *s_mp3_decoder = NULL;
     uint8_t *task_ctrl = (typeof(task_ctrl))arg;
-    FATFS *s_pfs = NULL;
+    //FATFS *s_pfs = NULL;
 
     *task_ctrl = 1;
 
-    s_pfs = os_malloc(sizeof(FATFS));
-
-    if (NULL == s_pfs)
+    if(s_pfs == NULL)
     {
-        a2dp_loge("s_pfs malloc failed!");
-        goto error;
-    }
+        s_pfs = os_malloc(sizeof(FATFS));
 
-    os_memset(&tmp_mp3_frame_info, 0, sizeof(tmp_mp3_frame_info));
-    os_memset(s_pfs, 0, sizeof(*s_pfs));
+        if (NULL == s_pfs)
+        {
+            a2dp_loge("s_pfs malloc failed!");
+            goto error;
+        }
 
-    fr = f_mount(s_pfs, "1:", 1);
+        os_memset(&tmp_mp3_frame_info, 0, sizeof(tmp_mp3_frame_info));
+        os_memset(s_pfs, 0, sizeof(*s_pfs));
 
-    if (fr != FR_OK)
-    {
-        a2dp_loge("f_mount failed:%d", fr);
-        goto error;
+        fr = f_mount(s_pfs, "1:", 1);
+
+        if (fr != FR_OK)
+        {
+            a2dp_loge("f_mount failed:%d", fr);
+            goto error;
+        }
     }
 
     //can't free !!!!!
@@ -2279,6 +2286,21 @@ static bk_err_t a2dp_source_demo_create_mp3_decode_task(void)
 error:;
 
     a2dp_source_demo_stop_mp3_decode_task();
+
+#if 1
+    if (s_pfs)
+    {
+        FRESULT fr = f_unmount(DISK_NUMBER_SDIO_SD, "1:", 1);
+
+        if (fr)
+        {
+            a2dp_loge("f_unmount err %d", fr);
+        }
+
+        os_free(s_pfs);
+        s_pfs = NULL;
+    }
+#endif
 
     return err;
 }

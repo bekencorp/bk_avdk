@@ -68,6 +68,8 @@ static void storage_frame_major_notify_app(uint32_t param)
 	if (frame == NULL)
 	{
 		LOGE("read frame NULL\n");
+		msg_send_rsp_to_media_major_mailbox((media_mailbox_msg_t *)param, BK_FAIL, APP_MODULE);
+		storage_major_info.capture_state = STORAGE_STATE_DISABLED;
 		return;
 	}
 

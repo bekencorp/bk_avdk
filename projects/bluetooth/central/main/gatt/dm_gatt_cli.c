@@ -102,7 +102,7 @@ static int32_t cmd_opt_parse(int argc, char **argv)
         {
         case 'r':
         case LONG_OPT_ENUM_RPA:
-            ret = sscanf(optarg, "%hhd", &s_cli_gatt_param.rpa);
+            ret = sscanf(optarg, "%hhu", &s_cli_gatt_param.rpa);
 
             if (ret != 1)
             {
@@ -115,7 +115,7 @@ static int32_t cmd_opt_parse(int argc, char **argv)
             break;
 
         case LONG_OPT_ENUM_PRIVACY:
-            ret = sscanf(optarg, "%hhd", &s_cli_gatt_param.privacy);
+            ret = sscanf(optarg, "%hhu", &s_cli_gatt_param.privacy);
 
             if (ret != 1)
             {
@@ -172,7 +172,7 @@ static int32_t cmd_opt_parse(int argc, char **argv)
 
         case 'p':
         case LONG_OPT_ENUM_PUBLIC_ADDR:
-            ret = sscanf(optarg, "%hhd", &s_cli_gatt_param.pa);
+            ret = sscanf(optarg, "%hhu", &s_cli_gatt_param.pa);
 
             if (ret != 1)
             {
@@ -385,9 +385,19 @@ static void cmd_ble_gatt_demo(char *pcWriteBuffer, int xWriteBufferLen, int argc
 
             ret = dm_gatts_enable_service(service, enable);
         }
-        else if (os_strcmp(argv[2], "start_adv") == 0)
+        else if (!os_strcmp(argv[2], "enable_adv") && argc >= 4)
         {
-            dm_gatts_start_adv();
+            uint8_t enable = 0;
+
+            ret = sscanf(argv[3], "%hhu", &enable);
+
+            if (ret != 1)
+            {
+                CLI_LOGE("%s enable param err %d\n", __func__, ret);
+                goto __usage;
+            }
+
+            ret = dm_gatts_enable_adv(enable);
         }
         else
         {
@@ -694,6 +704,10 @@ static void cmd_ble_gatt_demo(char *pcWriteBuffer, int xWriteBufferLen, int argc
 
         ret = dm_ble_gap_update_param(mac_final, interval, tout);
     }
+    else if (os_strcmp(argv[1], "test") == 0)
+    {
+
+    }
     else
     {
         goto __usage;
@@ -712,7 +726,7 @@ __usage:
     ble_gatt_demo_usage();
 
 __error:
-
+    CLI_LOGE("%s argc %d\n", __func__, argc);
     msg = CLI_CMD_RSP_ERROR;
     os_memcpy(pcWriteBuffer, msg, os_strlen(msg));
 }

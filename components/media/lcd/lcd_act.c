@@ -1683,7 +1683,7 @@ out:
 }
 
 
-void lcd_set_backligth_handle(param_pak_t *param)
+void lcd_set_backlight_handle(param_pak_t *param)
 {
 	int ret = BK_OK;
 
@@ -1791,7 +1791,7 @@ void lcd_event_handle(uint32_t event, uint32_t param)
 			break;
 
 		case EVENT_LCD_SET_BACKLIGHT_IND:
-			lcd_set_backligth_handle((param_pak_t *)param);
+			lcd_set_backlight_handle((param_pak_t *)param);
 			break;
 
 		case EVENT_LCD_DUMP_DECODER_IND:

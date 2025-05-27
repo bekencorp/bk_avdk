@@ -100,7 +100,6 @@ bk_err_t  media_app_lcd_display_file(char *file_name);  //display sd card file
 bk_err_t media_app_lcd_display(void* lcd_display);
 bk_err_t media_app_lcd_display_beken(void* lcd_display);
 bk_err_t media_app_lcd_blend(void *param);
-bk_err_t media_app_register_uvc_connect_state_cb(void *cb);
 bk_err_t media_app_lcd_gui_blend_open(int blend_x_size, int blend_y_size);
 bk_err_t media_app_lcd_gui_blend_close(void);
 bk_err_t media_app_lcd_decode(media_decode_mode_t decode_mode);
@@ -140,7 +139,6 @@ bk_err_t media_app_h264_regenerate_idr(camera_type_t type);
 bk_err_t media_app_lcd_fmt(pixel_format_t fmt);
 bk_err_t media_app_lcd_pipline_scale_open(void *config);
 bk_err_t media_app_lcd_pipline_scale_close(void);
-bk_err_t media_app_lcd_example_display(void *lcd_open);
 
 bk_err_t media_app_pipeline_dump(void);
 

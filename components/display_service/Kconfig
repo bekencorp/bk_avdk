@@ -9,7 +9,12 @@ menu "Display Service"
 		depends on SPI
 		bool "Enable LCD SPI Display"
 		default n
-		
+
+	config LCD_SPI_DEVICE_NUM
+		depends on LCD_SPI_DISPLAY
+		int "Set lcd spi device number"
+		default 1
+
 	config LCD_EXAMPLE
 		depends on SPI
 		bool "Enable LCD SPI Display"

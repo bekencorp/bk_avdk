@@ -60,6 +60,11 @@ static void *memset_wrapper(void *b, int c, uint32_t len)
 	return os_memset(b, c, len);
 }
 
+static void *memmove_wrapper(void *out, const void *in, uint32_t n)
+{
+    return os_memmove(out, in, n);
+}
+
 static void memset_word_wrapper(void *b, int32_t c, uint32_t n)
 {
 	return os_memset_word(b, c, n);
@@ -89,10 +94,11 @@ static bk_audio_osi_funcs_t audio_osi_funcs =
 	.memcpy = memcpy_wrapper,
 	.memcpy_word = memcpy_word_wrapper,
 	.memset = memset_wrapper,
+    .memmove = memmove_wrapper,
 	.memset_word = memset_word_wrapper,
 
 	.log_write = bk_printf_ext,
-	.assert = assert_wrapper,
+	.osi_assert = assert_wrapper,
 	.get_time = get_time_wrapper,
 };
 

@@ -60,6 +60,7 @@ extern "C" {
 #include "src/widgets/lv_switch.h"
 
 #include "src/draw/lv_draw.h"
+#include "src/draw/lv_img_buf.h"
 
 #include "src/lv_api_map.h"
 

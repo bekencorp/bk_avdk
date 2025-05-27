@@ -12,3 +12,4 @@ FAQ
    qspi_lcd常见问题 <qspi_lcd/index>
    audio常见问题 <audio/index>
    lcd常见问题 <lcd/index>
+   lvgl常见问题 <lvgl/index>

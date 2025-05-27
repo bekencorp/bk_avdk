@@ -547,6 +547,13 @@ static void refr_area(const lv_area_t * area_p)
     lv_draw_ctx_t * draw_ctx = disp_refr->driver->draw_ctx;
     draw_ctx->buf = disp_refr->driver->draw_buf->buf_act;
 
+    #if (!CONFIG_LVGL_USE_PSRAM)
+        extern void lv_dma2d_stop_memcpy_last_frame(void);
+        if (LV_VER_RES == lv_area_get_height(area_p) && LV_HOR_RES == lv_area_get_width(area_p)) {
+            lv_dma2d_stop_memcpy_last_frame();
+        }
+    #endif
+
     /*With full refresh just redraw directly into the buffer*/
     /*In direct mode draw directly on the absolute coordinates of the buffer*/
     if(disp_refr->driver->full_refresh || disp_refr->driver->direct_mode) {

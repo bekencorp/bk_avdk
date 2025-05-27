@@ -136,7 +136,7 @@ bk_err_t aud_tras_send_msg(aud_tras_op_t op, void *param)
 
 	msg.op = op;
 	msg.param = param;
-	if (aud_tras_info->is_running && aud_tras_info && aud_tras_info->aud_tras_int_msg_que) {
+	if (aud_tras_info && aud_tras_info->is_running && aud_tras_info->aud_tras_int_msg_que) {
 		ret = rtos_push_to_queue(&aud_tras_info->aud_tras_int_msg_que, &msg, BEKEN_NO_WAIT);
 		if (kNoErr != ret) {
 			LOGE("aud_tras_send_int_msg fail \r\n");
@@ -337,6 +337,12 @@ aud_tras_exit:
 bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 {
 	bk_err_t ret = BK_OK;
+
+	if (aud_tras_info)
+	{
+		LOGW("%s, already open\n", __func__);
+		return ret;
+	}
 
 	aud_tras_info = audio_tras_malloc(sizeof(aud_tras_info_t));
 

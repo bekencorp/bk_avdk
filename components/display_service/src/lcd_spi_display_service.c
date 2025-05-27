@@ -24,6 +24,7 @@
 #include <driver/lcd_qspi.h>
 #include <driver/qspi.h>
 #include <driver/qspi_types.h>
+#include <lcd_spi_display_service.h>
 
 
 #define LCD_SPI_TAG "lcd_spi"
@@ -36,50 +37,102 @@
 
 #define LCD_SPI_REFRESH_WITH_QSPI   1
 
-
-#define LCD_SPI_RESET_PIN           GPIO_28
+#if (LCD_SPI_DEVICE_NUM > 1)
+#define LCD_SPI_BACKLIGHT_PIN       GPIO_25
+#define LCD0_SPI_RESET_PIN          GPIO_6
+#define LCD0_SPI_DC_PIN             GPIO_7
+#define LCD1_SPI_RESET_PIN          GPIO_45
+#define LCD1_SPI_DC_PIN             GPIO_5
+#else
 #define LCD_SPI_BACKLIGHT_PIN       GPIO_26
-#define LCD_SPI_RS_PIN              GPIO_9
+#define LCD_SPI_RESET_PIN           GPIO_28
+#define LCD_SPI_DC_PIN              GPIO_9
+#endif
+
 #define LCD_SPI_DEVICE_CASET        0x2A
 #define LCD_SPI_DEVICE_RASET        0x2B
 #define LCD_SPI_DEVICE_RAMWR        0x2C
 
-#if LCD_SPI_REFRESH_WITH_QSPI
-#define LCD_SPI_ID                  QSPI_ID_0
-#else
-#define LCD_SPI_ID                  SPI_ID_0
-
+#if (!LCD_SPI_REFRESH_WITH_QSPI)
 spi_config_t config = {0};
 #endif
 
+static uint8_t lcd_spi_gpio_is_init = 0;
 
 static void lcd_spi_device_gpio_init(void)
 {
-    BK_LOG_ON_ERR(bk_gpio_driver_init());
+    if (lcd_spi_gpio_is_init == 1) {
+        LCD_SPI_LOGE("%s have been inited\r\n", __func__);
+        return;
+    }
 
-    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_BACKLIGHT_PIN));
-    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_RESET_PIN));
-    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_RS_PIN));
+    BK_LOG_ON_ERR(bk_gpio_driver_init());
 
     gpio_config_t config;
     config.io_mode = GPIO_OUTPUT_ENABLE;
     config.pull_mode = GPIO_PULL_DISABLE;
     config.func_mode = GPIO_SECOND_FUNC_DISABLE;
 
+#if (LCD_SPI_DEVICE_NUM > 1)
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD0_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD0_SPI_DC_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD1_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD1_SPI_DC_PIN));
+    bk_gpio_set_config(LCD0_SPI_RESET_PIN, &config);
+    bk_gpio_set_config(LCD0_SPI_DC_PIN, &config);
+    bk_gpio_set_config(LCD1_SPI_RESET_PIN, &config);
+    bk_gpio_set_config(LCD1_SPI_DC_PIN, &config);
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD0_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD0_SPI_DC_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD1_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD1_SPI_DC_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD0_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD1_SPI_RESET_PIN));
+    rtos_delay_milliseconds(100);
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD0_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD1_SPI_RESET_PIN));
+    rtos_delay_milliseconds(120);
+#else
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_DC_PIN));
     bk_gpio_set_config(LCD_SPI_RESET_PIN, &config);
-    bk_gpio_set_config(LCD_SPI_BACKLIGHT_PIN, &config);
-    bk_gpio_set_config(LCD_SPI_RS_PIN, &config);
+    bk_gpio_set_config(LCD_SPI_DC_PIN, &config);
 
-    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_BACKLIGHT_PIN));
     BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_RESET_PIN));
-    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_RS_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_DC_PIN));
+
+    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_RESET_PIN));
+    rtos_delay_milliseconds(100);
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_RESET_PIN));
+    rtos_delay_milliseconds(120);
+#endif
+
+    lcd_spi_gpio_is_init = 1;
 }
 
 static void lcd_spi_device_gpio_deinit(void)
 {
-    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_BACKLIGHT_PIN));
+    if (lcd_spi_gpio_is_init == 0) {
+        LCD_SPI_LOGE("%s have been deinited\r\n", __func__);
+        return;
+    }
+
+#if (LCD_SPI_DEVICE_NUM > 1)
+    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD0_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD1_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD0_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD0_SPI_DC_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD1_SPI_RESET_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD1_SPI_DC_PIN));
+#else
+    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_RESET_PIN));
+
     BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_RESET_PIN));
-    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_RS_PIN));
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_DC_PIN));
+#endif
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_BACKLIGHT_PIN));
+
+    lcd_spi_gpio_is_init = 0;
 }
 
 
@@ -96,12 +149,18 @@ static qspi_driver_t s_lcd_spi[SOC_QSPI_UNIT_NUM] = {
 #endif
 };
 
+static uint8_t s_lcd_spi_flag = 1;
+
 static void lcd_spi_driver_init_with_qspi(qspi_id_t qspi_id, lcd_qspi_clk_t clk)
 {
     qspi_config_t lcd_qspi_config;
     os_memset(&lcd_qspi_config, 0, sizeof(lcd_qspi_config));
 
-    os_memset(&s_lcd_spi, 0, sizeof(s_lcd_spi));
+    if (s_lcd_spi_flag) {
+        os_memset(&s_lcd_spi, 0, sizeof(s_lcd_spi));
+        s_lcd_spi_flag = 0;
+    }
+
     s_lcd_spi[qspi_id].hal.id = qspi_id;
     qspi_hal_init(&s_lcd_spi[qspi_id].hal);
 
@@ -165,6 +224,8 @@ static void lcd_spi_driver_init_with_qspi(qspi_id_t qspi_id, lcd_qspi_clk_t clk)
 static void lcd_spi_driver_deinit_with_qspi(qspi_id_t qspi_id)
 {
     BK_LOG_ON_ERR(bk_qspi_deinit(qspi_id));
+
+    s_lcd_spi_flag = 1;
 }
 
 static void lcd_spi_send_cmd_with_qspi(qspi_id_t qspi_id, uint8_t cmd)
@@ -233,39 +294,55 @@ void lcd_spi_send_data_with_qspi_indirect_mode(qspi_id_t qspi_id, uint8_t *data,
 }
 #endif
 
-static void lcd_spi_send_cmd(uint8_t cmd)
+static void lcd_spi_send_cmd(uint8_t id, uint8_t cmd)
 {
-    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_RS_PIN));
+#if (LCD_SPI_DEVICE_NUM > 1)
+    if (id == 0) {
+        BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD0_SPI_DC_PIN));
+    } else {
+        BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD1_SPI_DC_PIN));
+    }
+#else
+    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_DC_PIN));
+#endif
 
 #if LCD_SPI_REFRESH_WITH_QSPI
-    lcd_spi_send_cmd_with_qspi(LCD_SPI_ID, cmd);
+    lcd_spi_send_cmd_with_qspi(id, cmd);
 #else
-    bk_spi_write_bytes(LCD_SPI_ID, &cmd, 1);
+    bk_spi_write_bytes(id, &cmd, 1);
 #endif
 }
 
-static void lcd_spi_send_data(uint8_t *data, uint32_t data_len)
+static void lcd_spi_send_data(uint8_t id, uint8_t *data, uint32_t data_len)
 {
-    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_RS_PIN));
+#if (LCD_SPI_DEVICE_NUM > 1)
+    if (id == 0) {
+        BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD0_SPI_DC_PIN));
+    } else {
+        BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD1_SPI_DC_PIN));
+    }
+#else
+    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_DC_PIN));
+#endif
 
 #if LCD_SPI_REFRESH_WITH_QSPI
-    lcd_spi_send_data_with_qspi_indirect_mode(LCD_SPI_ID, data, data_len);
+    lcd_spi_send_data_with_qspi_indirect_mode(id, data, data_len);
 #else
 
 #if CONFIG_SPI_DMA
     if (data_len > 32) {
-        bk_spi_dma_write_bytes(LCD_SPI_ID, data, data_len);
+        bk_spi_dma_write_bytes(id, data, data_len);
     } else {
-        bk_spi_write_bytes(LCD_SPI_ID, data, data_len);
+        bk_spi_write_bytes(id, data, data_len);
     }
 #else
-    bk_spi_write_bytes(LCD_SPI_ID, data, data_len);
+    bk_spi_write_bytes(id, data, data_len);
 #endif
 #endif
 }
 
 #if (!LCD_SPI_REFRESH_WITH_QSPI)
-static void lcd_spi_driver_init(void)
+static void lcd_spi_driver_init(spi_id_t id)
 {
     bk_spi_driver_init();
 
@@ -287,12 +364,12 @@ static void lcd_spi_driver_init(void)
     config.dma_mode = SPI_DMA_MODE_DISABLE;
 #endif
 
-    BK_LOG_ON_ERR(bk_spi_init(LCD_SPI_ID, &config));
+    BK_LOG_ON_ERR(bk_spi_init(id, &config));
 }
 
-static void lcd_spi_driver_deinit(void)
+static void lcd_spi_driver_deinit(spi_id_t id)
 {
-    BK_LOG_ON_ERR(bk_spi_deinit(LCD_SPI_ID));
+    BK_LOG_ON_ERR(bk_spi_deinit(id));
 
 #if CONFIG_SPI_DMA
     bk_dma_free(DMA_DEV_GSPI0, config.spi_tx_dma_chan);
@@ -303,33 +380,46 @@ static void lcd_spi_driver_deinit(void)
 
 void lcd_spi_backlight_open(void)
 {
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_BACKLIGHT_PIN));
+    gpio_config_t config;
+    config.io_mode = GPIO_OUTPUT_ENABLE;
+    config.pull_mode = GPIO_PULL_DISABLE;
+    config.func_mode = GPIO_SECOND_FUNC_DISABLE;
+    bk_gpio_set_config(LCD_SPI_BACKLIGHT_PIN, &config);
     BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_BACKLIGHT_PIN));
 }
 
 void lcd_spi_backlight_close(void)
 {
     BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_BACKLIGHT_PIN));
+    bk_gpio_disable_output(LCD_SPI_BACKLIGHT_PIN);
+    BK_LOG_ON_ERR(gpio_dev_unmap(LCD_SPI_BACKLIGHT_PIN));
 }
 
-void lcd_spi_init(const lcd_device_t *device)
+#if (LCD_SPI_DEVICE_NUM > 1)
+static uint8_t lcd_spi_qspi_is_init = 0;
+#endif
+void lcd_spi_init(uint8_t id, const lcd_device_t *device)
 {
     if (device == NULL) {
         LCD_SPI_LOGE("lcd spi device not found\r\n");
         return;
     }
 
-    lcd_spi_device_gpio_init();
-
 #if LCD_SPI_REFRESH_WITH_QSPI
-    lcd_spi_driver_init_with_qspi(LCD_SPI_ID, device->spi->clk);
+#if (LCD_SPI_DEVICE_NUM > 1)
+    if (lcd_spi_qspi_is_init == 0) {
+        lcd_spi_driver_init_with_qspi(LCD_SPI_ID0, device->spi->clk);
+        lcd_spi_driver_init_with_qspi(LCD_SPI_ID1, device->spi->clk);
+        lcd_spi_qspi_is_init = 1;
+    }
 #else
-    lcd_spi_driver_init();
+    lcd_spi_driver_init_with_qspi(id, device->spi->clk);
 #endif
-
-    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_RESET_PIN));
-    rtos_delay_milliseconds(100);
-    BK_LOG_ON_ERR(bk_gpio_set_output_high(LCD_SPI_RESET_PIN));
-    rtos_delay_milliseconds(120);
+#else
+    lcd_spi_driver_init(id);
+#endif
+    lcd_spi_device_gpio_init();
 
     if (device->spi->init_cmd != NULL) {
         const lcd_qspi_init_cmd_t *init = device->spi->init_cmd;
@@ -337,9 +427,9 @@ void lcd_spi_init(const lcd_device_t *device)
             if (init->data_len == 0xFF) {
                 rtos_delay_milliseconds(init->data[0]);
             } else {
-                lcd_spi_send_cmd(init->cmd);
+                lcd_spi_send_cmd(id, init->cmd);
                 if (init->data_len != 0) {
-                    lcd_spi_send_data((uint8_t *)init->data, init->data_len);
+                    lcd_spi_send_data(id, (uint8_t *)init->data, init->data_len);
                 }
             }
             init++;
@@ -351,22 +441,20 @@ void lcd_spi_init(const lcd_device_t *device)
     lcd_spi_backlight_open();
 }
 
-void lcd_spi_deinit(void)
+void lcd_spi_deinit(uint8_t id)
 {
     lcd_spi_backlight_close();
 
-    BK_LOG_ON_ERR(bk_gpio_set_output_low(LCD_SPI_RESET_PIN));
-
+    lcd_spi_device_gpio_deinit();
 #if LCD_SPI_REFRESH_WITH_QSPI
-    lcd_spi_driver_deinit_with_qspi(LCD_SPI_ID);
+    lcd_spi_driver_deinit_with_qspi(id);
 #else
-    lcd_spi_driver_deinit();
+    lcd_spi_driver_deinit(id);
 #endif
 
-    lcd_spi_device_gpio_deinit();
 }
 
-void lcd_spi_display_frame(uint8_t *frame_buffer, uint32_t width, uint32_t height)
+void lcd_spi_display_frame(uint8_t id, uint8_t *frame_buffer, uint32_t width, uint32_t height)
 {
     uint8_t column_value[4] = {0};
     uint8_t row_value[4] = {0};
@@ -375,12 +463,12 @@ void lcd_spi_display_frame(uint8_t *frame_buffer, uint32_t width, uint32_t heigh
     row_value[2] = (height >> 8) & 0xFF;
     row_value[3] = (height & 0xFF) - 1;
 
-    lcd_spi_send_cmd(LCD_SPI_DEVICE_CASET);
-    lcd_spi_send_data(column_value, 4);
-    lcd_spi_send_cmd(LCD_SPI_DEVICE_RASET);
-    lcd_spi_send_data(row_value, 4);
+    lcd_spi_send_cmd(id, LCD_SPI_DEVICE_CASET);
+    lcd_spi_send_data(id, column_value, 4);
+    lcd_spi_send_cmd(id, LCD_SPI_DEVICE_RASET);
+    lcd_spi_send_data(id, row_value, 4);
 
-    lcd_spi_send_cmd(LCD_SPI_DEVICE_RAMWR);
-    lcd_spi_send_data(frame_buffer, width * height * 2);
+    lcd_spi_send_cmd(id, LCD_SPI_DEVICE_RAMWR);
+    lcd_spi_send_data(id, frame_buffer, width * height * 2);
 }
 

@@ -49,7 +49,11 @@ extern uint32_t  platform_is_in_interrupt_context(void);
 
 fb_info_t *fb_info = NULL;
 fb_mem_list_t fb_mem_list[FB_INDEX_MAX] = {0};
+#if CONFIG_MEDIA_PSRAM_SIZE_4M
+uint8_t fb_count[FB_INDEX_MAX] = {3, 4, 4, H265_GOP_FRAME_CNT};
+#else
 uint8_t fb_count[FB_INDEX_MAX] = {5, 4, 8, H265_GOP_FRAME_CNT * 2};
+#endif
 
 fb_mem_list_t *frame_buffer_list_get(pixel_format_t fmt)
 {
@@ -1121,6 +1125,7 @@ bk_err_t frame_buffer_fb_deregister(frame_module_t index, fb_type_t type)
 		GLOBAL_INT_DISABLE();
 	}
 
+	xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
 	fb_info->modules[index].enable = false;
 	fb_info->register_mask[type] &= INDEX_UNMASK(index);
 

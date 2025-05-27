@@ -147,8 +147,16 @@ menu "Lvgl_source"
 	config LV_ATTRIBUTE_FAST_MEM_L2
 		bool "Enable Lv Attribute Fast Mem L2"
 		default n
-		
+
 	config LV_CODE_LOAD_PSRAM
 		bool "Enable Lv Code load psram"
 		default n
+
+    config LV_IMG_UTILITY_CUSTOMIZE
+        bool "Enable LVGL use customized image decoding method"
+        default n
+
+    config LVGL_USE_TRIPLE_BUFFERS
+        bool "Enable LVGL use three buffers"
+        default n
 endmenu

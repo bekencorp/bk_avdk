@@ -1,6 +1,9 @@
 if (CONFIG_LVGL)
 set(incs
 	.
+	hal/fatfs
+	hal/vfs
+	hal/img_utility
 	port
 	)
 
@@ -165,14 +168,22 @@ set(srcs
 
 if (CONFIG_VFS)
 	list(APPEND srcs
-		hal/lv_fs_bk_posix.c
+		hal/vfs/lv_fs_bk_posix.c
+        hal/vfs/lv_vfs.c
 	)
 endif()
 
 if (CONFIG_FATFS)
 	list(APPEND srcs
-		hal/lv_fatfs.c
+		hal/fatfs/lv_fatfs.c
 	)
+endif()
+
+if (CONFIG_LV_IMG_UTILITY_CUSTOMIZE)
+    list(APPEND srcs
+        hal/img_utility/lv_img_utility.c
+        hal/img_utility/lv_jpeg_hw_decode.c
+    )
 endif()
 
 if (CONFIG_SOC_BK7256)

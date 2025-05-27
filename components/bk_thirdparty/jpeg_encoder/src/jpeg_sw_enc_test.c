@@ -5058,7 +5058,7 @@ error:
 
 #endif
 
-int jpeg_sw_enc_test(void)
+int jpeg_sw_enc_test(uint8_t quality_factor)
 {
     int                       file_size = 0;
     int                       ret = BK_OK;
@@ -5103,7 +5103,8 @@ int jpeg_sw_enc_test(void)
                         IMAGE_HEIGHT,
                         input, 
                         output_buffer, 
-                        &jpeg_sw_encoder.header_len);
+                        &jpeg_sw_encoder.header_len,
+                        quality_factor);
 
     jpeg_sw_encoder.enc(jpeg_sw_encoder.codec,
                         output_buffer + jpeg_sw_encoder.header_len,
